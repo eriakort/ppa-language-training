@@ -130,7 +130,7 @@
     var placement=data.data.placement||{};
     var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at,revision").single();
     if(r.error)throw r.error;
-    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",lastUpdated);localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.done;error="";render();
+    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",String(r.data.revision||1));localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.done;error="";render();
   }
   async function restore() {
     await signedIn();
@@ -231,7 +231,7 @@
     syncing = true; syncState = "syncing"; render();
     try {
       await signedIn();
-      var remote = await client.from("profile_data").select("preferences,updated_at").eq("profile_id", cloudProfileId).single();
+      var remote = await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id", cloudProfileId).single();
       if (remote.error) throw remote.error;
       var base = localStorage.getItem(syncKey("seen")) || "";
       var remoteTime = remote.data.updated_at || "";

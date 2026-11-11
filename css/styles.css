@@ -237,7 +237,7 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
 /* Account access: quiet persistent entry point, clear high-contrast dialog. */
 .account-launcher {
   position: fixed; z-index: 20; right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: max(16px, env(safe-area-inset-bottom, 0px)); min-height: 52px;
+  bottom: max(84px, calc(env(safe-area-inset-bottom, 0px) + 68px)); min-height: 52px;
   padding: 10px 22px; border: 2px solid var(--accent); border-radius: 999px;
   background: var(--surface); color: var(--ink); font-weight: 700;
   box-shadow: 0 3px 14px rgba(0,0,0,.16);
@@ -270,4 +270,39 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
 @media (max-width: 520px) {
   .account-launcher { min-height: 48px; font-size: 17px; }
   .account-card { border-radius: 18px; }
+}
+
+/* Manual cloud backup is separate from local profile storage and requires consent. */
+.cloud-launcher {
+  position: fixed; z-index: 20; right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: max(16px, env(safe-area-inset-bottom, 0px)); min-height: 52px;
+  padding: 10px 22px; border: 2px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--ink); font-weight: 700;
+  box-shadow: 0 3px 14px rgba(0,0,0,.16);
+}
+.cloud-panel[hidden] { display: none; }
+.cloud-panel {
+  position: fixed; z-index: 31; inset: 0; display: grid; place-items: center;
+  padding: 16px; background: rgba(0,0,0,.56); overflow-y: auto;
+}
+.cloud-card {
+  width: min(100%, 560px); max-height: min(90dvh, 800px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: clamp(20px, 5vw, 32px);
+  border-radius: 22px; background: var(--surface); color: var(--ink);
+  box-shadow: 0 12px 40px rgba(0,0,0,.24); text-align: left;
+}
+.cloud-card h2, .cloud-card p { margin: 0; }
+.cloud-card h2 { font-size: 28px; }
+.cloud-card .account-action { font-size: 19px; }
+.cloud-consent { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 12px !important; font-weight: 700; line-height: 1.4; }
+.cloud-consent input { width: 28px; height: 28px; min-height: 28px; flex: none; accent-color: var(--accent); }
+.cloud-card .link { align-self: center; }
+@media (max-width: 520px) {
+  .account-launcher, .cloud-launcher { min-height: 46px; padding: 8px 14px; font-size: 16px; }
+  .cloud-card { border-radius: 18px; }
+}
+
+.cloud-card select {
+  width: 100%; min-height: 56px; border: 2px solid var(--line); border-radius: 12px;
+  background: var(--bg); color: var(--ink); padding: 8px 12px; font: inherit;
 }

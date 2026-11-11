@@ -110,7 +110,7 @@ content/interests.js  Interest packs (topics, words, crossword words, phrases)
 tools/build.js        Builds dist/parole-ogni-giorno.html, one self-contained file
 tests/content.test.js Checks content and every generated crossword
 tests/speech.test.js  Speaking measures and speech engine, with a fake recogniser
-tests/account.test.js Static checks for account and recovery safeguards
+tests/account.test.js Static checks for account and recovery safeguards\ntests/cloud-sync.test.js Checks consent and cloud backup privacy safeguards
 tests/smoke.test.js   Browser click-through of the built page
 ```
 

@@ -21,12 +21,8 @@ The first migration is `supabase/migrations/202611110001_hybrid_identity.sql`.
 | --- | --- |
 | `learner_profiles` | Learner profile identity, separate from login identity |
 | `profile_members` | User-to-profile relationship and role |
-| `profile_data` | Preferences and placement state |
-| `learning_sessions` | Active checkpoints, completion state and summaries |
-
-A session stores its generated exercise list and current interaction state as JSON.
-That is deliberate: rebuilding a randomized session after sign-in would not resume
-the same exercise.
+| `profile_data` | Preferences, placement and the versioned local backup snapshot |
+| `learning_sessions` | Active checkpoints, completion state and summaries (reserved for detailed sync) |
 
 ## Incremental delivery
 
@@ -40,58 +36,71 @@ the same exercise.
 3. **Account access backend:** trusted profile creation and role-limited invitations
    through the `profile-access` Edge Function. Client role grants are revoked;
    the service-role key stays server-side.
-4. **Account UI (this increment):** bilingual sign-in, self-registration,
-   email-confirmation messaging, password recovery/reset and sign-out. Account
-   access is optional and does not change local profile storage.
-5. **Cloud persistence:** explicit opt-in, profile-scoped session sync, conflict
-   handling and cross-device resume.
-6. **Therapist access and lifecycle:** role-limited history, export, account/profile
+4. **Account UI:** bilingual sign-in, self-registration, email-confirmation
+   messaging, password recovery/reset and sign-out. Account access is optional
+   and does not change local profile storage.
+5. **Manual cloud backup (this increment):** after explicit per-profile consent,
+   an authenticated user can create/update a cloud profile backup or restore it
+   on another device. There is no background upload or automatic merge. Restore
+   requires confirmation because it replaces the covered local profile data.
+6. **Automatic cross-device sync:** future work to add versioned checkpoints,
+   conflict detection/merge rules, offline queueing and clear sync status. It is
+   deliberately not enabled by this manual-backup increment.
+7. **Therapist access and lifecycle:** role-limited history, export, account/profile
    deletion and retention controls.
 
-## Current local checkpoint behavior
+## Local checkpoint and backup contents
 
-The active checkpoint is stored in `localStorage` under `pog_active_session`.
-It contains the already-generated steps, current index, interaction state and
-answer log. Audio blobs are not copied into this checkpoint; they remain in the
-existing IndexedDB recording store. A refresh restores the exact current step.
-Completing or leaving the exercise clears the active checkpoint. The current
-implementation is device/browser-local; it is not yet a cross-device backup.
+The active checkpoint is stored in profile-scoped `localStorage`. It contains
+the already-generated steps, current index, interaction state and answer log.
+Audio blobs remain in the existing IndexedDB recording store and are never
+included in the cloud backup.
+
+The manual backup uses an explicit allowlist of local profile keys: profile
+details, settings, placement, history, completed session summaries, personal
+phrases in both languages and the active exercise checkpoint. The profile name,
+optional birth year, town/interests, personal phrases and speech-recognition
+transcripts may therefore be included. Read the notice in the app before
+consenting. No profile data is uploaded merely by signing in.
+
+Backups are user-triggered. The app does not silently overwrite a cloud backup.
+Restoring asks for confirmation and replaces the corresponding local keys for
+the active local profile; it does not alter the cloud copy. The local profile ID
+and cloud mapping remain on the device. This first backup increment does not
+provide automatic conflict resolution or continuous sync.
 
 ## Privacy and deployment gates
 
-- Do not enable cloud sync until the user-facing notice, consent capture and
-  data-processing arrangements have been reviewed for the intended use in the EU.
-  PPA-related information may be health data under GDPR.
-- Keep audio recordings device-only by default. Cloud audio upload is out of scope.
+- PPA-related information may be health data under GDPR. Review the notice,
+  lawful basis, data-processing arrangements, retention and transfer settings
+  with an appropriate EU privacy professional before real-world use.
 - Use a Supabase project in an appropriate EU region, TLS, least-privilege access
   and row-level security on every learner-data table.
+- Keep audio recordings device-only. Cloud audio upload is out of scope.
 - Only the Supabase publishable/anon key may be used in browser code. Never ship a
   service-role key or other server secret to GitHub Pages.
-- The SQL migration establishes tables and row-level policies, but does not itself
-  provision an account flow or enable syncing. The trusted signup/invitation flow
-  must create the first owner membership; this is intentionally not client-writable.
+- Client cloud writes are limited by membership RLS. The cloud profile is created
+  by the trusted `profile-access` Edge Function; clients cannot grant roles.
+- Revoke consent in the cloud-backup panel to stop further backups/restores from
+  this device. Revocation does not delete the cloud copy; account/profile deletion
+  and remote data deletion are a separate lifecycle increment.
 - This prototype remains a language-practice aid, not a medical device or validated
   clinical assessment.
 
-## Supabase account-access setup
+## Supabase setup
 
 Create a Supabase project and apply migrations in filename order. Deploy the
 `profile-access` Edge Function with server-side secrets:
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
 `APP_SITE_URL` (origin only, e.g. `https://eriakort.github.io`) and
 `AUTH_REDIRECT_URL` (the complete app URL, including
-`/ppa-language-training/`). Configure the same complete URL in Supabase Auth's
+`/ppa-language-training/`). Configure the complete URL in Supabase Auth's
 allowed redirect URLs.
 
-When ready to enable browser sign-in, put the project URL and publishable/anon key
-in `js/supabase-config.js`. That file is deliberately empty by default; without
-both values the account entry explains that online access is not configured.
-The publishable/anon key is designed for browser use with RLS. Never place the
-service-role key in `js/supabase-config.js`, another browser asset or Git.
+When ready to enable browser sign-in and backup, put the project URL and
+publishable/anon key in `js/supabase-config.js`. That file is deliberately
+empty by default. Never place the service-role key in browser code or Git.
 
-The account interface supports email/password registration and sign-in, email
-confirmation, password reset and sign-out. Invitation acceptance uses Supabase's
-email confirmation redirect and reports the invited profile when the invitation
-metadata is present. Cloud syncing is not implemented: local learner data and
-recordings are not uploaded, exported or migrated by signing in. The account
-currently establishes authentication only, not cross-device learner continuity.
+The app's backup controls require an authenticated session, a local learner
+profile and an explicit per-profile consent choice. A cloud profile and initial
+backup are created only after the user presses the create/backup action.

@@ -301,3 +301,8 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
   .account-launcher, .cloud-launcher { min-height: 46px; padding: 8px 14px; font-size: 16px; }
   .cloud-card { border-radius: 18px; }
 }
+
+.cloud-card select {
+  width: 100%; min-height: 56px; border: 2px solid var(--line); border-radius: 12px;
+  background: var(--bg); color: var(--ink); padding: 8px 12px; font: inherit;
+}

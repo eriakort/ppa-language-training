@@ -229,3 +229,7 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
   .tile { width: 52px; height: 52px; font-size: 26px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+.profile-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; width: 100%; }
+.profile-card { min-height: 112px; }
+.profile-card strong { overflow-wrap: anywhere; }

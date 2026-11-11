@@ -30,14 +30,18 @@ the same exercise.
 
 ## Incremental delivery
 
-1. **Local checkpointing (this increment):** save the active exercise state after
-   each screen update and restore it after refresh. This works on the current
-   single-device deployment and does not upload data.
-2. **Identity and profile selection:** Supabase Auth, self-registration, shared
-   device profile chooser, and trusted caregiver/therapist invitations.
-3. **Cloud persistence:** explicit opt-in, profile-scoped session sync, conflict
+1. **Local checkpointing:** save the active exercise state after each screen
+   update and restore it after refresh. This works on the current single-device
+   deployment and does not upload data.
+2. **Shared-device profiles (this increment):** create and switch between local
+   learner profiles. Preferences, placement, progress, history, checkpoints,
+   therapist PIN and IndexedDB recordings are partitioned by profile. Existing
+   single-profile browser data is migrated into the first local profile.
+3. **Identity and account access:** Supabase Auth, self-registration, and trusted
+   caregiver/therapist invitations, with clear ownership and recovery flows.
+4. **Cloud persistence:** explicit opt-in, profile-scoped session sync, conflict
    handling and cross-device resume.
-4. **Therapist access and lifecycle:** role-limited history, export, account/profile
+5. **Therapist access and lifecycle:** role-limited history, export, account/profile
    deletion and retention controls.
 
 ## Current local checkpoint behavior

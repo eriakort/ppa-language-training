@@ -22,7 +22,7 @@ A prototype tablet app for short daily language practice for people with
   form, and moves to an easier level when it becomes too hard (average under
   60% over the last 3 sessions). It can move back up after 5 sessions over 90%.
   A family member or therapist can set levels by hand.
-- **First-time setup:** name, optional year of birth, town, interests,
+- **Shared tablet profiles:** create several learner profiles and switch between them; each profile keeps its own preferences, levels, session history, resumable exercise and local voice recordings. Existing single-profile data is migrated to the first profile on this device.\n- **First-time setup:** name, optional year of birth, town, interests,
   favourite team, and an untimed placement check that picks a starting level
   for each game. It can be paused, resumed or skipped.
 - **Interests** (football, politics and current affairs, fashion, showbiz and

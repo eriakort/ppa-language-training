@@ -2,8 +2,32 @@
   "use strict";
   var app = document.getElementById("app");
 
-  function save(k, v) { try { localStorage.setItem("pog_" + k, JSON.stringify(v)); } catch (e) {} }
-  function load(k) { try { var v = localStorage.getItem("pog_" + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  var activeProfileId = (function () { try { return localStorage.getItem("pog_active_profile_id") || ""; } catch (e) { return ""; } })();
+  var GLOBAL_KEYS = { lang: true, profiles: true, active_profile_id: true };
+  function storageKey(k) { return GLOBAL_KEYS[k] ? "pog_" + k : activeProfileId ? "pog_p_" + activeProfileId + "_" + k : "pog_" + k; }
+  function save(k, v) { try { localStorage.setItem(storageKey(k), JSON.stringify(v)); } catch (e) {} }
+  function load(k) { try { var v = localStorage.getItem(storageKey(k)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+  function profileList() { var p = load("profiles"); return Array.isArray(p) ? p : []; }
+  function setActiveProfile(id) { activeProfileId = id; try { localStorage.setItem("pog_active_profile_id", id); } catch (e) {} }
+  function createLocalProfile(name) {
+    var id = "lp-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    var list = profileList(); list.push({ id: id, name: name || "", createdAt: new Date().toISOString() });
+    save("profiles", list); setActiveProfile(id); return id;
+  }
+  function initializeLocalProfiles() {
+    var list = profileList();
+    if (!list.length) {
+      var legacy = null; try { legacy = JSON.parse(localStorage.getItem("pog_profile") || "null"); } catch (e) {}
+      if (legacy && legacy.name) {
+        var id = createLocalProfile(legacy.name), keys = [];
+        try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf("pog_") === 0 && !/^pog_(profiles|active_profile_id|lang)$/.test(k) && k.indexOf("pog_p_") !== 0) keys.push(k); } } catch (e) {}
+        keys.forEach(function (k) { try { localStorage.setItem("pog_p_" + id + "_" + k.slice(4), localStorage.getItem(k)); localStorage.removeItem(k); } catch (e) {} });
+      }
+    }
+    list = profileList();
+    if (!activeProfileId && list.length) setActiveProfile(list[0].id);
+    if (activeProfileId && !list.some(function (p) { return p.id === activeProfileId; })) setActiveProfile(list.length ? list[0].id : "");
+  }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function fill(s, o) { return s.replace(/\{(\w+)\}/g, function (_, k) { return o[k]; }); }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
@@ -66,6 +90,7 @@
   }
   function getHistory() { var h = load("history"); return (h && typeof h === "object") ? h : {}; }
   function getProfile() { var p = load("profile"); return (p && p.name) ? p : null; }
+  function updateProfileDirectory(p) { var list = profileList(), found = false; list = list.map(function (x) { if (x.id === activeProfileId) { found = true; return Object.assign({}, x, { name: p.name }); } return x; }); if (!found && activeProfileId) list.push({ id: activeProfileId, name: p.name, createdAt: new Date().toISOString() }); save("profiles", list); }
   function getPlacement() { var p = load("placement"); return (p && p.status) ? p : { status: "none", levels: {}, flags: [] }; }
 
   /* Active exercise checkpoint. The generated steps and live game state are saved
@@ -76,7 +101,7 @@
       checkpoint.pendingRec = null; // Blob data belongs in IndexedDB, never localStorage.
       save("active_session", { version: 1, screen: "item", session: checkpoint, savedAt: new Date().toISOString() });
     } else {
-      try { localStorage.removeItem("pog_active_session"); } catch (e) {}
+      try { localStorage.removeItem(storageKey("active_session")); } catch (e) {}
     }
   }
   function restoreActiveSession() {
@@ -222,7 +247,7 @@
     S.pendingRec = null;
     var id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     S.recIds.push(id);
-    RECS.add({ id: id, t: Date.now(), session: S.id, game: st.game, lv: st.lv, label: itemLabel(st), heard: heard || "", result: result, measures: S.meas, mime: p.mime, blob: p.blob }).catch(function () {});
+    RECS.add({ profileId: activeProfileId, id: id, t: Date.now(), session: S.id, game: st.game, lv: st.lv, label: itemLabel(st), heard: heard || "", result: result, measures: S.meas, mime: p.mime, blob: p.blob }).catch(function () {});
   }
   function bestVerdict(st, text) {
     var order = { good: 3, almost: 2, retry: 1, none: 0 }, best = "none";
@@ -741,6 +766,12 @@
     return '<p class="tag">' + pre + esc(t.game[st.game]) + (st.lv ? ' · ' + esc(t.level) + ' ' + st.lv : '') + '</p>';
   }
 
+  function viewProfiles() {
+    var t = T[lang], list = profileList();
+    return header(false) + '<section class="card home"><h1>' + esc(t.profilesTitle) + '</h1><p class="sub">' + esc(t.profilesHelp) + '</p>' + langSeg() +
+      '<div class="profile-list">' + list.map(function (p) { return '<button class="modecard profile-card" data-act="profile-switch" data-id="' + esc(p.id) + '"><strong>' + esc(p.name || t.unnamedProfile) + '</strong><span>' + esc(p.id === activeProfileId ? t.profileCurrent : t.profileChoose) + '</span></button>'; }).join("") + '</div>' +
+      '<button class="primary" data-act="profile-add">' + esc(t.profileAdd) + '</button><button class="link" data-act="home">' + esc(t.back) + '</button><p class="note">' + esc(t.localNote) + '</p></section>';
+  }
   function viewOnboard() {
     var t = T[lang], p = getProfile() || {};
     return header(false) + '<section class="card home">' +
@@ -789,7 +820,7 @@
       (pending
         ? '<button class="primary" data-act="place">' + esc(t.placeContinue) + '</button><button class="link" data-act="start">' + esc(t.startAnyway) + '</button>'
         : '<button class="primary" data-act="start">' + esc(t.start) + '</button>') +
-      '<div class="links"><button class="link" data-act="scripts">' + esc(t.scripts) + '</button>' +
+      '<div class="links"><button class="link" data-act="profiles">' + esc(t.changeProfile) + '</button><button class="link" data-act="scripts">' + esc(t.scripts) + '</button>' +
       '<button class="link" data-act="settings">' + esc(t.settings) + '</button>' +
       '<button class="link" data-act="therapist">' + esc(t.thArea) + '</button></div>' +
       noTtsNote() + '<p class="note">' + esc(t.proto) + '</p></section>';
@@ -833,7 +864,7 @@
   }
   function thLock() { TH.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); TH = { unlocked: false, recs: null, urls: [], confirm: "", changing: false }; }
   function thLoad() {
-    RECS.list().then(function (list) { TH.recs = list; if (screen === "therapist") render(); }, function () { TH.recs = []; if (screen === "therapist") render(); });
+    RECS.list(activeProfileId).then(function (list) { TH.recs = list; if (screen === "therapist") render(); }, function () { TH.recs = []; if (screen === "therapist") render(); });
   }
   function fmtS(ms) { return ms == null ? "–" : (ms / 1000).toFixed(1).replace(".", lang === "it" ? "," : "."); }
   function avg(list) { var v = list.filter(function (x) { return x != null; }); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null; }
@@ -1150,7 +1181,7 @@
 
   function render() {
     persistActiveSession();
-    var html = screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
+    var html = screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "profiles" ? viewProfiles() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
     app.innerHTML = html;
     flash = "";
     window.scrollTo(0, 0);
@@ -1204,11 +1235,15 @@
     if (act === "int") { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }
     if (act === "onboard-place" || act === "onboard-skip") {
       var p = readProfile("pf-"); if (!p) { rerenderKeep(); return; }
-      save("profile", p);
+      if (!activeProfileId) createLocalProfile(p.name);
+      save("profile", p); updateProfileDirectory(p);
       if (act === "onboard-skip") { save("placement", { status: "skipped", levels: {}, flags: [] }); screen = "settings"; render(); return; }
       save("placement", { status: "in_progress", levels: {}, flags: [] });
       pending = "place"; screen = "mode"; render(); return;
     }
+    if (act === "profiles") { screen = "profiles"; render(); return; }
+    if (act === "profile-add") { createLocalProfile(""); S = null; screen = "onboard"; render(); return; }
+    if (act === "profile-switch") { var targetId = b.getAttribute("data-id"); if (targetId && targetId !== activeProfileId && profileList().some(function (p) { return p.id === targetId; })) { stopVoice(); micCancel(); S = null; setActiveProfile(targetId); screen = getProfile() ? "home" : "onboard"; } else screen = "home"; render(); return; }
     if (act === "place" || act === "start") { pending = act; screen = "mode"; render(); return; }
     if (act === "who") {
       var who = b.getAttribute("data-w") === "assist" ? "assist" : "solo";
@@ -1235,7 +1270,7 @@
     }
     if (act === "pin-forgot") { TH.confirm = "forgot"; render(); return; }
     if (act === "pin-forgot-yes") {
-      RECS.clear().catch(function () {}).then(function () { save("sessions", []); save("pin", null); thLock(); flash = t.pinReset; render(); });
+      RECS.clear(activeProfileId).catch(function () {}).then(function () { save("sessions", []); save("pin", null); thLock(); flash = t.pinReset; render(); });
       return;
     }
     if (act === "th-cancel") { TH.confirm = ""; render(); return; }
@@ -1248,7 +1283,7 @@
     }
     if (act === "rec-clear") { TH.confirm = "clear"; render(); return; }
     if (act === "rec-clear-yes") {
-      RECS.clear().catch(function () {}).then(function () { TH.confirm = ""; TH.recs = null; flash = t.recsCleared; render(); });
+      RECS.clear(activeProfileId).catch(function () {}).then(function () { TH.confirm = ""; TH.recs = null; flash = t.recsCleared; render(); });
       return;
     }
     if (act === "export") { exportCsv(); render(); return; }
@@ -1267,7 +1302,7 @@
     }
     if (act === "save-settings") {
       var pr = readProfile("set-"); if (!pr) { rerenderKeep(); return; }
-      save("profile", pr);
+      save("profile", pr); updateProfileDirectory(pr);
       var set = getSettings();
       GAMES.forEach(function (g) { set.levels[g] = +document.getElementById("lv-" + g).value; });
       set.auto = document.getElementById("set-auto").checked;
@@ -1384,6 +1419,8 @@
     record("model");
   }
 
+  initializeLocalProfiles();
+  RECS.assignLegacy(activeProfileId).catch(function () {});
   document.documentElement.lang = lang;
   RECS.purge().catch(function () {});
   if (!restoreActiveSession()) screen = getProfile() ? "home" : "onboard";

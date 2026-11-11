@@ -34,13 +34,20 @@ window.POG.recordings = (function () {
   var api = {
     retentionDays: 30,
     add: function (rec) { return run("readwrite", function (s) { return s.put(rec); }); },
-    list: function () {
+    list: function (profileId) {
       return run("readonly", function (s) { return s.getAll(); }).then(function (all) {
-        return (all || []).sort(function (a, b) { return b.t - a.t; });
+        return (all || []).filter(function (rec) { return !profileId || rec.profileId === profileId; }).sort(function (a, b) { return b.t - a.t; });
       });
     },
+    assignLegacy: function (profileId) {
+      if (!profileId) return Promise.resolve(0);
+      return run("readwrite", function (s) { var req = s.getAll(); req.onsuccess = function () { (req.result || []).filter(function (rec) { return !rec.profileId; }).forEach(function (rec) { rec.profileId = profileId; s.put(rec); }); }; return req; }).then(function (all) { return all ? all.length : 0; });
+    },
     remove: function (id) { return run("readwrite", function (s) { return s.delete(id); }); },
-    clear: function () { return run("readwrite", function (s) { return s.clear(); }); },
+    clear: function (profileId) {
+      if (!profileId) return run("readwrite", function (s) { return s.clear(); });
+      return run("readwrite", function (s) { var req = s.getAll(); req.onsuccess = function () { (req.result || []).filter(function (rec) { return rec.profileId === profileId; }).forEach(function (rec) { s.delete(rec.id); }); }; return req; });
+    },
     /* Deletes recordings older than the retention period. Resolves with how many were deleted. */
     purge: function (now) {
       var limit = (now || Date.now()) - RETENTION_MS;

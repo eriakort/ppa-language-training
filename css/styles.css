@@ -331,3 +331,89 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
 /* Deletion and retention controls */
 .deletion-retention-launcher { bottom: max(24px, env(safe-area-inset-bottom, 0px)); }
 .account-action.danger { border: 2px solid #9b3434; color: #9b3434; background: transparent; }
+
+
+/* Responsive utility controls and dialogs: keep every fixed launcher in its own slot. */
+.therapist-cloud-launcher {
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: auto;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  max-width: calc(100vw - 32px);
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.profile-lifecycle-launcher {
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: auto;
+  bottom: max(78px, calc(env(safe-area-inset-bottom, 0px) + 68px));
+  max-width: calc(100vw - 32px);
+  white-space: normal;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.deletion-retention-launcher {
+  left: max(16px, env(safe-area-inset-left, 0px));
+  right: auto;
+  bottom: max(140px, calc(env(safe-area-inset-bottom, 0px) + 130px));
+}
+.account-panel,
+.cloud-panel,
+.therapist-cloud-panel {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+.account-card,
+.cloud-card,
+.therapist-cloud-card {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.therapist-cloud-card {
+  width: min(100%, 980px);
+}
+.therapist-cloud-card .tbl {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+@media (max-width: 520px) {
+  .therapist-cloud-launcher,
+  .profile-lifecycle-launcher,
+  .deletion-retention-launcher {
+    max-width: calc(100vw - 24px);
+    min-height: 44px;
+    padding: 8px 12px;
+    font-size: 15px;
+  }
+  .therapist-cloud-launcher {
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  }
+  .profile-lifecycle-launcher {
+    bottom: max(68px, calc(env(safe-area-inset-bottom, 0px) + 58px));
+  }
+  .deletion-retention-launcher {
+    bottom: max(124px, calc(env(safe-area-inset-bottom, 0px) + 114px));
+  }
+  .account-panel,
+  .cloud-panel,
+  .therapist-cloud-panel {
+    padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+  }
+  .therapist-cloud-card {
+    max-height: 94dvh;
+    padding: 16px;
+  }
+}
+@media (max-width: 360px) {
+  .therapist-cloud-launcher,
+  .profile-lifecycle-launcher,
+  .deletion-retention-launcher {
+    font-size: 14px;
+    padding: 7px 10px;
+  }
+}

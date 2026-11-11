@@ -20,6 +20,7 @@ for (const file of [
   if (!source.includes('window.addEventListener("pog:languagechange"')) fail.push(file + " does not refresh on language changes");
   if (!source.includes('ev.detail && ev.detail.lang === "en"')) fail.push(file + " does not validate the selected language");
   if (!source.includes("T = ") && !source.includes("copy = translations[lang]")) fail.push(file + " does not update its translation dictionary");
+  if (source.includes("translations[lang]") && !/var\s+translations\s*=/.test(source)) fail.push(file + " references an undeclared translations dictionary");
   if (!source.includes("if (panel") || !source.includes("render()")) fail.push(file + " does not rerender an open panel");
 }
 if (fail.length) { fail.forEach((x) => console.error("FAIL " + x)); process.exit(1); }

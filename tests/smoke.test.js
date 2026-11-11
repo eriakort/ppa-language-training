@@ -86,6 +86,11 @@ async function playThrough(page, solo) {
   check(/Calcio/.test(await p.textContent(".mychips")), "home shows the interests");
   await p.click('[data-act="start"]'); await p.click('[data-w="assist"]');
   check(/Bologna FC/.test(await p.textContent(".card .instr")), "story topic uses the favourite team");
+  const resumePrompt = await p.textContent(".instr");
+  const checkpoint = await p.evaluate(() => JSON.parse(localStorage.getItem("pog_active_session")));
+  check(!!(checkpoint && checkpoint.session && checkpoint.session.steps.length), "active exercise checkpoint is saved locally");
+  await p.reload();
+  check(await p.textContent(".instr") === resumePrompt, "refresh restores the exact active exercise");
   await playThrough(p, false);
   check((await p.$$("tbody tr")).length >= 10, "assisted session completes with a summary");
   check(p.errors.length === 0, "no page errors (assisted): " + p.errors.join("; "));

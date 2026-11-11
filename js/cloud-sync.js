@@ -60,6 +60,7 @@
   function status() {
     if(!client)return T.unavailable;
     if(!activeId())return T.noProfile;
+    if(!isSignedIn)return T.signedOut;
     if(!localStorage.getItem(consentKey()))return T.local;
     return T.linked;
   }
@@ -68,6 +69,7 @@
     var html='<div class="cloud-card"><div class="account-head"><h2 id="cloud-title">'+T.title+'</h2><button type="button" class="account-close" data-cloud="close" aria-label="'+T.close+'">×</button></div>';
     html+='<p>'+T.intro+'</p><p class="account-note">'+T.privacy+'</p><p class="account-note">'+T.local+'</p>';
     html+='<p><strong>'+T.status+':</strong> '+escapeHtml(status())+'</p>';
+    if(client&&!isSignedIn)html+='<button class="link" data-cloud="account">'+T.account+'</button>';
     if(lastUpdated)html+='<p class="account-note">'+T.last+': '+escapeHtml(new Date(lastUpdated).toLocaleString(lang==="it"?"it-IT":"en-GB"))+'</p>';
     if(!client)html+='<p class="account-error">'+T.unavailable+'</p>';
     else if(!activeId())html+='<p class="account-error">'+T.noProfile+'</p>';

@@ -50,9 +50,9 @@
     try { var p=JSON.parse(localStorage.getItem(localKey("profile"))||"null"); if(p&&p.name)return p.name; } catch(e) {}
     return "";
   }
-  function snapshot() {
-    var data={};
-    KEYS.forEach(function(k){ var raw=localStorage.getItem(localKey(k)); if(raw!==null){ try{data[k]=JSON.parse(raw);}catch(e){} } });
+  function snapshot(profileId) {
+    var data={}, id=profileId||activeId();
+    KEYS.forEach(function(k){ var raw=localStorage.getItem(id ? "pog_p_"+id+"_"+k : "pog_"+k); if(raw!==null){ try{data[k]=JSON.parse(raw);}catch(e){} } });
     return {version:1,savedAt:new Date().toISOString(),data:data};
   }
   function el(tag,attrs,value){var n=document.createElement(tag);Object.keys(attrs||{}).forEach(function(k){n.setAttribute(k,attrs[k]);});if(value!=null)n.textContent=value;return n;}
@@ -220,48 +220,58 @@
     clearTimeout(syncTimer);
     syncTimer = setTimeout(syncNow, 1200);
   }
-  function applyCloudSnapshot(saved) {
+  function applyCloudSnapshot(saved, profileId) {
     if (!saved || saved.version !== 1 || !saved.data || typeof saved.data !== "object") throw new Error(T.none);
+    var id=profileId||activeId();
     KEYS.forEach(function (k) {
-      if (Object.prototype.hasOwnProperty.call(saved.data, k)) localStorage.setItem(localKey(k), JSON.stringify(saved.data[k]));
-      else localStorage.removeItem(localKey(k));
+      var storage=id ? "pog_p_"+id+"_"+k : "pog_"+k;
+      if (Object.prototype.hasOwnProperty.call(saved.data, k)) localStorage.setItem(storage, JSON.stringify(saved.data[k]));
+      else localStorage.removeItem(storage);
     });
   }
   async function syncNow() {
-    if (syncing || !client || !navigator.onLine || !syncEnabled() || !cloudProfileId || !localStorage.getItem(consentKey())) return;
+    var profileId=activeId(), cloudId=cloudProfileId;
+    var localSyncKey=function(name){return "pog_cloud_sync_"+profileId+"_"+name;};
+    if (syncing || !client || !navigator.onLine || !syncEnabled() || !cloudId || !localStorage.getItem("pog_cloud_consent_"+profileId)) return;
     syncing = true; syncState = "syncing"; render();
     try {
       await signedIn();
-      var remote = await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id", cloudProfileId).single();
+      if(activeId()!==profileId)return;
+      var remote = await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id", cloudId).single();
       if (remote.error) throw remote.error;
-      var base = Number(localStorage.getItem(syncKey("seen")) || 0);
+      if(activeId()!==profileId)return;
+      var base = Number(localStorage.getItem(localSyncKey("seen")) || 0);
       var remoteRevision = Number(remote.data.revision || 1);
       var remoteTime = remote.data.updated_at || "";
-      var dirty = localStorage.getItem(syncKey("dirty")) === "1";
-      var localVersion = Number(localStorage.getItem(syncKey("local_version")) || 0);
+      var dirty = localStorage.getItem(localSyncKey("dirty")) === "1";
+      var localVersion = Number(localStorage.getItem(localSyncKey("local_version")) || 0);
       if (base && remoteRevision !== base) {
         if (dirty) { syncState = "conflict"; return; }
-        applyCloudSnapshot(remote.data.preferences);
-        localStorage.setItem(syncKey("seen"), String(remoteRevision));
+        applyCloudSnapshot(remote.data.preferences,profileId);
+        localStorage.setItem(localSyncKey("seen"), String(remoteRevision));
         lastUpdated = remoteTime;
         setTimeout(function () { window.location.reload(); }, 400);
         return;
       }
       if (!dirty) { syncState = "idle"; lastUpdated = remoteTime; return; }
       if (!base) { syncState = "conflict"; return; }
-      var data = snapshot(), now = new Date().toISOString();
+      var data = snapshot(profileId), now = new Date().toISOString();
       var result = await client.from("profile_data")
         .update({ preferences: data, placement: data.data.placement || {}, updated_at: now })
-        .eq("profile_id", cloudProfileId).eq("revision", base)
+        .eq("profile_id", cloudId).eq("revision", base)
         .select("updated_at,revision").maybeSingle();
       if (result.error) throw result.error;
       if (!result.data) { syncState = "conflict"; return; }
       lastUpdated = result.data.updated_at;
-      localStorage.setItem(syncKey("seen"), String(result.data.revision || (base + 1)));
-      if (Number(localStorage.getItem(syncKey("local_version")) || 0) === localVersion) localStorage.removeItem(syncKey("dirty"));
+      localStorage.setItem(localSyncKey("seen"), String(result.data.revision || (base + 1)));
+      if (Number(localStorage.getItem(localSyncKey("local_version")) || 0) === localVersion) localStorage.removeItem(localSyncKey("dirty"));
       syncState = "idle";
     } catch (e) { syncState = navigator.onLine ? "error" : "offline"; }
-    finally { syncing = false; render(); if (syncState === "idle" && localStorage.getItem(syncKey("dirty")) === "1") { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); } }
+    finally {
+      syncing = false; render();
+      if(activeId()!==profileId){cloudProfileId=localStorage.getItem(mapKey())||"";if(syncEnabled())setTimeout(syncNow,0);}
+      else if (syncState === "idle" && localStorage.getItem(localSyncKey("dirty")) === "1") { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); }
+    }
   }
   window.addEventListener("pog:local-change", function (event) {
     if (event.detail && event.detail.profileId === activeId()) queueSync();

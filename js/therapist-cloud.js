@@ -7,10 +7,11 @@
   catch (e) { return; }
   var panel = null, selected = "", profiles = [], rows = [], message = "";
   var lang = localStorage.getItem("pog_lang") === "en" ? "en" : "it";
-  var copy = {
+  var translations = {
     en: { open:"Therapist history", title:"Shared learner history", intro:"Read-only session trends. This view contains aggregate activity and speaking measures only; it never shows personal phrases, exercise labels, recognition transcripts or audio.", signIn:"Sign in to view shared profiles.", none:"No profiles are shared with this account.", choose:"Choose a learner", date:"Date", mode:"Mode", items:"Items", spoken:"Spoken", onset:"Avg onset (s)", wpm:"Avg words/min", pauses:"Avg pauses", longest:"Avg longest pause (s)", export:"Export CSV", empty:"No shared session history yet.", close:"Close", failed:"Could not load shared history.", csv:"therapist-session-history" },
     it: { open:"Storico terapista", title:"Storico condiviso", intro:"Andamento delle sessioni in sola lettura. Questa vista mostra solo attività aggregata e misure del parlato; non mostra frasi personali, etichette degli esercizi, trascrizioni o registrazioni audio.", signIn:"Accedi per visualizzare i profili condivisi.", none:"Nessun profilo è condiviso con questo account.", choose:"Scegli una persona", date:"Data", mode:"Modalità", items:"Elementi", spoken:"Parlato", onset:"Avvio medio (s)", wpm:"Parole/min medie", pauses:"Pause medie", longest:"Pausa max media (s)", export:"Esporta CSV", empty:"Non ci sono ancora sessioni condivise.", close:"Chiudi", failed:"Impossibile caricare lo storico.", csv:"storico-sessioni-terapista" }
-  }[lang];
+  };
+  var copy = translations[lang];
   function el(tag, attrs, value) { var n=document.createElement(tag); Object.keys(attrs||{}).forEach(function(k){n.setAttribute(k,attrs[k]);}); if(value!=null)n.textContent=value; return n; }
   function fmt(v, divisor) { return v == null ? "–" : (Number(v)/divisor).toFixed(1).replace(".", lang==="it"?",":"."); }
   function esc(v) { return String(v==null?"":v).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];}); }
@@ -87,4 +88,11 @@
   window.addEventListener("pog:profile-change",publishActive);
   client.auth.onAuthStateChange(function(){publishActive();});
   window.addEventListener("load",publishActive);
-})();
+  window.addEventListener("pog:languagechange", function (ev) {
+    lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
+    copy = translations[lang];
+    var root = document.getElementById("app"), launch = root && root.querySelector(".therapist-cloud-launcher");
+    if (launch) launch.textContent = copy.open;
+    if (panel && !panel.hidden) render();
+  });
+  })();

@@ -197,3 +197,21 @@ account and caregiver membership; invitations and role changes are not performed
 by the browser. This is a prerequisite for safe account-level deletion and
 ownership changes, not an account deletion feature.
 
+## Account deletion preflight (read-only)
+
+The account-deletion review checks every profile membership for the signed-in
+user, the number of owners and caregivers on each profile, pending profile
+deletion requests, and incoming or outgoing ownership transfers. It identifies
+owned profiles that must first be transferred to an existing caregiver or
+deleted, and shared memberships that must be revoked during account closure.
+A profile already scheduled for deletion remains a blocker until the scheduled
+profile deletion has completed. Pending transfer invitations must also be
+resolved before account closure.
+
+This step is deliberately read-only: it does not remove memberships, alter
+ownership, delete profiles, erase local data, or delete the Supabase Auth user.
+A future account-deletion operation must re-check these dependencies
+transactionally immediately before deletion, handle any applicable legal
+retention obligations, revoke remaining memberships, and delete the Auth user
+only after all owned profiles have been resolved. Device-local data and
+IndexedDB recordings cannot be erased remotely and must be clearly disclosed.

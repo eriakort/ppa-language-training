@@ -8,7 +8,7 @@
   function save(k, v) { try { localStorage.setItem(storageKey(k), JSON.stringify(v)); window.dispatchEvent(new CustomEvent("pog:local-change", { detail: { key: k, profileId: activeProfileId } })); } catch (e) {} }
   function load(k) { try { var v = localStorage.getItem(storageKey(k)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function profileList() { var p = load("profiles"); return Array.isArray(p) ? p : []; }
-  function setActiveProfile(id) { activeProfileId = id; try { localStorage.setItem("pog_active_profile_id", id); } catch (e) {} }
+  function setActiveProfile(id) { activeProfileId = id; try { localStorage.setItem("pog_active_profile_id", id); window.dispatchEvent(new CustomEvent("pog:profile-change", { detail: { profileId: id } })); } catch (e) {} }
   function createLocalProfile(name) {
     var id = "lp-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     var list = profileList(); list.push({ id: id, name: name || "", createdAt: new Date().toISOString() });

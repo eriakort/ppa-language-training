@@ -199,7 +199,7 @@
     launcher.addEventListener("click",show);root.appendChild(launcher);
   }
   document.addEventListener("keydown",function(e){if(e.key==="Escape")hide();});
-  if(client)client.auth.onAuthStateChange(function(event,session){isSignedIn=!!session;if(panel&&!panel.hidden){cloudProfileId=localStorage.getItem(mapKey())||"";render();}});
+  if(client)client.auth.onAuthStateChange(function(event,session){isSignedIn=!!session;if(panel&&!panel.hidden){cloudProfileId=localStorage.getItem(mapKey())||"";render();}if(session){cloudProfileId=localStorage.getItem(mapKey())||"";if(syncEnabled())syncNow();}});
   if(window.MutationObserver){
     var root=document.getElementById("app");
     if(root)new MutationObserver(mount).observe(root,{childList:true});
@@ -213,6 +213,7 @@
     cloudProfileId = cloudProfileId || localStorage.getItem(mapKey()) || "";
     if (!syncEnabled() || !localStorage.getItem(consentKey()) || !cloudProfileId) return;
     localStorage.setItem(syncKey("dirty"), "1");
+    localStorage.setItem(syncKey("local_version"), String(Number(localStorage.getItem(syncKey("local_version")) || 0) + 1));
     syncState = navigator.onLine ? "queued" : "offline";
     render();
     if (!navigator.onLine) return;
@@ -237,6 +238,7 @@
       var remoteRevision = Number(remote.data.revision || 1);
       var remoteTime = remote.data.updated_at || "";
       var dirty = localStorage.getItem(syncKey("dirty")) === "1";
+      var localVersion = Number(localStorage.getItem(syncKey("local_version")) || 0);
       if (base && remoteRevision !== base) {
         if (dirty) { syncState = "conflict"; return; }
         applyCloudSnapshot(remote.data.preferences);
@@ -256,10 +258,10 @@
       if (!result.data) { syncState = "conflict"; return; }
       lastUpdated = result.data.updated_at;
       localStorage.setItem(syncKey("seen"), String(result.data.revision || (base + 1)));
-      localStorage.removeItem(syncKey("dirty"));
+      if (Number(localStorage.getItem(syncKey("local_version")) || 0) === localVersion) localStorage.removeItem(syncKey("dirty"));
       syncState = "idle";
     } catch (e) { syncState = navigator.onLine ? "error" : "offline"; }
-    finally { syncing = false; render(); }
+    finally { syncing = false; render(); if (syncState === "idle" && localStorage.getItem(syncKey("dirty")) === "1") { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); } }
   }
   window.addEventListener("pog:local-change", function (event) {
     if (event.detail && event.detail.profileId === activeId()) queueSync();

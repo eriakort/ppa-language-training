@@ -91,8 +91,8 @@
   window.addEventListener("pog:languagechange", function (ev) {
     lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
     copy = translations[lang];
-    var root = document.getElementById("app"), launch = root && root.querySelector(".therapist-cloud-launcher");
+    var launch = document.querySelector(".therapist-cloud-launcher");
     if (launch) launch.textContent = copy.open;
-    if (panel && !panel.hidden) render();
+    if (panel) { panel.setAttribute("aria-label", copy.title); if (!panel.hidden) render(); }
   });
   })();

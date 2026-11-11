@@ -1,0 +1,4 @@
+project_id = "ppa-language-training"
+
+[functions.profile-access]
+verify_jwt = false

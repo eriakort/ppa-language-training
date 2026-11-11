@@ -77,14 +77,21 @@ Deno.serve(async (req) => {
     if (!canInvite) return json({ error: "Your role cannot invite this type of member" }, 403);
 
     const siteUrl = Deno.env.get("APP_SITE_URL")!;
+    const { data: existing } = await admin.from("profile_members")
+      .select("user_id").eq("profile_id", profileId).eq("user_id", (await admin.auth.admin.listUsers()).data.users.find((u) => u.email?.toLowerCase() === email)?.id ?? "").maybeSingle();
+    if (existing) return json({ error: "This person already has access to the profile" }, 409);
+
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
       redirectTo: siteUrl,
       data: { invited_profile_id: profileId, invited_role: role },
     });
     if (inviteError || !invited.user) return json({ error: "Could not send invitation" }, 400);
 
+    const { data: alreadyMember } = await admin.from("profile_members")
+      .select("user_id").eq("profile_id", profileId).eq("user_id", invited.user.id).maybeSingle();
+    if (alreadyMember) return json({ error: "This person already has access to the profile" }, 409);
     const { error: addError } = await admin.from("profile_members")
-      .upsert({ profile_id: profileId, user_id: invited.user.id, role }, { onConflict: "profile_id,user_id" });
+      .insert({ profile_id: profileId, user_id: invited.user.id, role });
     if (addError) return json({ error: "Invitation sent, but profile access could not be assigned. Contact the administrator." }, 500);
     return json({ invited: true });
   }

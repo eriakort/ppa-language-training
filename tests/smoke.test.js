@@ -109,9 +109,9 @@ async function playThrough(page, solo) {
   check(/Calcio/.test(await p.textContent(".mychips")), "original learner interests remain isolated after switching");
   await p.click('[data-act="lang"][data-l="en"]');
   check((await p.textContent(".home h1")) === "Hello, Test", "English language selection updates the learner greeting");
-  await p.evaluate(() => window.dispatchEvent(new CustomEvent("pog:authchange", { detail: { signedIn: false, signedOut: true } })));
+  await p.evaluate(() => { localStorage.setItem("pog_account_signed_out", "1"); window.dispatchEvent(new CustomEvent("pog:authchange", { detail: { signedIn: false, signedOut: true } })); });
   check((await p.textContent(".home h1")) === "Welcome", "signing out removes the learner name from the greeting without deleting the profile");
-  await p.evaluate(() => window.dispatchEvent(new CustomEvent("pog:authchange", { detail: { signedIn: true, signedOut: false } })));
+  await p.evaluate(() => { localStorage.removeItem("pog_account_signed_out"); window.dispatchEvent(new CustomEvent("pog:authchange", { detail: { signedIn: true, signedOut: false } })); });
   check((await p.textContent(".home h1")) === "Hello, Test", "signing in restores the learner greeting");
 
   // English content and the cloud backup panel must follow the selected language.

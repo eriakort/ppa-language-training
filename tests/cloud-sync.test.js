@@ -16,7 +16,7 @@ check(html.indexOf("js/account.js")<html.indexOf("js/cloud-sync.js"),"cloud cont
 
 check(cloud.includes("pog:local-change") && cloud.includes("queueSync"),"local changes are queued for automatic sync");
 check(cloud.includes("window.addEventListener(\"online\"") && cloud.includes("offline"),"offline changes wait for a reconnect");
-check(cloud.includes('syncState = "conflict"') && cloud.includes('.eq("updated_at", base)'),"sync detects remote changes and uses optimistic concurrency");
+check(cloud.includes('syncState = "conflict"') && cloud.includes('.eq("revision", base)'),"sync detects remote changes and uses optimistic concurrency");
 check(cloud.includes("applyCloudSnapshot") && cloud.includes("syncKey(\"seen\")"),"clean devices can receive newer cloud snapshots without overwriting dirty local work");
 check(cloud.includes("syncKey(\"enabled\")") && cloud.includes("consentKey()"),"automatic sync requires prior backup/restore and active consent");
 

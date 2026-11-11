@@ -189,7 +189,7 @@ Deno.serve(async (req) => {
     const enriched = await Promise.all((transfers ?? []).map(async (transfer) => {
       const [{ data: profile }, { data: source }] = await Promise.all([
         admin.from("learner_profiles").select("display_name").eq("id", transfer.profile_id).maybeSingle(),
-        admin.auth.admin.getUserById(transfer.from_user_id)
+        admin.auth.admin.getUserById(transfer.from_user_id ?? "")
       ]);
       return { id: transfer.id, profile_id: transfer.profile_id, profile_name: profile?.display_name ?? "",
         from_email: source.user?.email ?? "", expires_at: transfer.expires_at };

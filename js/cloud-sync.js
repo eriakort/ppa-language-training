@@ -86,7 +86,7 @@
       } else html+='<p class="account-message">'+T.linked+'</p><button class="primary account-action" data-cloud="backup">'+T.backup+'</button><button class="account-action" data-cloud="restore">'+T.restore+'</button>';
       html+='<button class="link" data-cloud="revoke">'+T.revoke+'</button>';
     }
-    if(syncEnabled()) { var syncLabel = syncState === "conflict" ? (lang === "it" ? "Conflitto: scegli Backup o Ripristina." : "Conflict: choose Backup or Restore.") : syncState === "offline" ? (lang === "it" ? "Offline: modifiche in attesa." : "Offline: changes queued.") : syncState === "syncing" ? (lang === "it" ? "Sincronizzazione…" : "Synchronising…") : syncState === "error" ? (lang === "it" ? "Sincronizzazione non riuscita; modifiche in attesa." : "Sync failed; changes remain queued.") : (lang === "it" ? "Sincronizzazione automatica attiva" : "Automatic sync is active"); html+='<p class="account-note" role="status">'+escapeHtml(syncLabel)+'</p><button class="account-action" data-cloud="sync">'+(lang === "it" ? "Sincronizza ora" : "Sync now")+'</button>'; }
+    if(syncEnabled()) { var syncLabel = syncState === "conflict" ? (lang === "it" ? "Conflitto: scegli Backup o Ripristina." : "Conflict: choose Backup or Restore.") : syncState === "offline" ? (lang === "it" ? "Offline: modifiche in attesa." : "Offline: changes queued.") : syncState === "syncing" ? (lang === "it" ? "Sincronizzazione…" : "Synchronising…") : syncState === "queued" ? (lang === "it" ? "Modifiche in attesa…" : "Changes queued…") : syncState === "error" ? (lang === "it" ? "Sincronizzazione non riuscita; modifiche in attesa." : "Sync failed; changes remain queued.") : (lang === "it" ? "Sincronizzazione automatica attiva" : "Automatic sync is active"); html+='<p class="account-note" role="status">'+escapeHtml(syncLabel)+'</p><button class="account-action" data-cloud="sync">'+(lang === "it" ? "Sincronizza ora" : "Sync now")+'</button>'; }
     if(message)html+='<p class="account-message" role="status">'+escapeHtml(message)+'</p>';
     if(error)html+='<p class="account-error" role="alert">'+escapeHtml(error)+'</p>';
     html+='</div>';panel.innerHTML=html;
@@ -296,6 +296,9 @@
     render();
   });
   cloudProfileId = localStorage.getItem(mapKey()) || "";
-  if (syncEnabled()) syncNow();
+  if (syncEnabled()) {
+    if (localStorage.getItem(syncKey("dirty")) === "1") syncState = navigator.onLine ? "queued" : "offline";
+    syncNow();
+  }
 
 })();

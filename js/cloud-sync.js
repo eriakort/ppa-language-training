@@ -15,7 +15,7 @@
       confirmBackup:"Caricare nel tuo account la copia dei dati elencati nell'informativa?",
       revoke:"Disattiva il backup su questo dispositivo", revoked:"Consenso revocato su questo dispositivo. La copia già presente nel cloud non è stata cancellata.",
       account:"Apri account", close:"Chiudi", error:"Operazione non riuscita. Riprova.", noMapping:"Profilo cloud non collegato.",
-      linked:"Profilo cloud collegato", consentMissing:"Per continuare devi confermare il consenso."
+      linked:"Profilo cloud collegato", consentMissing:"Per continuare devi confermare il consenso.", find:"Trova i profili cloud", link:"Collega profilo selezionato", confirmLink:"Collegare questo profilo locale al profilo cloud selezionato?", noCloudProfiles:"Non ci sono profili cloud accessibili con questo account."
     },
     en: {
       title:"Cloud backup", open:"Cloud backup", intro:"Keep a copy of your progress online and restore it on another device.",
@@ -31,11 +31,11 @@
       confirmBackup:"Upload the data described in the privacy notice to your account?",
       revoke:"Turn off backup on this device", revoked:"Consent revoked on this device. The existing cloud copy has not been deleted.",
       account:"Open account", close:"Close", error:"The operation failed. Please try again.", noMapping:"No cloud profile is linked.",
-      linked:"Cloud profile linked", consentMissing:"You must confirm consent to continue."
+      linked:"Cloud profile linked", consentMissing:"You must confirm consent to continue.", find:"Find my cloud profiles", link:"Link selected profile", confirmLink:"Link this local profile to the selected cloud profile?", noCloudProfiles:"No cloud profiles are available to this account."
     }
   };
   var lang = localStorage.getItem("pog_lang") === "en" ? "en" : "it", T = copy[lang];
-  var client = null, panel = null, launcher = null, message = "", error = "", cloudProfileId = "", lastUpdated = "";
+  var client = null, panel = null, launcher = null, message = "", error = "", cloudProfileId = "", lastUpdated = "", isSignedIn = false, availableProfiles = [];
   var KEYS = ["profile","settings","placement","history","sessions","scripts_it","scripts_en","active_session"];
   function configured() { return !!(cfg.url && cfg.anonKey && window.supabase && window.supabase.createClient); }
   if (configured()) {
@@ -74,8 +74,14 @@
     else if(!localStorage.getItem(consentKey())) {
       html+='<label class="cloud-consent"><input type="checkbox" id="cloud-consent"> '+T.consent+'</label><button class="primary account-action" data-cloud="consent">'+T.enable+'</button>';
     } else {
-      if(!cloudProfileId)html+='<button class="primary account-action" data-cloud="create">'+T.create+'</button>';
-      else html+='<p class="account-message">'+T.linked+'</p><button class="primary account-action" data-cloud="backup">'+T.backup+'</button><button class="account-action" data-cloud="restore">'+T.restore+'</button>';
+      if(!cloudProfileId) {
+        html+='<button class="primary account-action" data-cloud="create">'+T.create+'</button><button class="account-action" data-cloud="find">'+T.find+'</button>';
+        if(availableProfiles.length) {
+          html+='<label>'+T.status+'<select id="cloud-profile-choice">';
+          availableProfiles.forEach(function(p){html+='<option value="'+escapeHtml(p.id)+'">'+escapeHtml(p.display_name)+'</option>';});
+          html+='</select></label><button class="account-action" data-cloud="link">'+T.link+'</button>';
+        }
+      } else html+='<p class="account-message">'+T.linked+'</p><button class="primary account-action" data-cloud="backup">'+T.backup+'</button><button class="account-action" data-cloud="restore">'+T.restore+'</button>';
       html+='<button class="link" data-cloud="revoke">'+T.revoke+'</button>';
     }
     if(message)html+='<p class="account-message" role="status">'+escapeHtml(message)+'</p>';
@@ -84,9 +90,9 @@
   }
   function show() {
     if(!panel){panel=el("section",{class:"cloud-panel",role:"dialog","aria-modal":"true","aria-labelledby":"cloud-title",hidden:""});document.body.appendChild(panel);bind();}
-    cloudProfileId=localStorage.getItem(mapKey())||"";message="";error="";
+    cloudProfileId=localStorage.getItem(mapKey())||"";message="";error="";availableProfiles=[];
     panel.hidden=false;render();
-    if(client&&cloudProfileId)refreshCloudStatus();
+    if(client)client.auth.getSession().then(function(r){isSignedIn=!!(r.data&&r.data.session);render();if(cloudProfileId&&isSignedIn)refreshCloudStatus();}).catch(fail);
   }
   function hide(){if(panel)panel.hidden=true;}
   function fail(e){error=e&&e.message?e.message:T.error;message="";render();}
@@ -142,6 +148,7 @@
       var b=ev.target.closest("[data-cloud]");if(!b)return;
       var a=b.dataset.cloud;message="";error="";
       if(a==="close"){hide();return;}
+      if(a==="account"){hide();var accountButton=document.querySelector(".account-launcher");if(accountButton)accountButton.click();return;}
       if(a==="consent"){
         var cb=panel.querySelector("#cloud-consent");
         if(!cb||!cb.checked){error=T.consentMissing;render();return;}
@@ -149,6 +156,23 @@
       }
       if(a==="revoke"){
         localStorage.removeItem(consentKey());message=T.revoked;render();return;
+      }
+      if(a==="find"){
+        (async function(){try{
+          await signedIn();
+          var r=await client.from("learner_profiles").select("id,display_name").order("created_at",{ascending:true});
+          if(r.error)throw r.error;
+          availableProfiles=r.data||[];
+          if(!availableProfiles.length)message=T.noCloudProfiles;
+          render();
+        }catch(e){fail(e);}})();return;
+      }
+      if(a==="link"){
+        var choice=panel.querySelector("#cloud-profile-choice");
+        if(!choice||!choice.value)return;
+        if(!window.confirm(T.confirmLink))return;
+        cloudProfileId=choice.value;localStorage.setItem(mapKey(),cloudProfileId);availableProfiles=[];
+        refreshCloudStatus();return;
       }
       if(a==="create"){
         (async function(){try{await signedIn();await backup();}catch(e){fail(e);}})();return;
@@ -170,7 +194,7 @@
     launcher.addEventListener("click",show);root.appendChild(launcher);
   }
   document.addEventListener("keydown",function(e){if(e.key==="Escape")hide();});
-  if(client)client.auth.onAuthStateChange(function(){if(panel&&!panel.hidden){cloudProfileId=localStorage.getItem(mapKey())||"";render();}});
+  if(client)client.auth.onAuthStateChange(function(event,session){isSignedIn=!!session;if(panel&&!panel.hidden){cloudProfileId=localStorage.getItem(mapKey())||"";render();}});
   if(window.MutationObserver){
     var root=document.getElementById("app");
     if(root)new MutationObserver(mount).observe(root,{childList:true});

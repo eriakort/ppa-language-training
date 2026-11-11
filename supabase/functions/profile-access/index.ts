@@ -181,6 +181,21 @@ Deno.serve(async (req) => {
     return json({ transfer });
   }
 
+  if (body.action === "list_outgoing_transfers") {
+    const { data: transfers, error } = await admin.from("profile_ownership_transfers")
+      .select("id,profile_id,to_user_id,created_at,expires_at")
+      .eq("from_user_id", user.id).eq("status", "pending").gt("expires_at", new Date().toISOString());
+    if (error) return json({ error: "Could not load outgoing ownership requests" }, 500);
+    const enriched = await Promise.all((transfers ?? []).map(async (transfer) => {
+      const [{ data: profile }, { data: target }] = await Promise.all([
+        admin.from("learner_profiles").select("display_name").eq("id", transfer.profile_id).maybeSingle(),
+        admin.auth.admin.getUserById(transfer.to_user_id ?? "")
+      ]);
+      return { id: transfer.id, profile_name: profile?.display_name ?? "", to_email: target.user?.email ?? "", expires_at: transfer.expires_at };
+    }));
+    return json({ transfers: enriched });
+  }
+
   if (body.action === "list_incoming_transfers") {
     const { data: transfers, error } = await admin.from("profile_ownership_transfers")
       .select("id,profile_id,from_user_id,created_at,expires_at")

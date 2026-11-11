@@ -3,6 +3,7 @@ const fs=require("fs"),path=require("path"),root=path.resolve(__dirname,"..");
 const cloud=fs.readFileSync(path.join(root,"js/cloud-sync.js"),"utf8");
 const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
 const migration=fs.readFileSync(path.join(root,"supabase/migrations/202611110001_hybrid_identity.sql"),"utf8");
+const syncMigration=fs.readFileSync(path.join(root,"supabase/migrations/202611110004_automatic_sync.sql"),"utf8");
 function check(ok,label){if(!ok){console.error("FAIL "+label);process.exitCode=1;}else console.log("ok   "+label);}
 check(cloud.includes("cloud-consent")&&cloud.includes("consentKey"),"cloud backup requires a per-profile consent choice");
 check(cloud.includes("client.auth.getSession")&&cloud.includes("profile-access"),"cloud backup requires an authenticated account and trusted profile provisioning");
@@ -22,5 +23,5 @@ check(cloud.includes("syncKey(\"enabled\")") && cloud.includes("consentKey()"),"
 check(cloud.includes('select("preferences,updated_at,revision")')&&cloud.includes('.eq("revision", base)'),"automatic sync uses database revision compare-and-swap");
 check(cloud.includes('window.addEventListener("pog:local-change"')&&cloud.includes('window.addEventListener("online"'),"local changes are queued and retried after reconnect");
 check(cloud.includes('syncState === "conflict"')&&cloud.includes('data-cloud="sync"'),"sync status and manual conflict recovery are exposed in the cloud panel");
-check(migration.includes("create trigger profile_data_revision")&&migration.includes("new.revision := old.revision + 1"),"database advances a revision for every cloud update");
+check(syncMigration.includes("create trigger profile_data_revision")&&syncMigration.includes("new.revision := old.revision + 1"),"database advances a revision for every cloud update");
 check(cloud.includes('String(r.data.revision||1)')&&cloud.includes('syncKey("seen")'),"manual backup and restore establish a revision baseline");

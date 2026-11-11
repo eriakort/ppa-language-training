@@ -33,18 +33,19 @@ the same exercise.
 1. **Local checkpointing:** save the active exercise state after each screen
    update and restore it after refresh. This works on the current single-device
    deployment and does not upload data.
-2. **Shared-device profiles (this increment):** create and switch between local
-   learner profiles. Preferences, placement, progress, history, checkpoints,
-   therapist PIN and IndexedDB recordings are partitioned by profile. Existing
-   single-profile browser data is migrated into the first local profile.
-3. **Account access backend (this increment):** trusted profile creation and
-   role-limited invitations through the `profile-access` Edge Function. Client
-   role grants are revoked; the service-role key stays server-side.
-4. **Account UI and recovery:** Supabase Auth screens, email confirmation,
-   password recovery, sign-out and profile linking in the static app.
+2. **Shared-device profiles:** create and switch between local learner profiles.
+   Preferences, placement, progress, history, checkpoints, therapist PIN and
+   IndexedDB recordings are partitioned by profile. Existing single-profile data
+   is migrated into the first local profile on this device.
+3. **Account access backend:** trusted profile creation and role-limited invitations
+   through the `profile-access` Edge Function. Client role grants are revoked;
+   the service-role key stays server-side.
+4. **Account UI (this increment):** bilingual sign-in, self-registration,
+   email-confirmation messaging, password recovery/reset and sign-out. Account
+   access is optional and does not change local profile storage.
 5. **Cloud persistence:** explicit opt-in, profile-scoped session sync, conflict
    handling and cross-device resume.
-5. **Therapist access and lifecycle:** role-limited history, export, account/profile
+6. **Therapist access and lifecycle:** role-limited history, export, account/profile
    deletion and retention controls.
 
 ## Current local checkpoint behavior
@@ -75,13 +76,22 @@ implementation is device/browser-local; it is not yet a cross-device backup.
 ## Supabase account-access setup
 
 Create a Supabase project and apply migrations in filename order. Deploy the
-`profile-access` Edge Function with `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY` and the exact `APP_SITE_URL` as server-side secrets.
-The function supports owner profile creation and invitations. Owners may invite
-caregivers, therapists or learners; caregivers may invite learners only. The
-service-role key must never be placed in frontend code or committed to Git.
+`profile-access` Edge Function with server-side secrets:
+`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+`APP_SITE_URL` (origin only, e.g. `https://eriakort.github.io`) and
+`AUTH_REDIRECT_URL` (the complete app URL, including
+`/ppa-language-training/`). Configure the same complete URL in Supabase Auth's
+allowed redirect URLs.
 
-The app does not connect to a Supabase project yet: the next increment adds the
-sign-in/sign-up/recovery interface and configures only the public project URL and
-publishable key in the static frontend. Cloud syncing remains disabled until
-consent, offline behavior and cross-device conflict handling are implemented.
+When ready to enable browser sign-in, put the project URL and publishable/anon key
+in `js/supabase-config.js`. That file is deliberately empty by default; without
+both values the account entry explains that online access is not configured.
+The publishable/anon key is designed for browser use with RLS. Never place the
+service-role key in `js/supabase-config.js`, another browser asset or Git.
+
+The account interface supports email/password registration and sign-in, email
+confirmation, password reset and sign-out. Invitation acceptance uses Supabase's
+email confirmation redirect and reports the invited profile when the invitation
+metadata is present. Cloud syncing is not implemented: local learner data and
+recordings are not uploaded, exported or migrated by signing in. The account
+currently establishes authentication only, not cross-device learner continuity.

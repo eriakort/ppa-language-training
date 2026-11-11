@@ -45,6 +45,15 @@ A prototype tablet app for short daily language practice for people with
 - **Therapist area behind a PIN** with speaking trends, recordings to play,
   download or delete, and a CSV export of all results.
 
+## Accounts (optional)
+
+A bilingual account entry supports email/password sign-in, self-registration,
+email confirmation, password recovery and sign-out. It is disabled until a
+Supabase project is configured in `js/supabase-config.js` with its public URL
+and publishable/anon key. The service-role key is never used in the browser.
+Signing in does not upload learner profiles, exercise history or recordings;
+cloud synchronization is a separate future increment.
+
 ## Where it runs
 
 **Main version: GitHub Pages** (https://eriakort.github.io/ppa-language-training/).
@@ -91,6 +100,8 @@ css/styles.css        Styles, light and dark themes
 js/strings.js         Interface text (Italian and English)
 js/app.js             App logic: sessions, levels, placement, games, scoring,
                       consent, therapist area
+js/account.js         Optional bilingual Supabase Auth interface
+js/supabase-config.js Public Supabase URL/key configuration (empty by default)
 js/speech.js          Speech input: Claude host dictation or the browser's Web Speech API
 js/recorder.js        Microphone recording and speaking measures
 js/recordings.js      Recording storage on the device (IndexedDB), 30-day clean-up
@@ -99,6 +110,7 @@ content/interests.js  Interest packs (topics, words, crossword words, phrases)
 tools/build.js        Builds dist/parole-ogni-giorno.html, one self-contained file
 tests/content.test.js Checks content and every generated crossword
 tests/speech.test.js  Speaking measures and speech engine, with a fake recogniser
+tests/account.test.js Static checks for account and recovery safeguards
 tests/smoke.test.js   Browser click-through of the built page
 ```
 

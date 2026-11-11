@@ -5,7 +5,7 @@
     it: {
       title:"Backup cloud", open:"Backup cloud", intro:"Puoi conservare una copia dei progressi online e ripristinarla su un altro dispositivo.",
       privacy:"La copia può contenere nome o soprannome, anno di nascita se inserito, città e interessi, impostazioni, frasi personali, esercizi svolti, risultati e checkpoint della sessione. Le registrazioni audio non vengono mai caricate.",
-      local:"I dati restano su questo dispositivo finché non scegli esplicitamente di creare una copia. Non c'è sincronizzazione automatica.",
+      local:"I dati restano su questo dispositivo finché non scegli esplicitamente di creare una copia. Dopo la prima copia o il ripristino, le modifiche vengono sincronizzate automaticamente.",
       consent:"Ho letto le informazioni e acconsento a caricare questi dati nel mio account Supabase.",
       enable:"Acconsenti e continua", backup:"Crea / aggiorna copia", restore:"Ripristina da cloud", status:"Stato", signedOut:"Accedi prima al tuo account.",
       unavailable:"Backup online non configurato. L'app continua a funzionare in modalità locale.",
@@ -20,7 +20,7 @@
     en: {
       title:"Cloud backup", open:"Cloud backup", intro:"Keep a copy of your progress online and restore it on another device.",
       privacy:"The backup may contain a name or nickname, optional birth year, town and interests, settings, personal phrases, completed exercises, results and the active session checkpoint. Audio recordings are never uploaded.",
-      local:"Your data stays on this device until you explicitly choose to create a backup. There is no automatic synchronization.",
+      local:"Your data stays on this device until you explicitly create or restore a backup. After that, changes are synchronized automatically.",
       consent:"I have read this information and consent to uploading these data to my Supabase account.",
       enable:"Consent and continue", backup:"Create / update backup", restore:"Restore from cloud", status:"Status", signedOut:"Sign in to your account first.",
       unavailable:"Online backup is not configured. The app continues to work locally.",
@@ -50,9 +50,9 @@
     try { var p=JSON.parse(localStorage.getItem(localKey("profile"))||"null"); if(p&&p.name)return p.name; } catch(e) {}
     return "";
   }
-  function snapshot() {
-    var data={};
-    KEYS.forEach(function(k){ var raw=localStorage.getItem(localKey(k)); if(raw!==null){ try{data[k]=JSON.parse(raw);}catch(e){} } });
+  function snapshot(profileId) {
+    var data={}, id=profileId||activeId();
+    KEYS.forEach(function(k){ var raw=localStorage.getItem(id ? "pog_p_"+id+"_"+k : "pog_"+k); if(raw!==null){ try{data[k]=JSON.parse(raw);}catch(e){} } });
     return {version:1,savedAt:new Date().toISOString(),data:data};
   }
   function el(tag,attrs,value){var n=document.createElement(tag);Object.keys(attrs||{}).forEach(function(k){n.setAttribute(k,attrs[k]);});if(value!=null)n.textContent=value;return n;}
@@ -86,6 +86,7 @@
       } else html+='<p class="account-message">'+T.linked+'</p><button class="primary account-action" data-cloud="backup">'+T.backup+'</button><button class="account-action" data-cloud="restore">'+T.restore+'</button>';
       html+='<button class="link" data-cloud="revoke">'+T.revoke+'</button>';
     }
+    if(syncEnabled()) { var syncLabel = syncState === "conflict" ? (lang === "it" ? "Conflitto: scegli Backup o Ripristina." : "Conflict: choose Backup or Restore.") : syncState === "offline" ? (lang === "it" ? "Offline: modifiche in attesa." : "Offline: changes queued.") : syncState === "syncing" ? (lang === "it" ? "Sincronizzazione…" : "Synchronising…") : syncState === "queued" ? (lang === "it" ? "Modifiche in attesa…" : "Changes queued…") : syncState === "error" ? (lang === "it" ? "Sincronizzazione non riuscita; modifiche in attesa." : "Sync failed; changes remain queued.") : (lang === "it" ? "Sincronizzazione automatica attiva" : "Automatic sync is active"); html+='<p class="account-note" role="status">'+escapeHtml(syncLabel)+'</p><button class="account-action" data-cloud="sync">'+(lang === "it" ? "Sincronizza ora" : "Sync now")+'</button>'; }
     if(message)html+='<p class="account-message" role="status">'+escapeHtml(message)+'</p>';
     if(error)html+='<p class="account-error" role="alert">'+escapeHtml(error)+'</p>';
     html+='</div>';panel.innerHTML=html;
@@ -127,14 +128,14 @@
     if(!localStorage.getItem(consentKey()))throw new Error(T.consentMissing);
     var id=await ensureCloudProfile(), data=snapshot();
     var placement=data.data.placement||{};
-    var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at").single();
+    var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at,revision").single();
     if(r.error)throw r.error;
-    lastUpdated=r.data.updated_at;message=T.done;error="";render();
+    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",String(r.data.revision||1));localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.done;error="";render();
   }
   async function restore() {
     await signedIn();
     if(!localStorage.getItem(consentKey()))throw new Error(T.consentMissing);
-    var r=await client.from("profile_data").select("preferences,updated_at").eq("profile_id",cloudProfileId).single();
+    var r=await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id",cloudProfileId).single();
     if(r.error)throw r.error;
     var saved=r.data.preferences;
     if(!saved||saved.version!==1||!saved.data||typeof saved.data!=="object")throw new Error(T.none);
@@ -142,7 +143,7 @@
       if(Object.prototype.hasOwnProperty.call(saved.data,k))localStorage.setItem(localKey(k),JSON.stringify(saved.data[k]));
       else localStorage.removeItem(localKey(k));
     });
-    lastUpdated=r.data.updated_at;message=T.restored;render();
+    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",String(r.data.revision||1));localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.restored;render();
     setTimeout(function(){window.location.reload();},500);
   }
   function bind() {
@@ -184,6 +185,7 @@
         if(!window.confirm(T.confirmBackup))return;
         backup().catch(fail);return;
       }
+      if(a==="sync"){cloudProfileId=localStorage.getItem(mapKey())||cloudProfileId;syncNow();return;}
       if(a==="restore"){
         if(!window.confirm(T.warning+" "+T.confirmRestore))return;
         restore().catch(fail);return;
@@ -197,10 +199,106 @@
     launcher.addEventListener("click",show);root.appendChild(launcher);
   }
   document.addEventListener("keydown",function(e){if(e.key==="Escape")hide();});
-  if(client)client.auth.onAuthStateChange(function(event,session){isSignedIn=!!session;if(panel&&!panel.hidden){cloudProfileId=localStorage.getItem(mapKey())||"";render();}});
+  if(client)client.auth.onAuthStateChange(function(event,session){isSignedIn=!!session;if(panel&&!panel.hidden){cloudProfileId=localStorage.getItem(mapKey())||"";render();}if(session){cloudProfileId=localStorage.getItem(mapKey())||"";if(syncEnabled())syncNow();}});
   if(window.MutationObserver){
     var root=document.getElementById("app");
     if(root)new MutationObserver(mount).observe(root,{childList:true});
   }
   mount();
+
+  var syncTimer = null, syncState = "idle", syncing = false;
+  function syncKey(s) { return "pog_cloud_sync_" + activeId() + "_" + s; }
+  function syncEnabled() { return localStorage.getItem(syncKey("enabled")) === "1" && !!localStorage.getItem(consentKey()); }
+  function queueSync() {
+    cloudProfileId = cloudProfileId || localStorage.getItem(mapKey()) || "";
+    if (!syncEnabled() || !localStorage.getItem(consentKey()) || !cloudProfileId) return;
+    localStorage.setItem(syncKey("dirty"), "1");
+    localStorage.setItem(syncKey("local_version"), String(Number(localStorage.getItem(syncKey("local_version")) || 0) + 1));
+    syncState = navigator.onLine ? "queued" : "offline";
+    render();
+    if (!navigator.onLine) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncNow, 1200);
+  }
+  function applyCloudSnapshot(saved, profileId) {
+    if (!saved || saved.version !== 1 || !saved.data || typeof saved.data !== "object") throw new Error(T.none);
+    var id=profileId||activeId();
+    KEYS.forEach(function (k) {
+      var storage=id ? "pog_p_"+id+"_"+k : "pog_"+k;
+      if (Object.prototype.hasOwnProperty.call(saved.data, k)) localStorage.setItem(storage, JSON.stringify(saved.data[k]));
+      else localStorage.removeItem(storage);
+    });
+  }
+  async function syncNow() {
+    var profileId=activeId(), cloudId=cloudProfileId;
+    var localSyncKey=function(name){return "pog_cloud_sync_"+profileId+"_"+name;};
+    if (syncing || !client || !navigator.onLine || !syncEnabled() || !cloudId || !localStorage.getItem("pog_cloud_consent_"+profileId)) return;
+    syncing = true; syncState = "syncing"; render();
+    try {
+      await signedIn();
+      if(activeId()!==profileId)return;
+      var remote = await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id", cloudId).single();
+      if (remote.error) throw remote.error;
+      if(activeId()!==profileId)return;
+      var base = Number(localStorage.getItem(localSyncKey("seen")) || 0);
+      var remoteRevision = Number(remote.data.revision || 1);
+      var remoteTime = remote.data.updated_at || "";
+      var dirty = localStorage.getItem(localSyncKey("dirty")) === "1";
+      var localVersion = Number(localStorage.getItem(localSyncKey("local_version")) || 0);
+      if (base && remoteRevision !== base) {
+        if (dirty) { syncState = "conflict"; return; }
+        applyCloudSnapshot(remote.data.preferences,profileId);
+        localStorage.setItem(localSyncKey("seen"), String(remoteRevision));
+        lastUpdated = remoteTime;
+        setTimeout(function () { window.location.reload(); }, 400);
+        return;
+      }
+      if (!dirty) { syncState = "idle"; lastUpdated = remoteTime; return; }
+      if (!base) { syncState = "conflict"; return; }
+      var data = snapshot(profileId), now = new Date().toISOString();
+      var result = await client.from("profile_data")
+        .update({ preferences: data, placement: data.data.placement || {}, updated_at: now })
+        .eq("profile_id", cloudId).eq("revision", base)
+        .select("updated_at,revision").maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) { syncState = "conflict"; return; }
+      lastUpdated = result.data.updated_at;
+      localStorage.setItem(localSyncKey("seen"), String(result.data.revision || (base + 1)));
+      if (Number(localStorage.getItem(localSyncKey("local_version")) || 0) === localVersion) localStorage.removeItem(localSyncKey("dirty"));
+      syncState = "idle";
+    } catch (e) { syncState = navigator.onLine ? "error" : "offline"; }
+    finally {
+      syncing = false; render();
+      if(activeId()!==profileId){cloudProfileId=localStorage.getItem(mapKey())||"";if(syncEnabled())setTimeout(syncNow,0);}
+      else if (syncState === "idle" && localStorage.getItem(localSyncKey("dirty")) === "1") { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); }
+    }
+  }
+  window.addEventListener("pog:local-change", function (event) {
+    if (event.detail && event.detail.profileId === activeId()) queueSync();
+  });
+  window.addEventListener("online", function () {
+    if (localStorage.getItem(syncKey("dirty")) === "1") syncNow();
+  });
+  window.addEventListener("offline", function () {
+    if (localStorage.getItem(syncKey("dirty")) === "1") { syncState = "offline"; render(); }
+  });
+  window.addEventListener("focus", function () {
+    cloudProfileId = localStorage.getItem(mapKey()) || "";
+    if (syncEnabled()) syncNow();
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && syncEnabled()) { cloudProfileId = localStorage.getItem(mapKey()) || ""; syncNow(); }
+  });
+  window.addEventListener("pog:profile-change", function () {
+    cloudProfileId = localStorage.getItem(mapKey()) || "";
+    syncState = "idle";
+    if (syncEnabled()) syncNow();
+    render();
+  });
+  cloudProfileId = localStorage.getItem(mapKey()) || "";
+  if (syncEnabled()) {
+    if (localStorage.getItem(syncKey("dirty")) === "1") syncState = navigator.onLine ? "queued" : "offline";
+    syncNow();
+  }
+
 })();

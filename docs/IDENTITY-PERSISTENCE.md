@@ -43,9 +43,15 @@ The first migration is `supabase/migrations/202611110001_hybrid_identity.sql`.
    an authenticated user can create/update a cloud profile backup or restore it
    on another device. There is no background upload or automatic merge. Restore
    requires confirmation because it replaces the covered local profile data.
-6. **Automatic cross-device sync:** future work to add versioned checkpoints,
-   conflict detection/merge rules, offline queueing and clear sync status. It is
-   deliberately not enabled by this manual-backup increment.
+6. **Automatic cross-device sync:** after a profile has been backed up or restored
+   with consent, local changes are queued and uploaded after a short debounce;
+   offline changes remain queued until connectivity returns. Each device tracks
+   the last cloud revision it observed. A conditional update prevents a stale
+   device from silently overwriting a newer cloud revision. If both sides changed,
+   the app reports a conflict and the user chooses the existing Backup or Restore
+   action; clean devices can receive a newer cloud snapshot automatically.
+   Audio remains local. This is revision-based conflict protection, not a semantic
+   merge of simultaneous exercise answers.
 7. **Therapist access and lifecycle:** role-limited history, export, account/profile
    deletion and retention controls.
 
@@ -56,6 +62,15 @@ the already-generated steps, current index, interaction state and answer log.
 Audio blobs remain in the existing IndexedDB recording store and are never
 included in the cloud backup.
 
+Automatic sync reuses the explicit allowlist and consent established by manual
+backup. It never uploads audio recordings. A local change event marks the profile
+dirty; a debounced upload runs while online, and the dirty marker survives offline
+periods and page reloads. On reconnect, the queued snapshot is retried. A database-managed integer
+revision is compared with the last revision seen by that device; a stale write is
+rejected rather than overwriting newer cloud data. When local data
+is clean, a newer cloud snapshot can be restored automatically. When local data
+is also dirty, the app stops and asks the user to choose Backup or Restore.
+
 The manual backup uses an explicit allowlist of local profile keys: profile
 details, settings, placement, history, completed session summaries, personal
 phrases in both languages and the active exercise checkpoint. The profile name,
@@ -63,11 +78,12 @@ optional birth year, town/interests, personal phrases and speech-recognition
 transcripts may therefore be included. Read the notice in the app before
 consenting. No profile data is uploaded merely by signing in.
 
-Backups are user-triggered. The app does not silently overwrite a cloud backup.
-Restoring asks for confirmation and replaces the corresponding local keys for
-the active local profile; it does not alter the cloud copy. The local profile ID
-and cloud mapping remain on the device. This first backup increment does not
-provide automatic conflict resolution or continuous sync.
+The initial backup or restore establishes a per-device revision baseline. Subsequent
+local changes are queued and synchronized after a short debounce. Every cloud update
+advances a database-managed revision, and automatic writes compare the revision they
+last observed before saving. A mismatch is surfaced as a conflict; the user must
+choose whether to back up the local copy or restore the cloud copy. Offline changes
+remain queued until connectivity returns. Audio remains device-only.
 
 ## Privacy and deployment gates
 

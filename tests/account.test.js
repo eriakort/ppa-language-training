@@ -12,6 +12,7 @@ function check(ok, label) {
 check(account.includes("signInWithPassword") && account.includes("signUp"), "account supports sign-in and self-registration");
 check(account.includes("resetPasswordForEmail") && account.includes("updateUser"), "account supports password recovery and reset");
 check(account.includes("onAuthStateChange") && account.includes("SIGNED_IN"), "account responds to confirmation and invitation sessions");
+check(account.includes('window.dispatchEvent(new CustomEvent("pog:authchange"') && account.includes('localStorage.setItem("pog_account_signed_out", "1")'), "sign-in and sign-out state is shared with the main app and persists across refreshes");
 check(account.includes("it: {") && account.includes("en: {"), "account interface has Italian and English text");
 check((config.includes('url: ""') && config.includes('anonKey: ""')) || (/url: "https:\/\/[^\"]+\.supabase\.co"/.test(config) && /anonKey: "[^\"]+"/.test(config) && !config.includes("service_role")), "Supabase config is either disabled or uses a public project URL and anon key");
 check(!config.includes("service_role") && !account.includes("SUPABASE_SERVICE_ROLE_KEY"), "browser account code contains no service-role secret");

@@ -3,7 +3,7 @@ window.POG = window.POG || {};
 window.POG.strings = {
   it: {
     appName: "Parole ogni giorno", tagline: "Esercizi di linguaggio quotidiani · circa 10 minuti",
-    hello: "Ciao, {name}", start: "Inizia la sessione", scripts: "Frasi personali", settings: "Livelli e impostazioni",
+    hello: "Ciao, {name}", profilesTitle: "Chi usa il tablet?", profilesHelp: "Ogni persona ha i propri progressi e le proprie impostazioni su questo dispositivo.", profileAdd: "Aggiungi un profilo", profileChoose: "Tocca per passare a questo profilo", profileCurrent: "Profilo attivo", changeProfile: "Cambia persona", unnamedProfile: "Nuovo profilo", start: "Inizia la sessione", scripts: "Frasi personali", settings: "Livelli e impostazioni",
     proto: "Prototipo: le immagini sono icone provvisorie.", stop: "Basta per oggi",
     planTitle: "Oggi, dal più impegnativo al più facile", hard: "Più impegnativo", easy: "Più facile",
     game: { describe: "Racconto", crossword: "Cruciverba", name: "Parole", wordbuild: "Componi la parola", script: "Frasi personali", read: "Lettura ad alta voce", echo: "Ripetizione", seq: "Sequenze", maze: "Labirinto" },
@@ -99,7 +99,7 @@ window.POG.strings = {
   },
   en: {
     appName: "Words every day", tagline: "Daily language practice · about 10 minutes",
-    hello: "Hello, {name}", start: "Start the session", scripts: "Personal phrases", settings: "Levels and settings",
+    hello: "Hello, {name}", profilesTitle: "Who is using the tablet?", profilesHelp: "Each person has their own progress and settings on this device.", profileAdd: "Add a profile", profileChoose: "Tap to switch to this profile", profileCurrent: "Current profile", changeProfile: "Switch person", unnamedProfile: "New profile", start: "Start the session", scripts: "Personal phrases", settings: "Levels and settings",
     proto: "Prototype: pictures are placeholder icons.", stop: "Stop for today",
     planTitle: "Today, from most demanding to easiest", hard: "Most demanding", easy: "Easiest",
     game: { describe: "Telling", crossword: "Crossword", name: "Naming", wordbuild: "Word building", script: "Personal phrases", read: "Reading aloud", echo: "Repeating", seq: "Sequences", maze: "Maze" },

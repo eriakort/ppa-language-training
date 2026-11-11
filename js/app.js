@@ -101,7 +101,7 @@
       checkpoint.pendingRec = null; // Blob data belongs in IndexedDB, never localStorage.
       save("active_session", { version: 1, screen: "item", session: checkpoint, savedAt: new Date().toISOString() });
     } else {
-      try { localStorage.removeItem("pog_active_session"); } catch (e) {}
+      try { localStorage.removeItem(storageKey("active_session")); } catch (e) {}
     }
   }
   function restoreActiveSession() {
@@ -247,7 +247,7 @@
     S.pendingRec = null;
     var id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     S.recIds.push(id);
-    RECS.add({ id: id, t: Date.now(), session: S.id, game: st.game, lv: st.lv, label: itemLabel(st), heard: heard || "", result: result, measures: S.meas, mime: p.mime, blob: p.blob }).catch(function () {});
+    RECS.add({ profileId: activeProfileId, id: id, t: Date.now(), session: S.id, game: st.game, lv: st.lv, label: itemLabel(st), heard: heard || "", result: result, measures: S.meas, mime: p.mime, blob: p.blob }).catch(function () {});
   }
   function bestVerdict(st, text) {
     var order = { good: 3, almost: 2, retry: 1, none: 0 }, best = "none";
@@ -864,7 +864,7 @@
   }
   function thLock() { TH.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); TH = { unlocked: false, recs: null, urls: [], confirm: "", changing: false }; }
   function thLoad() {
-    RECS.list().then(function (list) { TH.recs = list; if (screen === "therapist") render(); }, function () { TH.recs = []; if (screen === "therapist") render(); });
+    RECS.list(activeProfileId).then(function (list) { TH.recs = list; if (screen === "therapist") render(); }, function () { TH.recs = []; if (screen === "therapist") render(); });
   }
   function fmtS(ms) { return ms == null ? "–" : (ms / 1000).toFixed(1).replace(".", lang === "it" ? "," : "."); }
   function avg(list) { var v = list.filter(function (x) { return x != null; }); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null; }
@@ -1270,7 +1270,7 @@
     }
     if (act === "pin-forgot") { TH.confirm = "forgot"; render(); return; }
     if (act === "pin-forgot-yes") {
-      RECS.clear().catch(function () {}).then(function () { save("sessions", []); save("pin", null); thLock(); flash = t.pinReset; render(); });
+      RECS.clear(activeProfileId).catch(function () {}).then(function () { save("sessions", []); save("pin", null); thLock(); flash = t.pinReset; render(); });
       return;
     }
     if (act === "th-cancel") { TH.confirm = ""; render(); return; }
@@ -1283,7 +1283,7 @@
     }
     if (act === "rec-clear") { TH.confirm = "clear"; render(); return; }
     if (act === "rec-clear-yes") {
-      RECS.clear().catch(function () {}).then(function () { TH.confirm = ""; TH.recs = null; flash = t.recsCleared; render(); });
+      RECS.clear(activeProfileId).catch(function () {}).then(function () { TH.confirm = ""; TH.recs = null; flash = t.recsCleared; render(); });
       return;
     }
     if (act === "export") { exportCsv(); render(); return; }
@@ -1420,6 +1420,7 @@
   }
 
   initializeLocalProfiles();
+  RECS.assignLegacy(activeProfileId).catch(function () {});
   document.documentElement.lang = lang;
   RECS.purge().catch(function () {});
   if (!restoreActiveSession()) screen = getProfile() ? "home" : "onboard";

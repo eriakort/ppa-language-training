@@ -50,8 +50,8 @@ begin
     where profile_id = transfer.profile_id and user_id = transfer.from_user_id for update;
   select role into target_role from public.profile_members
     where profile_id = transfer.profile_id and user_id = accepting_user_id for update;
-  if source_role <> 'owner' then raise exception 'Current owner is no longer eligible'; end if;
-  if target_role <> 'caregiver' then raise exception 'Only an existing caregiver can become owner'; end if;
+  if source_role is distinct from 'owner' then raise exception 'Current owner is no longer eligible'; end if;
+  if target_role is distinct from 'caregiver' then raise exception 'Only an existing caregiver can become owner'; end if;
   if exists (select 1 from public.profile_deletion_requests
       where profile_id = transfer.profile_id and status = 'pending') then
     raise exception 'Cancel the pending profile deletion before transferring ownership';

@@ -769,7 +769,7 @@
   function viewProfiles() {
     var t = T[lang], list = profileList();
     return header(false) + '<section class="card home"><h1>' + esc(t.profilesTitle) + '</h1><p class="sub">' + esc(t.profilesHelp) + '</p>' + langSeg() +
-      '<div class="profile-list">' + list.map(function (p) { return '<button class="modecard profile-card" data-act="profile-switch" data-id="' + esc(p.id) + '><strong>' + esc(p.name || t.unnamedProfile) + '</strong><span>' + esc(p.id === activeProfileId ? t.profileCurrent : t.profileChoose) + '</span></button>'; }).join("") + '</div>' +
+      '<div class="profile-list">' + list.map(function (p) { return '<button class="modecard profile-card" data-act="profile-switch" data-id="' + esc(p.id) + '"><strong>' + esc(p.name || t.unnamedProfile) + '</strong><span>' + esc(p.id === activeProfileId ? t.profileCurrent : t.profileChoose) + '</span></button>'; }).join("") + '</div>' +
       '<button class="primary" data-act="profile-add">' + esc(t.profileAdd) + '</button><button class="link" data-act="home">' + esc(t.back) + '</button><p class="note">' + esc(t.localNote) + '</p></section>';
   }
   function viewOnboard() {

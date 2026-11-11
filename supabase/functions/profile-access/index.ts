@@ -1,6 +1,6 @@
 // Supabase Edge Function: profile-access
 // Required secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
-// APP_SITE_URL (the exact public app origin, e.g. https://example.github.io).
+// APP_SITE_URL (origin only) and AUTH_REDIRECT_URL (complete app URL).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       (membership.role === "caregiver" && role === "learner");
     if (!canInvite) return json({ error: "Your role cannot invite this type of member" }, 403);
 
-    const siteUrl = Deno.env.get("APP_SITE_URL")!;
+    const siteUrl = Deno.env.get("AUTH_REDIRECT_URL") ?? Deno.env.get("APP_SITE_URL")!;
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
       redirectTo: siteUrl,
       data: { invited_profile_id: profileId, invited_role: role },

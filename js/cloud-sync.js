@@ -208,7 +208,8 @@
   function syncKey(s) { return "pog_cloud_sync_" + activeId() + "_" + s; }
   function syncEnabled() { return localStorage.getItem(syncKey("enabled")) === "1"; }
   function queueSync() {
-    if (!syncEnabled() || !localStorage.getItem(consentKey())) return;
+    cloudProfileId = cloudProfileId || localStorage.getItem(mapKey()) || "";
+    if (!syncEnabled() || !localStorage.getItem(consentKey()) || !cloudProfileId) return;
     localStorage.setItem(syncKey("dirty"), "1");
     syncState = navigator.onLine ? "queued" : "offline";
     render();

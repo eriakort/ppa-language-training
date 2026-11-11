@@ -190,4 +190,10 @@
     observer.observe(document.getElementById("app"), { childList: true });
   }
   mount();
-})();
+  window.addEventListener("pog:languagechange", function (ev) {
+    lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
+    T = copy[lang];
+    if (launcher) launcher.textContent = T.account;
+    if (panel && !panel.hidden) render();
+  });
+  })();

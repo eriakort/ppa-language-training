@@ -1,10 +1,11 @@
 (function () {
   "use strict";
   var cfg=window.POG_SUPABASE_CONFIG||{}, lang=localStorage.getItem("pog_lang")==="en"?"en":"it";
-  var T={
+  var translations={
     en:{open:"Deletion & retention",title:"Deletion and retention",intro:"These controls apply to the linked cloud profile. Local data on this device is not deleted.",retention:"Therapist summary retention",retentionNote:"Controls only aggregate therapist dashboard metrics. Older metrics are removed by the scheduled daily maintenance job. Full session history and local recordings are not affected.",save:"Save retention period",days:"days",deletion:"Cloud profile deletion",deletionNote:"A request starts a 30-day grace period. At the end, the cloud profile, cloud backup, session records, therapist metrics and shared memberships are permanently deleted. Local copies on devices are not erased. Only the sole profile owner can request deletion.",request:"Request cloud profile deletion",cancel:"Cancel deletion request",pending:"Deletion requested. Scheduled for",none:"No deletion request is pending.",saved:"Retention period saved. It will be applied by the scheduled maintenance job.",requested:"Deletion request created.",cancelled:"Deletion request cancelled.",confirm:"Request permanent deletion of this cloud profile after the 30-day grace period?",confirmCancel:"Cancel the pending deletion request?",noCloud:"Link this local profile to a cloud profile first.",signedOut:"Sign in to manage deletion and retention.",failed:"Could not complete this operation.",close:"Close",notOwner:"Only the sole profile owner can request cloud profile deletion."},
     it:{open:"Eliminazione e conservazione",title:"Eliminazione e conservazione",intro:"Questi controlli riguardano il profilo cloud collegato. I dati locali su questo dispositivo non vengono eliminati.",retention:"Conservazione dei riepiloghi per il terapista",retentionNote:"Riguarda solo le metriche aggregate del pannello del terapista. Le metriche più vecchie vengono eliminate dalla manutenzione giornaliera programmata. Lo storico completo e le registrazioni locali non sono interessati.",save:"Salva periodo di conservazione",days:"giorni",deletion:"Eliminazione del profilo cloud",deletionNote:"La richiesta avvia un periodo di attesa di 30 giorni. Al termine, il profilo cloud, il backup, le sessioni, le metriche e gli accessi condivisi vengono eliminati definitivamente. Le copie locali sui dispositivi non vengono cancellate. Solo l'unico proprietario del profilo può richiedere l'eliminazione.",request:"Richiedi eliminazione del profilo cloud",cancel:"Annulla richiesta di eliminazione",pending:"Eliminazione richiesta. Programmata per",none:"Nessuna richiesta di eliminazione in sospeso.",saved:"Periodo di conservazione salvato. Sarà applicato dalla manutenzione programmata.",requested:"Richiesta di eliminazione creata.",cancelled:"Richiesta di eliminazione annullata.",confirm:"Richiedere l'eliminazione definitiva di questo profilo cloud dopo 30 giorni?",confirmCancel:"Annullare la richiesta di eliminazione in sospeso?",noCloud:"Collega prima questo profilo locale a un profilo cloud.",signedOut:"Accedi per gestire eliminazione e conservazione.",failed:"Impossibile completare l'operazione.",close:"Chiudi",notOwner:"Solo l'unico proprietario del profilo può richiedere l'eliminazione cloud."}
-  }[lang];
+  };
+  var T=translations[lang];
   if(!cfg.url||!cfg.anonKey||!window.supabase||!window.supabase.createClient)return;
   var client;try{client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});}catch(e){return;}
   var panel=null,days=365,request=null,message="",error="",busy=false;
@@ -47,4 +48,11 @@
   }
   var root=document.getElementById("app");if(!root)return;
   if(!root.querySelector(".deletion-retention-launcher")){var launch=document.createElement("button");launch.type="button";launch.className="profile-lifecycle-launcher deletion-retention-launcher";launch.textContent=T.open;launch.setAttribute("aria-haspopup","dialog");launch.addEventListener("click",show);root.appendChild(launch);}
-})();
+  window.addEventListener("pog:languagechange", function (ev) {
+    lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
+    T = translations[lang];
+    var root = document.getElementById("app"), launch = root && root.querySelector(".deletion-retention-launcher");
+    if (launch) launch.textContent = T.open;
+    if (panel && !panel.hidden) render();
+  });
+  })();

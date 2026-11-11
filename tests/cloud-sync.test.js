@@ -17,11 +17,12 @@ check(html.indexOf("js/account.js")<html.indexOf("js/cloud-sync.js"),"cloud cont
 check(cloud.includes("pog:local-change") && cloud.includes("queueSync"),"local changes are queued for automatic sync");
 check(cloud.includes("window.addEventListener(\"online\"") && cloud.includes("offline"),"offline changes wait for a reconnect");
 check(cloud.includes('syncState = "conflict"') && cloud.includes('.eq("revision", base)'),"sync detects remote changes and uses optimistic concurrency");
-check(cloud.includes("applyCloudSnapshot") && cloud.includes("syncKey(\"seen\")"),"clean devices can receive newer cloud snapshots without overwriting dirty local work");
+check(cloud.includes("applyCloudSnapshot") && cloud.includes("localSyncKey(\"seen\")"),"clean devices can receive newer cloud snapshots without overwriting dirty local work");
 check(cloud.includes("syncKey(\"enabled\")") && cloud.includes("consentKey()"),"automatic sync requires prior backup/restore and active consent");
 
 check(cloud.includes('select("preferences,updated_at,revision")')&&cloud.includes('.eq("revision", base)'),"automatic sync uses database revision compare-and-swap");
 check(cloud.includes('window.addEventListener("pog:local-change"')&&cloud.includes('window.addEventListener("online"'),"local changes are queued and retried after reconnect");
 check(cloud.includes('syncState === "conflict"')&&cloud.includes('data-cloud="sync"'),"sync status and manual conflict recovery are exposed in the cloud panel");
 check(syncMigration.includes("create trigger profile_data_revision")&&syncMigration.includes("new.revision := old.revision + 1"),"database advances a revision for every cloud update");
-check(cloud.includes('String(r.data.revision||1)')&&cloud.includes('syncKey("seen")'),"manual backup and restore establish a revision baseline");
+check(cloud.includes('String(r.data.revision||1)')&&cloud.includes('pog_cloud_sync_"+activeId()+"_seen'),"manual backup and restore establish a revision baseline");
+check(cloud.includes("snapshot(profileId)")&&cloud.includes("localSyncKey"),"in-flight sync is isolated to the learner profile that started it");

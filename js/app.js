@@ -68,6 +68,32 @@
   function getProfile() { var p = load("profile"); return (p && p.name) ? p : null; }
   function getPlacement() { var p = load("placement"); return (p && p.status) ? p : { status: "none", levels: {}, flags: [] }; }
 
+  /* Active exercise checkpoint. The generated steps and live game state are saved
+     together so a refresh resumes the exact item instead of rebuilding the session. */
+  function persistActiveSession() {
+    if (screen === "item" && S && S.i >= 0 && S.i < S.steps.length) {
+      var checkpoint = JSON.parse(JSON.stringify(S));
+      checkpoint.pendingRec = null; // Blob data belongs in IndexedDB, never localStorage.
+      save("active_session", { version: 1, screen: "item", session: checkpoint, savedAt: new Date().toISOString() });
+    } else {
+      try { localStorage.removeItem("pog_active_session"); } catch (e) {}
+    }
+  }
+  function restoreActiveSession() {
+    var checkpoint = load("active_session");
+    if (!checkpoint || checkpoint.version !== 1 || checkpoint.screen !== "item" || !checkpoint.session) return false;
+    var session = checkpoint.session;
+    if (!Array.isArray(session.steps) || !Array.isArray(session.log) ||
+        typeof session.i !== "number" || session.i < 0 || session.i >= session.steps.length ||
+        !session.steps[session.i] || (session.mode !== "session" && session.mode !== "place")) return false;
+    session.started = new Date(session.started);
+    if (isNaN(session.started.getTime())) return false;
+    session.pendingRec = null;
+    S = session;
+    screen = "item";
+    return true;
+  }
+
   /* ---------- voice ---------- */
   var tts = ("speechSynthesis" in window) && typeof window.SpeechSynthesisUtterance !== "undefined";
   if (tts) { try { speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function () {}; } catch (e) { tts = false; } }
@@ -1123,6 +1149,7 @@
   }
 
   function render() {
+    persistActiveSession();
     var html = screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
     app.innerHTML = html;
     flash = "";
@@ -1359,6 +1386,6 @@
 
   document.documentElement.lang = lang;
   RECS.purge().catch(function () {});
-  screen = getProfile() ? "home" : "onboard";
+  if (!restoreActiveSession()) screen = getProfile() ? "home" : "onboard";
   render();
 })();

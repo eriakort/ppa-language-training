@@ -1,5 +1,14 @@
 /* Interface text in Italian and English. */
 window.POG = window.POG || {};
+/* The saved language. The app stores settings as JSON, so it is saved as "en" with quotes;
+   accept the plain form too. Every module reads the language through this one function. */
+window.POG.getLang = function () {
+  try {
+    var v = localStorage.getItem("pog_lang");
+    if (v && v.charAt(0) === '"') v = JSON.parse(v);
+    return v === "en" ? "en" : "it";
+  } catch (e) { return "it"; }
+};
 window.POG.strings = {
   it: {
     appName: "Parole ogni giorno", tagline: "Esercizi di linguaggio quotidiani · circa 10 minuti",

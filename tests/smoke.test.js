@@ -30,11 +30,12 @@ const MOCK_MIC = `(function(){
 
 const SCRIPT_CUES = { "Al bar": "Vorrei un caffè, per favore.", "Hai bisogno di una mano": "Puoi aiutarmi, per favore?", "Qualcuno ti chiede come stai": "Grazie, sto bene." };
 
-async function open(browser, withMic) {
+async function open(browser, withMic, supabaseStub) {
   const page = await browser.newPage({ viewport: { width: 820, height: 1180 } });
   page.errors = [];
   page.on("pageerror", (e) => page.errors.push(e.message));
   if (withMic) await page.addInitScript(MOCK_MIC);
+  if (supabaseStub) await page.route(/cdn\.jsdelivr\.net/, (r) => r.fulfill({ contentType: "application/javascript", body: supabaseStub }));
   await page.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
   await page.goto("http://app.test/");
   return page;
@@ -131,7 +132,41 @@ async function playThrough(page, solo) {
   await en.click('[data-act="start"]');
   await en.click('[data-w="assist"]');
   check(/Your morning/.test(await en.textContent(".instr")), "English learning session uses English exercise content");
+  // The choice must survive a reload in every panel, not only in the main app.
+  await en.click('[data-act="stop"]');
+  await en.click('[data-act="home"]');
+  await en.reload();
+  check((await en.textContent(".home h1")) === "Hello, English", "English stays selected after reloading");
+  await en.click(".cloud-launcher");
+  check((await en.textContent(".cloud-card h2")) === "Cloud backup", "after reloading, the cloud backup panel is still in English");
+  await en.click('[data-cloud="close"]');
   check(en.errors.length === 0, "no page errors (English language and logout): " + en.errors.join("; "));
+
+  // Real sign-out through the Account dialog, with a stand-in for Supabase that remembers the sign-out.
+  const SUPABASE_STUB = `window.supabase = { createClient: function () {
+    var subs = [], signedIn = !sessionStorage.getItem("signedOut");
+    var user = { id: "u1", email: "test@example.com", user_metadata: {} };
+    var q = function () { var o = { select: function () { return o; }, eq: function () { return o; }, order: function () { return o; }, limit: function () { return o; },
+      maybeSingle: function () { return Promise.resolve({ data: null, error: null }); }, single: function () { return Promise.resolve({ data: null, error: null }); },
+      then: function (r) { return Promise.resolve({ data: [], error: null }).then(r); } }; return o; };
+    return { auth: {
+        getSession: function () { return Promise.resolve({ data: { session: signedIn ? { user: user } : null } }); },
+        getUser: function () { return Promise.resolve({ data: { user: signedIn ? user : null } }); },
+        onAuthStateChange: function (cb) { subs.push(cb); return { data: { subscription: { unsubscribe: function () {} } } }; },
+        signOut: function () { signedIn = false; sessionStorage.setItem("signedOut", "1"); subs.forEach(function (cb) { cb("SIGNED_OUT", null); }); return Promise.resolve({ error: null }); }
+      }, from: q, rpc: function () { return Promise.resolve({ data: null, error: null }); }, functions: { invoke: function () { return Promise.resolve({ data: null, error: null }); } } };
+  } };`;
+  const so = await open(browser, false, SUPABASE_STUB);
+  await so.fill("#pf-name", "Eric"); await so.click('[data-act="onboard-skip"]'); await so.click('[data-act="home"]');
+  await so.waitForTimeout(300);
+  check((await so.textContent(".home h1")) === "Ciao, Eric", "signed in: the greeting uses the learner's name");
+  await so.click(".account-launcher");
+  await Promise.all([so.waitForNavigation(), so.click('[data-action="signout"]')]);
+  await so.waitForTimeout(300);
+  check(!(await so.$(".account-panel:not([hidden])")), "signing out closes the account dialog and reloads the page");
+  check((await so.textContent(".home h1")) === "Benvenuto", "after signing out, the learner's name is gone");
+  check(!(await so.$(".mychips")), "after signing out, the learner's interests are hidden");
+  check(so.errors.length === 0, "no page errors (sign-out): " + so.errors.join("; "));
 
   // Solo session with a simulated microphone
   const q = await open(browser, true);

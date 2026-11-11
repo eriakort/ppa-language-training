@@ -37,7 +37,7 @@
       modeHint: "Create an account or sign in to an existing one."
     }
   };
-  var lang = localStorage.getItem("pog_lang") === "en" ? "en" : "it";
+  var lang = window.POG.getLang();
   var T = copy[lang], client = null, mode = "signin", message = "", error = "", user = null;
   var launcher, panel, observer;
 
@@ -96,8 +96,14 @@
   }
   function publishAuthState(session, event) {
     try {
-      if (event === "SIGNED_OUT") localStorage.setItem("pog_account_signed_out", "1");
-      else if (session) localStorage.removeItem("pog_account_signed_out");
+      if (session) {
+        localStorage.setItem("pog_account_had_session", "1");
+        localStorage.removeItem("pog_account_signed_out");
+      } else if (event === "SIGNED_OUT" || localStorage.getItem("pog_account_had_session") === "1") {
+        /* Signed out here, or a session this device had has ended (expired, or signed out in another tab). */
+        localStorage.setItem("pog_account_signed_out", "1");
+        localStorage.removeItem("pog_account_had_session");
+      }
     } catch (e) {}
     window.dispatchEvent(new CustomEvent("pog:authchange", { detail: {
       signedIn: !!session,
@@ -154,7 +160,11 @@
       else if (a === "signout") {
         client.auth.signOut().then(function (r) {
           if (r.error) fail(r.error);
-          else { user = null; publishAuthState(null, "SIGNED_OUT"); mode = "signin"; message = ""; render(); }
+          else {
+            /* Leave the signed-in view completely: close the dialog and reload so every panel starts signed out. */
+            user = null; publishAuthState(null, "SIGNED_OUT"); hide();
+            window.location.reload();
+          }
         }).catch(fail);
         return;
       }
@@ -202,6 +212,10 @@
     observer.observe(document.getElementById("app"), { childList: true });
   }
   mount();
+  /* Signed out in another tab: reload this one too. */
+  window.addEventListener("storage", function (ev) {
+    if (ev.key === "pog_account_signed_out" && ev.newValue === "1") window.location.reload();
+  });
   window.addEventListener("pog:languagechange", function (ev) {
     lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
     T = copy[lang];

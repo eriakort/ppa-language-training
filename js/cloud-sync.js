@@ -34,7 +34,7 @@
       linked:"Cloud profile linked", consentMissing:"You must confirm consent to continue.", find:"Find my cloud profiles", link:"Link selected profile", confirmLink:"Link this local profile to the selected cloud profile?", noCloudProfiles:"No cloud profiles are available to this account."
     }
   };
-  var lang = localStorage.getItem("pog_lang") === "en" ? "en" : "it", T = copy[lang];
+  var lang = window.POG.getLang(), T = copy[lang];
   var client = null, panel = null, launcher = null, message = "", error = "", cloudProfileId = "", lastUpdated = "", isSignedIn = false, availableProfiles = [];
   var KEYS = ["profile","settings","placement","history","sessions","scripts_it","scripts_en","active_session"];
   function configured() { return !!(cfg.url && cfg.anonKey && window.supabase && window.supabase.createClient); }

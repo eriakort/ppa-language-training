@@ -180,3 +180,19 @@ invocation are configured and verified in the Supabase project.
 This increment does not delete authentication accounts. Account deletion
 requires a separate account-level workflow that checks all profile memberships,
 ownership transfers and outstanding legal retention obligations.
+
+
+## Ownership transfer
+
+Migration: `supabase/migrations/202611110008_profile_ownership_transfer.sql`.
+
+A current owner can request transfer to an existing caregiver on the same cloud
+profile. The caregiver must accept within seven days. Acceptance is performed
+through a trusted Edge Function and a service-role-only database function that
+atomically promotes the recipient to owner and changes the former owner to
+caregiver. The former owner retains access; no learner data is copied or deleted.
+A pending profile deletion blocks transfer until it is cancelled. Only one
+pending transfer per profile is allowed. The recipient must already have an
+account and caregiver membership; invitations and role changes are not performed
+by the browser. This is a prerequisite for safe account-level deletion and
+ownership changes, not an account deletion feature.

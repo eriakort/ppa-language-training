@@ -159,5 +159,88 @@ Deno.serve(async (req) => {
       return json({ retention_days: days, note: "The new retention period is applied by the scheduled maintenance job." });
     }
   }
+
+  if (body.action === "request_ownership_transfer") {
+    const profileId = typeof body.profile_id === "string" ? body.profile_id : "";
+    const targetId = typeof body.user_id === "string" ? body.user_id : "";
+    if (!/^[0-9a-f-]{36}$/i.test(profileId) || !/^[0-9a-f-]{36}$/i.test(targetId) || targetId === user.id)
+      return json({ error: "Invalid profile or member" }, 400);
+    const { data: owner } = await admin.from("profile_members").select("role")
+      .eq("profile_id", profileId).eq("user_id", user.id).maybeSingle();
+    if (owner?.role !== "owner") return json({ error: "Only the current owner can transfer ownership" }, 403);
+    const { data: target } = await admin.from("profile_members").select("role")
+      .eq("profile_id", profileId).eq("user_id", targetId).maybeSingle();
+    if (target?.role !== "caregiver") return json({ error: "The new owner must already be a caregiver on this profile" }, 409);
+    const { data: deletion } = await admin.from("profile_deletion_requests").select("id")
+      .eq("profile_id", profileId).eq("status", "pending").maybeSingle();
+    if (deletion) return json({ error: "Cancel the pending profile deletion before transferring ownership" }, 409);
+    await admin.from("profile_ownership_transfers").update({ status: "expired" })
+      .eq("profile_id", profileId).eq("status", "pending").lte("expires_at", new Date().toISOString());
+    const { data: transfer, error } = await admin.from("profile_ownership_transfers")
+      .insert({ profile_id: profileId, from_user_id: user.id, to_user_id: targetId })
+      .select("id,status,expires_at").single();
+    if (error || !transfer) return json({ error: "Could not create ownership transfer request" }, 500);
+    return json({ transfer });
+  }
+
+  if (body.action === "list_outgoing_transfers") {
+    const { data: transfers, error } = await admin.from("profile_ownership_transfers")
+      .select("id,profile_id,to_user_id,created_at,expires_at")
+      .eq("from_user_id", user.id).eq("status", "pending").gt("expires_at", new Date().toISOString());
+    if (error) return json({ error: "Could not load outgoing ownership requests" }, 500);
+    const enriched = await Promise.all((transfers ?? []).map(async (transfer) => {
+      const [{ data: profile }, { data: target }] = await Promise.all([
+        admin.from("learner_profiles").select("display_name").eq("id", transfer.profile_id).maybeSingle(),
+        admin.auth.admin.getUserById(transfer.to_user_id ?? "")
+      ]);
+      return { id: transfer.id, profile_name: profile?.display_name ?? "", to_email: target.user?.email ?? "", expires_at: transfer.expires_at };
+    }));
+    return json({ transfers: enriched });
+  }
+
+  if (body.action === "list_incoming_transfers") {
+    const { data: transfers, error } = await admin.from("profile_ownership_transfers")
+      .select("id,profile_id,from_user_id,created_at,expires_at")
+      .eq("to_user_id", user.id).eq("status", "pending").gt("expires_at", new Date().toISOString());
+    if (error) return json({ error: "Could not load ownership invitations" }, 500);
+    const enriched = await Promise.all((transfers ?? []).map(async (transfer) => {
+      const [{ data: profile }, { data: source }] = await Promise.all([
+        admin.from("learner_profiles").select("display_name").eq("id", transfer.profile_id).maybeSingle(),
+        admin.auth.admin.getUserById(transfer.from_user_id ?? "")
+      ]);
+      return { id: transfer.id, profile_id: transfer.profile_id, profile_name: profile?.display_name ?? "",
+        from_email: source.user?.email ?? "", expires_at: transfer.expires_at };
+    }));
+    return json({ transfers: enriched });
+  }
+
+  if (body.action === "accept_ownership_transfer") {
+    const transferId = typeof body.transfer_id === "string" ? body.transfer_id : "";
+    if (!/^[0-9a-f-]{36}$/i.test(transferId)) return json({ error: "Invalid transfer" }, 400);
+    const { data: pending } = await admin.from("profile_ownership_transfers").select("id,expires_at")
+      .eq("id", transferId).eq("to_user_id", user.id).eq("status", "pending").maybeSingle();
+    if (!pending) return json({ error: "Transfer is no longer pending" }, 409);
+    if (new Date(pending.expires_at).getTime() <= Date.now()) {
+      await admin.from("profile_ownership_transfers").update({ status: "expired" }).eq("id", transferId).eq("status", "pending");
+      return json({ error: "Transfer invitation has expired" }, 409);
+    }
+    const { data: result, error } = await admin.rpc("complete_profile_ownership_transfer", {
+      transfer_id: transferId, accepting_user_id: user.id
+    });
+    if (error) return json({ error: "Could not accept this ownership transfer. It may have expired or the profile may no longer be eligible." }, 409);
+    return json({ accepted: true, profile_id: result.profile_id });
+  }
+
+  if (body.action === "cancel_ownership_transfer") {
+    const transferId = typeof body.transfer_id === "string" ? body.transfer_id : "";
+    if (!/^[0-9a-f-]{36}$/i.test(transferId)) return json({ error: "Invalid transfer" }, 400);
+    const { data: transfer, error } = await admin.from("profile_ownership_transfers").update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+      .eq("id", transferId).eq("from_user_id", user.id).eq("status", "pending")
+      .select("id").maybeSingle();
+    if (error) return json({ error: "Could not cancel ownership transfer" }, 500);
+    if (!transfer) return json({ error: "Transfer is no longer cancellable" }, 409);
+    return json({ cancelled: true });
+  }
+
   return json({ error: "Unknown action" }, 400);
 });

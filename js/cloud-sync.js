@@ -128,14 +128,14 @@
     if(!localStorage.getItem(consentKey()))throw new Error(T.consentMissing);
     var id=await ensureCloudProfile(), data=snapshot();
     var placement=data.data.placement||{};
-    var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at").single();
+    var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at,revision").single();
     if(r.error)throw r.error;
     lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",lastUpdated);localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.done;error="";render();
   }
   async function restore() {
     await signedIn();
     if(!localStorage.getItem(consentKey()))throw new Error(T.consentMissing);
-    var r=await client.from("profile_data").select("preferences,updated_at").eq("profile_id",cloudProfileId).single();
+    var r=await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id",cloudProfileId).single();
     if(r.error)throw r.error;
     var saved=r.data.preferences;
     if(!saved||saved.version!==1||!saved.data||typeof saved.data!=="object")throw new Error(T.none);

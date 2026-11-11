@@ -52,8 +52,11 @@ The first migration is `supabase/migrations/202611110001_hybrid_identity.sql`.
    action; clean devices can receive a newer cloud snapshot automatically.
    Audio remains local. This is revision-based conflict protection, not a semantic
    merge of simultaneous exercise answers.
-7. **Therapist access and lifecycle:** role-limited history, export, account/profile
-   deletion and retention controls.
+7. **Therapist access and lifecycle:** the first security increment makes therapist
+   membership read-only. Therapists can read session history but cannot read the broad
+   profile snapshot or create, update or delete sessions. Owners/caregivers retain
+   profile snapshot management; learners can participate in session writes. Later
+   increments add scoped history views, export, account/profile deletion and retention controls.
 
 ## Local checkpoint and backup contents
 
@@ -95,6 +98,8 @@ remain queued until connectivity returns. Audio remains device-only.
 - Keep audio recordings device-only. Cloud audio upload is out of scope.
 - Only the Supabase publishable/anon key may be used in browser code. Never ship a
   service-role key or other server secret to GitHub Pages.
+- Therapist membership is read-only: session history is visible to profile members,
+  but therapists cannot read the broader profile snapshot or write session data.
 - Client cloud writes are limited by membership RLS. The cloud profile is created
   by the trusted `profile-access` Edge Function; clients cannot grant roles.
 - Revoke consent in the cloud-backup panel to stop further backups/restores from

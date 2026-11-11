@@ -125,3 +125,8 @@ empty by default. Never place the service-role key in browser code or Git.
 The app's backup controls require an authenticated session, a local learner
 profile and an explicit per-profile consent choice. A cloud profile and initial
 backup are created only after the user presses the create/backup action.
+
+
+## Therapist session history projection
+
+The therapist dashboard reads only `therapist_session_metrics`, a dedicated aggregate projection. It contains session date/mode, item and spoken counts, result totals and aggregate onset, words-per-minute and pause measures. It does not contain exercise labels, personal phrases, recognition transcripts, audio, or raw session JSON. The client publishes at most the latest 60 local session aggregates only when the learner profile has explicit cloud consent and is already linked to a cloud profile. The dashboard lists only profiles explicitly shared with the signed-in account and exports the same limited columns as CSV. Therapists have SELECT only; owners/caregivers/learners may insert or update; no client delete policy is provided.

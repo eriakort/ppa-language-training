@@ -306,3 +306,14 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
   width: 100%; min-height: 56px; border: 2px solid var(--line); border-radius: 12px;
   background: var(--bg); color: var(--ink); padding: 8px 12px; font: inherit;
 }
+
+
+/* Read-only therapist cloud history */
+.therapist-cloud-launcher { position: fixed; z-index: 20; left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); min-height: 52px; padding: 10px 18px; border: 2px solid var(--accent); border-radius: 999px; background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 3px 14px rgba(0,0,0,.16); }
+.therapist-cloud-panel[hidden] { display: none; }
+.therapist-cloud-panel { position: fixed; z-index: 32; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.56); overflow-y: auto; }
+.therapist-cloud-card { width: min(100%, 980px); max-height: min(92dvh, 850px); overflow: auto; display: flex; flex-direction: column; gap: 16px; padding: clamp(18px, 4vw, 30px); border-radius: 22px; background: var(--surface); color: var(--ink); box-shadow: 0 12px 40px rgba(0,0,0,.24); text-align: left; }
+.therapist-cloud-card h2, .therapist-cloud-card p { margin: 0; }
+.therapist-cloud-card select { width: 100%; min-height: 56px; border: 2px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--ink); padding: 8px 12px; font: inherit; }
+.therapist-cloud-card .tbl { max-width: 100%; overflow-x: auto; }
+@media (max-width: 520px) { .therapist-cloud-launcher { min-height: 46px; font-size: 15px; padding: 8px 12px; } }

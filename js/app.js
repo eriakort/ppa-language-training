@@ -1231,7 +1231,7 @@
   app.addEventListener("click", function (e) {
     var b = e.target.closest("[data-act]"); if (!b || b.disabled || busy) return;
     var act = b.getAttribute("data-act"), t = T[lang];
-    if (act === "lang") { lang = b.getAttribute("data-l"); save("lang", lang); document.documentElement.lang = lang; rerenderKeep(); return; }
+    if (act === "lang") { lang = b.getAttribute("data-l") === "en" ? "en" : "it"; save("lang", lang); document.documentElement.lang = lang; window.dispatchEvent(new CustomEvent("pog:languagechange", { detail: { lang: lang } })); rerenderKeep(); return; }
     if (act === "int") { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }
     if (act === "onboard-place" || act === "onboard-skip") {
       var p = readProfile("pf-"); if (!p) { rerenderKeep(); return; }

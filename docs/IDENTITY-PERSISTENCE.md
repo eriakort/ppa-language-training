@@ -130,3 +130,20 @@ backup are created only after the user presses the create/backup action.
 ## Therapist session history projection
 
 The therapist dashboard reads only `therapist_session_metrics`, a dedicated aggregate projection. It contains session date/mode, item and spoken counts, result totals and aggregate onset, words-per-minute and pause measures. It does not contain exercise labels, personal phrases, recognition transcripts, audio, or raw session JSON. The client publishes at most the latest 60 local session aggregates only when the learner profile has explicit cloud consent and is already linked to a cloud profile. The dashboard lists only profiles explicitly shared with the signed-in account and exports the same limited columns as CSV. Therapists have SELECT only; owners/caregivers/learners may insert or update; no client delete policy is provided.
+
+
+## Profile export and shared-access lifecycle
+
+The Profile privacy panel exports the active local profile's JSON data allowlist
+(profile details, settings, placement, history, completed session summaries,
+bilingual personal phrases and active checkpoint). The export is generated on
+the device and is not uploaded. IndexedDB audio recordings remain device-only
+and are not included in this JSON export.
+
+For linked cloud profiles, owners can view shared membership and revoke access
+for non-owner members. Caregivers can revoke learner access only. Therapists
+cannot manage membership. The browser cannot write membership rows: listing
+and revocation are authorized by the profile-access Edge Function using the
+server-side service-role key. Owners cannot revoke another owner or remove
+themselves through this action. This increment does not delete the learner
+profile, cloud snapshot, session metrics, or authentication account.

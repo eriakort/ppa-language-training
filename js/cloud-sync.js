@@ -177,6 +177,7 @@
         refreshCloudStatus();return;
       }
       if(a==="create"){
+        if(!window.confirm(T.confirmBackup))return;
         (async function(){try{await signedIn();await backup();}catch(e){fail(e);}})();return;
       }
       if(a==="backup"){

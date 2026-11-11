@@ -4,6 +4,7 @@ const path = require("path");
 const root = path.resolve(__dirname, "..");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202611110002_secure_membership_provisioning.sql"), "utf8");
 const fn = fs.readFileSync(path.join(root, "supabase/functions/profile-access/index.ts"), "utf8");
+const frontend = ["index.html", "js/app.js", "js/strings.js"].map((file) => fs.readFileSync(path.join(root, file), "utf8")).join(" ");
 
 function check(ok, label) {
   if (!ok) { console.error("FAIL " + label); process.exitCode = 1; }
@@ -14,4 +15,4 @@ check(migration.includes("set search_path = pg_catalog, public"), "security-defi
 check(fn.includes('body.action === "create_profile"') && fn.includes('role: "owner"'), "self-registration provisions the first owner via trusted server code");
 check(fn.includes('body.action === "invite_member"'), "managed invitations use a trusted server endpoint");
 check(fn.includes('membership.role === "owner"') && fn.includes('membership.role === "caregiver" && role === "learner"'), "invitation roles are restricted by inviter permissions");
-const frontend = ["index.html", "js/app.js", "js/strings.js"].map((file) => fs.readFileSync(path.join(root, file), "utf8")).join("\\n");\ncheck(fn.includes("SUPABASE_SERVICE_ROLE_KEY") && !frontend.includes("SUPABASE_SERVICE_ROLE_KEY"), "service-role key is never included in browser assets");
+check(fn.includes("SUPABASE_SERVICE_ROLE_KEY") && !frontend.includes("SUPABASE_SERVICE_ROLE_KEY"), "service-role key is never included in browser assets");

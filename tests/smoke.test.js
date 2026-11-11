@@ -87,13 +87,26 @@ async function playThrough(page, solo) {
   await p.click('[data-act="start"]'); await p.click('[data-w="assist"]');
   check(/Bologna FC/.test(await p.textContent(".card .instr")), "story topic uses the favourite team");
   const resumePrompt = await p.textContent(".instr");
-  const checkpoint = await p.evaluate(() => JSON.parse(localStorage.getItem("pog_active_session")));
+  const checkpoint = await p.evaluate(() => { const key = Object.keys(localStorage).find((k) => k.startsWith("pog_p_") && k.endsWith("_active_session")); return key ? JSON.parse(localStorage.getItem(key)) : null; });
   check(!!(checkpoint && checkpoint.session && checkpoint.session.steps.length), "active exercise checkpoint is saved locally");
   await p.reload();
   check(await p.textContent(".instr") === resumePrompt, "refresh restores the exact active exercise");
   await playThrough(p, false);
   check((await p.$$("tbody tr")).length >= 10, "assisted session completes with a summary");
   check(p.errors.length === 0, "no page errors (assisted): " + p.errors.join("; "));
+
+  // Shared-device profiles keep each person's settings and history separate.
+  await p.click('[data-act="home"]');
+  await p.click('[data-act="profiles"]');
+  await p.click('[data-act="profile-add"]');
+  await p.fill("#pf-name", "Second");
+  await p.click('[data-act="onboard-skip"]');
+  await p.click('[data-act="home"]');
+  check(/Second/.test(await p.textContent(".home h1")), "new learner profile becomes active");
+  await p.click('[data-act="profiles"]');
+  await p.click('button[data-act="profile-switch"]:has-text("Test")');
+  check(/Test/.test(await p.textContent(".home h1")), "switching restores the original learner profile");
+  check(/Calcio/.test(await p.textContent(".mychips")), "original learner interests remain isolated after switching");
 
   // Solo session with a simulated microphone
   const q = await open(browser, true);

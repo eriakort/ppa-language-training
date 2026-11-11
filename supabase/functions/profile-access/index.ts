@@ -149,13 +149,15 @@ Deno.serve(async (req) => {
       return json({ deletion_request: request });
     }
 
-    const days = Number(body.retention_days);
-    if (![30, 90, 180, 365, 730].includes(days)) return json({ error: "Choose a supported retention period" }, 400);
-    const { error } = await admin.from("profile_retention_settings").upsert({
-      profile_id: profileId, therapist_metrics_retention_days: days, updated_by: user.id, updated_at: new Date().toISOString()
-    }, { onConflict: "profile_id" });
-    if (error) return json({ error: "Could not update retention setting" }, 500);
-    return json({ retention_days: days, note: "The new retention period is applied by the scheduled maintenance job." });
+    if (body.action === "set_retention") {
+      const days = Number(body.retention_days);
+      if (![30, 90, 180, 365, 730].includes(days)) return json({ error: "Choose a supported retention period" }, 400);
+      const { error } = await admin.from("profile_retention_settings").upsert({
+        profile_id: profileId, therapist_metrics_retention_days: days, updated_by: user.id, updated_at: new Date().toISOString()
+      }, { onConflict: "profile_id" });
+      if (error) return json({ error: "Could not update retention setting" }, 500);
+      return json({ retention_days: days, note: "The new retention period is applied by the scheduled maintenance job." });
+    }
   }
   return json({ error: "Unknown action" }, 400);
 });

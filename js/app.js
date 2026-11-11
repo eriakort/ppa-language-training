@@ -5,7 +5,7 @@
   var activeProfileId = (function () { try { return localStorage.getItem("pog_active_profile_id") || ""; } catch (e) { return ""; } })();
   var GLOBAL_KEYS = { lang: true, profiles: true, active_profile_id: true };
   function storageKey(k) { return GLOBAL_KEYS[k] ? "pog_" + k : activeProfileId ? "pog_p_" + activeProfileId + "_" + k : "pog_" + k; }
-  function save(k, v) { try { localStorage.setItem(storageKey(k), JSON.stringify(v)); } catch (e) {} }
+  function save(k, v) { try { localStorage.setItem(storageKey(k), JSON.stringify(v)); window.dispatchEvent(new CustomEvent("pog:local-change", { detail: { key: k, profileId: activeProfileId } })); } catch (e) {} }
   function load(k) { try { var v = localStorage.getItem(storageKey(k)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function profileList() { var p = load("profiles"); return Array.isArray(p) ? p : []; }
   function setActiveProfile(id) { activeProfileId = id; try { localStorage.setItem("pog_active_profile_id", id); } catch (e) {} }

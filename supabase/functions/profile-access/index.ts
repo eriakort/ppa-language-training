@@ -32,6 +32,70 @@ Deno.serve(async (req) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON" }, 400); }
 
+  if (body.action === "account_deletion_preflight") {
+    const { data: memberships, error: membershipError } = await admin.from("profile_members")
+      .select("profile_id,role,created_at").eq("user_id", user.id);
+    if (membershipError) return json({ error: "Could not inspect account memberships" }, 500);
+    const profileIds = (memberships ?? []).map((item) => item.profile_id);
+    const [{ data: profiles, error: profilesError }, { data: outgoing, error: outgoingError },
+      { data: incoming, error: incomingError }] = await Promise.all([
+      profileIds.length ? admin.from("learner_profiles").select("id,display_name,created_at").in("id", profileIds) : Promise.resolve({ data: [], error: null }),
+      admin.from("profile_ownership_transfers").select("id,profile_id,expires_at")
+        .eq("from_user_id", user.id).eq("status", "pending"),
+      admin.from("profile_ownership_transfers").select("id,profile_id,expires_at")
+        .eq("to_user_id", user.id).eq("status", "pending")
+    ]);
+    if (profilesError || outgoingError || incomingError)
+      return json({ error: "Could not inspect account deletion dependencies" }, 500);
+    const ids = profileIds;
+    const [{ data: allMembers, error: allMembersError }, { data: deletions, error: deletionError }] = await Promise.all([
+      ids.length ? admin.from("profile_members").select("profile_id,user_id,role").in("profile_id", ids) : Promise.resolve({ data: [], error: null }),
+      ids.length ? admin.from("profile_deletion_requests").select("id,profile_id,status,scheduled_for")
+        .in("profile_id", ids).eq("status", "pending") : Promise.resolve({ data: [], error: null })
+    ]);
+    if (allMembersError || deletionError) return json({ error: "Could not inspect profile ownership" }, 500);
+    const profileRows = profiles ?? [];
+    const rows = (memberships ?? []).map((membership) => {
+      const profile = profileRows.find((item) => item.id === membership.profile_id);
+      const related = (allMembers ?? []).filter((item) => item.profile_id === membership.profile_id);
+      const owners = related.filter((item) => item.role === "owner");
+      const caregivers = related.filter((item) => item.role === "caregiver");
+      const pendingDeletion = (deletions ?? []).find((item) => item.profile_id === membership.profile_id);
+      return {
+        profile_id: membership.profile_id,
+        profile_name: profile?.display_name ?? "Learner profile",
+        role: membership.role,
+        member_count: related.length,
+        owner_count: owners.length,
+        caregiver_count: caregivers.length,
+        can_transfer_to_caregiver: membership.role === "owner" && owners.length === 1 && caregivers.some((item) => item.user_id !== user.id),
+        deletion_pending: Boolean(pendingDeletion),
+        deletion_scheduled_for: pendingDeletion?.scheduled_for ?? null,
+        account_action: membership.role === "owner"
+          ? (pendingDeletion ? "wait_for_profile_deletion" : (owners.length === 1 && caregivers.some((item) => item.user_id !== user.id) ? "transfer_or_delete_profile" : "delete_profile_before_account"))
+          : "membership_will_be_revoked"
+      };
+    });
+    const blockers = [];
+    for (const row of rows) {
+      if (row.role === "owner" && row.account_action !== "wait_for_profile_deletion")
+        blockers.push({ type: "owned_profile", profile_id: row.profile_id, profile_name: row.profile_name, action: row.account_action });
+      if (row.role === "owner" && row.deletion_pending)
+        blockers.push({ type: "profile_deletion_pending", profile_id: row.profile_id, profile_name: row.profile_name, scheduled_for: row.deletion_scheduled_for });
+    }
+    for (const transfer of outgoing ?? []) blockers.push({ type: "outgoing_transfer_pending", profile_id: transfer.profile_id, expires_at: transfer.expires_at });
+    for (const transfer of incoming ?? []) blockers.push({ type: "incoming_transfer_pending", profile_id: transfer.profile_id, expires_at: transfer.expires_at });
+    return json({
+      ready: blockers.length === 0,
+      membership_count: rows.length,
+      owned_profile_count: rows.filter((row) => row.role === "owner").length,
+      profiles: rows,
+      pending_transfers: { outgoing: (outgoing ?? []).length, incoming: (incoming ?? []).length },
+      blockers,
+      note: "This is a read-only preflight. It does not delete the account, profiles, memberships, backups, sessions or recordings."
+    });
+  }
+
   if (body.action === "create_profile") {
     const displayName = typeof body.display_name === "string" ? body.display_name.trim() : "";
     if (!displayName || displayName.length > 80) return json({ error: "Name must be 1–80 characters" }, 400);

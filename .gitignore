@@ -1,3 +1,9 @@
 node_modules/
 dist/
 .DS_Store
+
+# Local Supabase credentials and environment files
+.env
+.env.*
+!.env.example
+supabase/.env

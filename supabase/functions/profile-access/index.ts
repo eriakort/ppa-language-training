@@ -174,6 +174,8 @@ Deno.serve(async (req) => {
     const { data: deletion } = await admin.from("profile_deletion_requests").select("id")
       .eq("profile_id", profileId).eq("status", "pending").maybeSingle();
     if (deletion) return json({ error: "Cancel the pending profile deletion before transferring ownership" }, 409);
+    await admin.from("profile_ownership_transfers").update({ status: "expired" })
+      .eq("profile_id", profileId).eq("status", "pending").lte("expires_at", new Date().toISOString());
     const { data: transfer, error } = await admin.from("profile_ownership_transfers")
       .insert({ profile_id: profileId, from_user_id: user.id, to_user_id: targetId })
       .select("id,status,expires_at").single();
@@ -215,6 +217,13 @@ Deno.serve(async (req) => {
   if (body.action === "accept_ownership_transfer") {
     const transferId = typeof body.transfer_id === "string" ? body.transfer_id : "";
     if (!/^[0-9a-f-]{36}$/i.test(transferId)) return json({ error: "Invalid transfer" }, 400);
+    const { data: pending } = await admin.from("profile_ownership_transfers").select("id,expires_at")
+      .eq("id", transferId).eq("to_user_id", user.id).eq("status", "pending").maybeSingle();
+    if (!pending) return json({ error: "Transfer is no longer pending" }, 409);
+    if (new Date(pending.expires_at).getTime() <= Date.now()) {
+      await admin.from("profile_ownership_transfers").update({ status: "expired" }).eq("id", transferId).eq("status", "pending");
+      return json({ error: "Transfer invitation has expired" }, 409);
+    }
     const { data: result, error } = await admin.rpc("complete_profile_ownership_transfer", {
       transfer_id: transferId, accepting_user_id: user.id
     });

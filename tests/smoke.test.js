@@ -45,6 +45,7 @@ async function spokenAnswer(page) {
   if (/Racconto/.test(tag)) return "Mi sveglio presto, bevo il caffè, faccio colazione e poi leggo il giornale in cucina con calma";
   if (/Parole ·/.test(tag)) return "è " + (await page.getAttribute(".pic", "aria-label"));
   if (/Sequenze/.test(tag)) return (await page.$$eval(".chip", (e) => e.map((x) => x.textContent))).join(" ");
+  if (await page.$(".passage")) return page.textContent(".passage");
   if (await page.$(".phrase")) return page.textContent(".phrase");
   if (await page.$(".cue")) return SCRIPT_CUES[(await page.textContent(".cue")).trim()];
   return "";
@@ -102,6 +103,93 @@ async function playThrough(page, solo) {
   check(q.errors.length === 0, "no page errors (solo): " + q.errors.join("; "));
 
   await browser.close();
+
+  /* Website version: browser speech recognition (simulated) + real recording from Chromium's fake microphone. */
+  const browser2 = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+  const MOCK_SR = `(function(){
+    function SR(){ window.__sr = this; }
+    SR.prototype.start = function(){ var s = this; setTimeout(function(){ s.onstart && s.onstart(); }, 20); };
+    SR.prototype.stop = function(){ var s = this; setTimeout(function(){ s.onend && s.onend(); }, 20); };
+    SR.prototype.abort = SR.prototype.stop;
+    window.webkitSpeechRecognition = SR; window.SpeechRecognition = SR;
+    window.__say = function(t){ var s = window.__sr; s.onspeechstart && s.onspeechstart(); var r = [{ transcript: t }]; r.isFinal = true; s.onresult && s.onresult({ resultIndex: 0, results: [r] }); };
+  })();`;
+  const ctx2 = await browser2.newContext({ viewport: { width: 1000, height: 1200 }, acceptDownloads: true });
+  const w = await ctx2.newPage();
+  w.errors = [];
+  w.on("pageerror", (e) => w.errors.push(e.message));
+  await w.addInitScript(MOCK_SR);
+  // https, like GitHub Pages: browsers only allow the microphone on secure pages
+  await w.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  await w.goto("https://app.test/");
+  await w.fill("#pf-name", "Test"); await w.click('[data-act="onboard-skip"]');
+  // reading aloud at level 2 (word-by-word highlighting)
+  await w.selectOption("#lv-read", "2"); await w.click('[data-act="save-settings"]');
+  // consent, then PIN
+  await w.click('[data-act="rec-on"]');
+  await w.click('[data-act="consent-yes"]');
+  check(/casella/.test(await w.textContent(".nudge")), "consent needs the box ticked");
+  await w.check("#consent-ok"); await w.click('[data-act="consent-yes"]');
+  check(!!(await w.$("#th-pin1")), "after consent, asks to create a PIN");
+  await w.fill("#th-pin1", "1234"); await w.fill("#th-pin2", "4321"); await w.click('[data-act="pin-set"]');
+  check(/coincidono/.test(await w.textContent(".nudge")), "mismatched PINs are refused");
+  await w.fill("#th-pin1", "1234"); await w.fill("#th-pin2", "1234"); await w.click('[data-act="pin-set"]');
+  await w.waitForSelector(".report");
+  check(true, "PIN saved and therapist area opens");
+  await w.click('[data-act="home"]');
+  // solo session with recording
+  await w.click('[data-act="start"]');
+  check(/Google/.test(await w.textContent(".note")), "mode screen explains where the browser sends speech");
+  await w.click('[data-w="solo"]');
+  let sawRead = false;
+  for (let i = 0; i < 300; i++) {
+    if (await w.$(".sumhead")) break;
+    if (await w.$('[data-act="advance"]')) { await w.click('[data-act="advance"]'); continue; }
+    if (await w.$('[data-act="reveal"]')) { await w.click('[data-act="reveal"]'); continue; }
+    if ((await w.$(".cw")) || (await w.$(".slots"))) { await w.click('[data-act="hint"]'); continue; }
+    const o = await w.$$('[data-act="opt"]:not([disabled])'); if (o.length) { await o[0].click(); await w.waitForTimeout(1700); continue; }
+    if (await w.$('[data-act="mic"]')) {
+      if (await w.$(".passage")) sawRead = true;
+      await w.click('[data-act="mic"]'); await w.waitForTimeout(700);
+      if (await w.$(".passage")) check((await w.$$(".rw.on, .rw.done")).length > 0, "reading aloud highlights words while listening");
+      await w.evaluate((t) => window.__say(t), await spokenAnswer(w)); await w.waitForTimeout(300);
+      if (await w.$('[data-act="mic-done"]')) await w.click('[data-act="mic-done"]');
+      await w.waitForTimeout(400); continue;
+    }
+    await w.click('[data-r="good"]');
+  }
+  check(sawRead, "the session includes reading aloud");
+  const spoken2 = await w.$$eval("tbody tr", (rows) => rows.filter((r) => /Racconto|Parole|Frasi|Lettura|Ripetizione|Sequenze/.test(r.children[0].textContent)).map((r) => r.querySelector(".pill").textContent));
+  check(spoken2.length >= 8 && spoken2.every((r) => r === "Giusto"), "browser recognition: spoken answers recognised (" + spoken2.join(", ") + ")");
+  // therapist area
+  await w.click('[data-act="home"]'); await w.click('[data-act="therapist"]');
+  await w.fill("#th-pin", "0000"); await w.click('[data-act="pin-enter"]');
+  check(/corretto/.test(await w.textContent(".nudge")), "wrong PIN is refused");
+  await w.fill("#th-pin", "1234"); await w.click('[data-act="pin-enter"]');
+  await w.waitForSelector(".rec", { timeout: 5000 }).catch(() => {});
+  const recs = await w.$$(".rec");
+  check(recs.length >= 8, "recordings are listed (" + recs.length + ")");
+  check((await w.$$(".rec audio")).length === recs.length, "each recording can be played");
+  const sizes = await w.evaluate(() => new Promise((res) => { const rq = indexedDB.open("pog-audio"); rq.onsuccess = () => { const g = rq.result.transaction("rec").objectStore("rec").getAll(); g.onsuccess = () => res(g.result.map((r) => r.blob ? r.blob.size : 0)); }; }));
+  check(sizes.length && sizes.every((x) => x > 0), "recordings contain audio");
+  check((await w.$$(".report tbody tr")).length >= 1, "speaking trends table has the session");
+  check(/parole\/min|Inizio risposta/.test(await w.textContent(".rec .note")), "recordings show speaking measures");
+  const [dl] = await Promise.all([w.waitForEvent("download", { timeout: 5000 }), w.click('[data-act="export"]')]);
+  check(/\.csv$/.test(dl.suggestedFilename()), "CSV export downloads a file");
+  // delete one recording
+  await w.click('[data-act="rec-del"]'); await w.click('[data-act="rec-del-yes"]');
+  await w.waitForTimeout(400);
+  check((await w.$$(".rec")).length === recs.length - 1, "a recording can be deleted after confirming");
+  // assisted mode with the helper recording one answer
+  await w.click('[data-act="home"]'); await w.click('[data-act="start"]'); await w.click('[data-w="assist"]');
+  await w.click('[data-act="arec"]'); await w.waitForTimeout(1500);
+  check(/Ferma/.test(await w.textContent('[data-act="arec"]')), "assisted mode: the helper can record an answer");
+  await w.click('[data-r="good"]'); await w.waitForTimeout(600);
+  const assistRec = await w.evaluate(() => new Promise((res) => { const rq = indexedDB.open("pog-audio"); rq.onsuccess = () => { const g = rq.result.transaction("rec").objectStore("rec").getAll(); g.onsuccess = () => res(g.result.filter((r) => r.result === "good" && !r.heard).length); }; }));
+  check(assistRec === 1, "assisted recording is saved with the helper's rating");
+  check(w.errors.length === 0, "no page errors (website version): " + w.errors.join("; "));
+  await browser2.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

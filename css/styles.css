@@ -134,6 +134,27 @@ button:disabled { opacity: .45; cursor: default; }
 .heard em { color: var(--muted); }
 .heard .lbl { display: block; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-style: normal; margin-bottom: 4px; }
 
+/* Reading aloud */
+.passage { font-size: clamp(26px, 4vw, 36px); line-height: 1.7; font-weight: 700; margin: 0; max-width: 32ch; text-align: left; }
+.rw { border-radius: 6px; padding: 0 3px; transition: background .15s, color .15s; }
+.rw.on { background: var(--hl); }
+.rw.done { color: var(--muted); }
+.rec-toggle.on { background: var(--almost-soft); color: var(--almost); }
+
+/* Consent and therapist area */
+.consent { text-align: left; margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 10px; max-width: 60ch; }
+.recs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rec { background: var(--soft); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.rec-h { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 16px; }
+.rec-h span { color: var(--muted); }
+.rec-item { margin: 0; font-size: 18px; }
+.rec-heard { margin: 0; font-size: 17px; }
+.rec-heard .lbl { display: block; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.rec audio { width: 100%; max-width: 100%; }
+.rec .row-actions { justify-content: flex-start; }
+a.secondary { display: inline-flex; align-items: center; color: var(--ink); text-decoration: none; }
+.secondary.danger { background: var(--almost-soft); color: var(--almost); }
+
 /* Mode choice */
 .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; width: 100%; }
 .modecard { background: var(--soft); border: 3px solid transparent; border-radius: 20px; padding: 24px; text-align: left; display: flex; flex-direction: column; gap: 8px; min-height: 170px; }

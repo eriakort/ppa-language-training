@@ -14,7 +14,10 @@ A prototype tablet app for short daily language practice for people with
 - **Daily session, about 10 minutes**, ordered from the most demanding game to
   the easiest, so it always ends on something the person can do:
   telling (a story on a topic) → crossword or word building (alternate days)
-  → naming pictures → personal phrases → repeating → optional maze → sequences.
+  → naming pictures → personal phrases → reading aloud → repeating
+  → optional maze → sequences.
+- **Reading aloud** with words highlighted one at a time at a steady pace
+  (levels: whole passage, word by word, slowly word by word, listen then read).
 - **Levels that step down over time.** Each game starts at level 1, its hardest
   form, and moves to an easier level when it becomes too hard (average under
   60% over the last 3 sessions). It can move back up after 5 sessions over 90%.
@@ -33,27 +36,52 @@ A prototype tablet app for short daily language practice for people with
     correctness; the app only measures how much was said.
 - **No "wrong" on screen.** A missed answer adds a hint, then plays the model,
   then moves on.
+- **Voice recordings (optional, after consent).** Answers can be recorded for
+  the therapist, on the device only, deleted automatically after 30 days.
+  In assisted mode the helper can record an answer with one tap.
+- **Speaking measures** for the therapist: time to start answering, words per
+  minute, number and length of pauses. They are rough indicators for trends,
+  not clinical measurements.
+- **Therapist area behind a PIN** with speaking trends, recordings to play,
+  download or delete, and a CSV export of all results.
 
 ## Where it runs
 
-The app is published as a Claude artifact. The microphone check uses the
-artifact host's dictation feature, which works only in a Chromium browser
-(Chrome, Edge) or the Claude desktop app, and only for people in the artifact
-owner's organization. It is **not available on iPad, Safari or the Claude
-mobile apps**; there, and when opened as a plain web page (for example from
-this repository), the person rates their own spoken answers instead.
+**Main version: GitHub Pages** (https://eriakort.github.io/ppa-language-training/).
+Speech recognition uses the browser's Web Speech API:
+
+| Browser | Speech checking | Recording |
+| --- | --- | --- |
+| Chrome (computer, Android) | Yes (audio goes to Google's speech service) | Yes |
+| Safari (Mac, iPhone, iPad) | Yes (audio goes to Apple's speech service) | Yes |
+| Samsung Internet | Yes, as far as we know | Yes |
+| Edge | Uncertain; caniuse lists it as unsupported | Yes |
+| Firefox | No: self-rating instead | Yes |
+
+On some phones the microphone can't record and recognise at the same time. The
+app detects this and switches that device to recognition only; it can also be
+set in "Levels and settings". This has not yet been tested on real phones.
+
+**Claude artifact version:** uses the Claude host's dictation instead (Chrome,
+Edge or the Claude desktop app only) and can't record audio.
 
 Spoken prompts use the device's built-in voice (Web Speech API), so quality
 depends on the device.
 
 ## Data and privacy
 
-Everything stays in the browser's local storage on that device: profile,
-phrases, levels and history. The app sends none of this anywhere; the only
-outside request it makes is for the Atkinson Hyperlegible font from Google Fonts.
-In solo mode, speech is converted to text by the host's speech service; the app
-keeps only the text, never audio. Clearing the browser's site data resets
-everything.
+Everything stays in the browser on that device: profile, phrases, levels,
+session history (local storage) and voice recordings (IndexedDB). The app
+uploads none of it; the only outside request it makes itself is for the
+Atkinson Hyperlegible font from Google Fonts.
+
+- **Speech recognition** sends the audio to the browser's speech service
+  (Google in Chrome, Apple in Safari; Anthropic in the Claude artifact).
+- **Recordings** start only after a consent screen, stay on the device, are
+  deleted after 30 days, and can be deleted any time from the therapist area.
+- **The PIN** keeps the patient out of the therapist area. It is not strong
+  security: anyone with the device and browser tools could read the data.
+- Clearing the browser's site data deletes everything.
 
 ## Project structure
 
@@ -61,11 +89,16 @@ everything.
 index.html            Page shell: loads the files below
 css/styles.css        Styles, light and dark themes
 js/strings.js         Interface text (Italian and English)
-js/app.js             App logic: sessions, levels, placement, games, scoring
+js/app.js             App logic: sessions, levels, placement, games, scoring,
+                      consent, therapist area
+js/speech.js          Speech input: Claude host dictation or the browser's Web Speech API
+js/recorder.js        Microphone recording and speaking measures
+js/recordings.js      Recording storage on the device (IndexedDB), 30-day clean-up
 content/base.js       Everyday content for everyone
 content/interests.js  Interest packs (topics, words, crossword words, phrases)
 tools/build.js        Builds dist/parole-ogni-giorno.html, one self-contained file
 tests/content.test.js Checks content and every generated crossword
+tests/speech.test.js  Speaking measures and speech engine, with a fake recogniser
 tests/smoke.test.js   Browser click-through of the built page
 ```
 
@@ -74,7 +107,7 @@ tests/smoke.test.js   Browser click-through of the built page
 Open `index.html` in a browser to try it locally (no build needed).
 
 ```sh
-npm test                 # content checks, no install needed
+npm test                 # content and speech checks, no install needed
 npm run build            # writes dist/parole-ogni-giorno.html
 npm install && npx playwright install chromium
 npm run test:browser     # build + browser click-through
@@ -84,6 +117,8 @@ npm run test:browser     # build + browser click-through
 
 Most updates only touch `content/`:
 
+- **Reading passages:** `C.READ` in `content/base.js` (interests reuse their
+  `echo` sentences).
 - **New interest:** add an entry to `C.PACKS` in `content/interests.js` and its
   key to `C.PACK_KEYS`. Each pack needs `describe` topics, `name` items
   (`[word, hint, first sound]`), crossword words `cw` (capitals, no accents)

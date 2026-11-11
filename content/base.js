@@ -71,4 +71,15 @@ window.POG = window.POG || {};
     it: ["Al bar | Vorrei un caffè, per favore.", "Hai bisogno di una mano | Puoi aiutarmi, per favore?", "Qualcuno ti chiede come stai | Grazie, sto bene."],
     en: ["At a café | I'd like a coffee, please.", "You need a hand | Can you help me, please?", "Someone asks how you are | Thank you, I'm fine."]
   };
+  /* Reading aloud: two-sentence passages (levels 1-2) and short sentences (levels 3-4). Interest packs add their own. */
+  C.READ = {
+    it: { long: ["Oggi è una bella giornata. Dopo pranzo faccio una passeggiata in piazza.",
+                 "Mia sorella mi ha telefonato ieri sera. Domenica veniamo a pranzo da te.",
+                 "Il pane caldo profuma tutta la cucina. Ne taglio una fetta per la colazione."],
+          short: ["Apro la finestra.", "Il caffè è pronto.", "Andiamo al mercato."] },
+    en: { long: ["Today is a lovely day. After lunch I'll go for a walk in the square.",
+                 "My sister phoned me last night. On Sunday we're coming to lunch at yours.",
+                 "The warm bread makes the whole kitchen smell good. I'll cut a slice for breakfast."],
+          short: ["I open the window.", "The coffee is ready.", "Let's go to the market."] }
+  };
 })(window.POG.content = window.POG.content || {});

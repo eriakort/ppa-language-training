@@ -9,9 +9,9 @@
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
 
   /* Language games, hardest first. The maze is optional and sits outside language scoring. */
-  var GAMES = ["describe", "crossword", "name", "wordbuild", "script", "echo", "seq"];
-  var MAXLV = { describe: 3, crossword: 4, name: 4, wordbuild: 4, script: 3, echo: 3, seq: 3 };
-  var PLACE_N = { describe: 1, crossword: 2, name: 2, wordbuild: 2, script: 2, echo: 2, seq: 1 };
+  var GAMES = ["describe", "crossword", "name", "wordbuild", "script", "read", "echo", "seq"];
+  var MAXLV = { describe: 3, crossword: 4, name: 4, wordbuild: 4, script: 3, read: 4, echo: 3, seq: 3 };
+  var PLACE_N = { describe: 1, crossword: 2, name: 2, wordbuild: 2, script: 2, read: 1, echo: 2, seq: 1 };
   var RULE = { down: 0.6, downN: 3, up: 0.9, upN: 5, flag: 0.4, place: 0.6 };
 
   var T = window.POG.strings, C = window.POG.content;
@@ -61,7 +61,8 @@
     var lv = s.levels || {};
     GAMES.forEach(function (g) { var n = +lv[g]; lv[g] = (n >= 1 && n <= MAXLV[g]) ? n : 1; });
     var size = [4, 6, 8].indexOf(+s.mazeSize) >= 0 ? +s.mazeSize : 4;
-    return { levels: lv, auto: s.auto !== false, allowUp: s.allowUp !== false, maze: s.maze === true, mazeSize: size };
+    return { levels: lv, auto: s.auto !== false, allowUp: s.allowUp !== false, maze: s.maze === true, mazeSize: size,
+      record: s.record === true, consentAt: s.consentAt || null, recordConcurrent: s.recordConcurrent == null ? !isMobile() : !!s.recordConcurrent };
   }
   function getHistory() { var h = load("history"); return (h && typeof h === "object") ? h : {}; }
   function getProfile() { var p = load("profile"); return (p && p.name) ? p : null; }
@@ -95,60 +96,67 @@
   var ICON_SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>';
   var ICON_MIC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 0 0-7 0v6A3.5 3.5 0 0 0 12 15zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-2.6a8 8 0 0 0 7-7.9h-2z"/></svg>';
 
-  /* ---------- dictation (solo mode) ----------
-     The platform turns speech into text; the page never gets audio. null on Safari/iPad, Firefox and mobile apps. */
-  var D = null, micDenied = false, langRetry = false;
-  var L = { on: false, state: "idle", text: "", partial: "", step: null, timer: null };
-  if (window.claude && typeof window.claude.use === "function") {
-    window.claude.use("dictation").then(function (d) {
-      if (!d) return;
-      D = d;
-      d.onPartial(function (e) { if (!L.on) return; L.partial = e.text; updateHeard(); armSilence(); });
-      d.onFinal(function (e) {
-        if (!L.on) return;
-        L.text = L.text ? L.text + e.text : e.text.replace(/^\s+/, "");
-        L.partial = ""; updateHeard(); armSilence(); liveCheck();
-      });
-      d.onState(function (e) {
-        L.state = e.state;
-        if (e.state !== "idle") { if (L.on) render(); return; }
-        var was = L.on; L.on = false; clearTimeout(L.timer);
-        if (!was) return;
-        if (e.reason === "stopped" || e.reason === "viewer_stopped" || e.reason === "time_limit") { evaluateSpoken(); return; }
-        if (e.reason === "not_granted") { micDenied = true; if (S) S.nudge = T[lang].micDenied; }
-        else if (e.reason === "unavailable") { if (!langRetry) { langRetry = true; if (S) S.nudge = T[lang].tapAgain; } else { micDenied = true; if (S) S.nudge = T[lang].micDenied; } }
-        else if (e.reason === "dismissed") { if (S) S.nudge = T[lang].micDismissed; }
-        else if (e.reason !== "hidden") { if (S) S.nudge = T[lang].micBusy; }
-        if (screen === "item") render();
-      });
-      if (screen === "mode" || screen === "item") render();
-    }, function () {});
+  /* ---------- speech input (solo mode) and voice recording ----------
+     js/speech.js turns speech into text; js/recorder.js records audio (only after consent) and measures it. */
+  var micDenied = false, recOn = false, pacer = null;
+  var L = { on: false, state: "idle", text: "", partial: "", step: null, timer: null, t0: 0, lastFin: "" };
+  var SP = window.POG.createSpeech({
+    onText: function (fin, interim) {
+      if (!L.on) return;
+      L.text = fin; L.partial = interim;
+      updateHeard(); armSilence();
+      if (fin !== L.lastFin) { L.lastFin = fin; liveCheck(); }
+    },
+    onState: function (state, reason) {
+      L.state = state;
+      if (state !== "idle") { if (L.on && screen === "item") render(); return; }
+      var was = L.on, hadRec = recOn;
+      L.on = false; clearTimeout(L.timer); stopPacer();
+      if (!was) return;
+      if (reason === "stopped") { finishRecording().then(evaluateSpoken); return; }
+      cancelRecording();
+      if (!S) return;
+      var t = T[lang];
+      if (reason === "denied" || reason === "unavailable") { micDenied = true; S.nudge = t.micDenied; }
+      else if (reason === "retry") S.nudge = t.tapAgain;
+      else if (reason === "dismissed") S.nudge = t.micDismissed;
+      else if (reason === "capture" && hadRec) {
+        /* This device can't record and recognise at once: recognise only from now on. */
+        var s = getSettings(); s.recordConcurrent = false; save("settings", s);
+        S.nudge = t.micConflict;
+      }
+      else if (reason !== "hidden") S.nudge = t.micBusy;
+      if (screen === "item") render();
+    },
+    onReady: function () { if (screen === "mode" || screen === "item") render(); }
+  });
+  var REC = window.POG.createRecorder();
+  var RECS = window.POG.recordings;
+  var IN_HOST = !!(window.claude && typeof window.claude.use === "function");
+
+  function micReady() { return SP.provider !== "none" && !micDenied; }
+  function isMobile() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
   }
-  function micReady() { return !!D && !micDenied; }
+  /* Recording needs consent, a browser that can record, and the normal website (the artifact host blocks it). */
+  function recordingWanted() { return getSettings().record && REC.supported && !IN_HOST; }
   function micStart() {
     if (!micReady()) return;
     stopVoice();
-    L.on = true; L.text = ""; L.partial = ""; L.step = cur(); L.state = "starting";
+    var st = cur();
+    L.on = true; L.text = ""; L.partial = ""; L.lastFin = ""; L.step = st; L.state = "starting"; L.t0 = Date.now();
     S.nudge = "";
-    var p;
-    try { p = langRetry ? D.start() : D.start({ language: lang }); } catch (err) { p = Promise.reject({ code: "upstream_error" }); }
-    p.catch(function (err) {
-      var code = err && err.code, t = T[lang];
-      L.on = false; clearTimeout(L.timer);
-      if (code === "not_granted") { micDenied = true; S.nudge = t.micDenied; }
-      else if (code === "dismissed") S.nudge = t.micDismissed;
-      else if (code === "unavailable") { if (!langRetry) { langRetry = true; S.nudge = t.tapAgain; } else { micDenied = true; S.nudge = t.micDenied; } }
-      else if (code === "stopped") return;
-      else S.nudge = t.micBusy;
-      if (screen === "item") render();
-    });
+    SP.start(lang);
+    recOn = false;
+    if (recordingWanted() && getSettings().recordConcurrent) { recOn = true; REC.start().catch(function () { recOn = false; }); }
+    if (st.game === "read" && st.lv >= 2) startPacer(st);
     render();
   }
-  function micStop() { if (D && L.on) { try { D.stop().catch(function () {}); } catch (e) {} } }
-  function micCancel() { if (D && L.on) { L.on = false; clearTimeout(L.timer); try { D.stop().catch(function () {}); } catch (e) {} } }
+  function micStop() { if (L.on) SP.stop(); }
+  function micCancel() { if (L.on) { L.on = false; clearTimeout(L.timer); SP.cancel(); } cancelRecording(); stopPacer(); }
   function armSilence() {
     clearTimeout(L.timer);
-    var st = L.step, ms = st && st.game === "describe" ? 20000 : 10000;
+    var g = L.step && L.step.game, ms = g === "describe" ? 20000 : g === "read" ? 15000 : 10000;
     L.timer = setTimeout(function () { if (L.on) micStop(); }, ms);
   }
   function updateHeard() {
@@ -158,19 +166,74 @@
   function liveCheck() {
     var st = L.step;
     if (!st || !S || cur() !== st || st.game === "describe") return;
-    if (judge(st, L.text) === "good") micStop();
+    if (bestVerdict(st, L.text) === "good") micStop();
   }
-  function evaluateSpoken() {
+  function withRate(m) {
+    var ms = m.speechMs || (m.totalMs - (m.onsetMs || 0));
+    var wpm = m.words && ms > 0 ? Math.round(m.words / ms * 60000) : null;
+    /* Outside 20-300 words a minute the timing was almost certainly mis-measured: show nothing rather than a wrong number. */
+    m.wpm = wpm != null && wpm >= 20 && wpm <= 300 ? wpm : null;
+    return m;
+  }
+  /* Speaking measures for the answer just given: from the audio when recording, otherwise from recogniser timing. */
+  function finishRecording() {
+    var tm = SP.timing(), words = toks(L.text + " " + L.partial).length;
+    var base = { totalMs: Date.now() - L.t0, onsetMs: tm.firstSpeech ? tm.firstSpeech - tm.startedAt : null, speechMs: null, pauses: null, longestPauseMs: null, words: words, src: "timing" };
+    if (!recOn) return Promise.resolve(withRate(base));
+    recOn = false;
+    return REC.stop().then(function (r) {
+      if (!r) return withRate(base);
+      var m = r.measures ? Object.assign({}, r.measures, { words: words, src: "audio" }) : base;
+      withRate(m);
+      if (r.blob && S) S.pendingRec = { blob: r.blob, mime: r.mime };
+      return m;
+    }, function () { return withRate(base); });
+  }
+  function cancelRecording() { if (recOn) { recOn = false; REC.cancel(); } }
+  function saveRecording(st, heard, result) {
+    var p = S && S.pendingRec;
+    if (!p) return;
+    S.pendingRec = null;
+    var id = "r" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    S.recIds.push(id);
+    RECS.add({ id: id, t: Date.now(), session: S.id, game: st.game, lv: st.lv, label: itemLabel(st), heard: heard || "", result: result, measures: S.meas, mime: p.mime, blob: p.blob }).catch(function () {});
+  }
+  function bestVerdict(st, text) {
+    var order = { good: 3, almost: 2, retry: 1, none: 0 }, best = "none";
+    SP.candidates().concat([text]).forEach(function (c) { var v = judge(st, c); if (order[v] > order[best]) best = v; });
+    return best;
+  }
+  function evaluateSpoken(meas) {
     var st = L.step;
     if (!S || screen !== "item" || cur() !== st) return;
     var text = (L.text + (L.partial ? " " + L.partial : "")).trim();
     L.partial = "";
-    if (!text) { S.nudge = T[lang].heardNothing; render(); return; }
-    S.heard.push(text);
-    var v = judge(st, text);
+    if (!text) { S.pendingRec = null; S.nudge = T[lang].heardNothing; render(); return; }
+    S.heard.push(text); S.meas = meas;
+    var v = bestVerdict(st, text);
+    saveRecording(st, text, v === "good" || v === "almost" ? v : "retry");
     if (v === "good" || v === "almost") { record(v); return; }
     rateAction("retry");
     if (S && cur() === st) { S.nudge = T[lang].tryHelp; render(); }
+  }
+  /* Reading aloud: highlights one word at a time at a steady pace. */
+  function startPacer(st) {
+    stopPacer();
+    var n = st.data.split(/\s+/).length, ms = st.lv === 2 ? 650 : st.lv === 3 ? 1000 : 900;
+    S.paceIdx = 0; paintPace();
+    pacer = setInterval(function () {
+      if (!S || screen !== "item" || cur() !== st) { stopPacer(); return; }
+      S.paceIdx++;
+      if (S.paceIdx >= n) { S.paceIdx = n; stopPacer(); }
+      paintPace();
+    }, ms);
+  }
+  function stopPacer() { clearInterval(pacer); pacer = null; }
+  function paintPace() {
+    [].forEach.call(app.querySelectorAll(".rw"), function (el, i) {
+      el.classList.toggle("on", i === S.paceIdx);
+      el.classList.toggle("done", i < S.paceIdx);
+    });
   }
 
   /* ---------- answer checking ---------- */
@@ -209,7 +272,7 @@
     if (!heard.length) return "none";
     if (st.game === "name") return coverage(toks(st.data[lang][0]), heard) >= 1 ? "good" : "retry";
     if (st.game === "seq") return grade(coverage(toks(st.data.items.join(" ")), heard, 1), 0.8, 0.5);
-    if (st.game === "echo") return grade(coverage(toks(st.data), heard), 0.8, 0.5);
+    if (st.game === "echo" || st.game === "read") return grade(coverage(toks(st.data), heard), 0.8, 0.5);
     if (st.game === "script") return st.lv === 1 && S.support === 0
       ? grade(coverage(toks(st.data.phrase), heard, 4), 0.6, 0.3)
       : grade(coverage(toks(st.data.phrase), heard), 0.8, 0.5);
@@ -284,6 +347,18 @@
     return src[lv - 1].slice(0, n);
   }
 
+  /* Reading passages: two sentences at levels 1-2, one short sentence at levels 3-4. */
+  function pickRead(lv, n, off) {
+    var ks = myPacks(), long = [], short = [], out = [];
+    ks.forEach(function (k) {
+      var s1 = PACKS[k].echo[lang][0];
+      s1.forEach(function (x, i) { long.push(x + " " + s1[(i + 1) % s1.length]); short.push(x); });
+    });
+    if (!long.length) { long = C.READ[lang].long; short = C.READ[lang].short; }
+    var pool = lv <= 2 ? long : short;
+    for (var i = 0; i < n; i++) out.push(pool[(off + i) % pool.length]);
+    return out;
+  }
   function makeSteps(g, lv, n, off) {
     var out = [], i;
     if (g === "describe") { var dp = describePool(); for (i = 0; i < n; i++) out.push({ game: g, lv: lv, data: dp[(off + i) % dp.length] }); }
@@ -298,6 +373,7 @@
       for (i = 0; i < Math.min(n, sc.length); i++) { var p = sc[(off + i) % sc.length]; out.push({ game: g, lv: (lv === 1 && !p.cue) ? 2 : lv, data: p }); }
     }
     if (g === "echo") pickEcho(lv, n, off).forEach(function (p) { out.push({ game: g, lv: lv, data: p }); });
+    if (g === "read") pickRead(lv, n, off).forEach(function (p) { out.push({ game: g, lv: lv, data: p }); });
     if (g === "seq") {
       var sq = SEQ[lang][off % SEQ[lang].length];
       if (lv === 3) sq = { label: sq.label, items: sq.items.slice(0, 5), show: sq.show ? sq.show.slice(0, 5) : null };
@@ -308,7 +384,7 @@
   function todayPlan() {
     var day = Math.floor(Date.now() / 86400000), set = getSettings();
     var letters = day % 2 ? "wordbuild" : "crossword";
-    var list = ["describe", letters, "name", "script", "echo"];
+    var list = ["describe", letters, "name", "script", "read", "echo"];
     if (set.maze) list.push("maze");
     list.push("seq");
     return { day: day, list: list, set: set };
@@ -317,16 +393,16 @@
     var tp = todayPlan(), L = tp.set.levels, d = tp.day, steps = [];
     tp.list.forEach(function (g) {
       if (g === "maze") { steps.push({ game: "maze", lv: null, data: { n: tp.set.mazeSize } }); return; }
-      var n = { describe: 1, crossword: 3, wordbuild: 3, name: 4, script: 2, echo: 3, seq: 1 }[g];
+      var n = { describe: 1, crossword: 3, wordbuild: 3, name: 4, script: 2, read: 1, echo: 2, seq: 1 }[g];
       steps = steps.concat(makeSteps(g, L[g], n, d));
     });
-    return { mode: "session", who: who, steps: steps, i: -1, log: [], stopped: false, started: new Date(), levels: L, games: tp.list };
+    return { mode: "session", id: "s" + Date.now().toString(36), who: who, steps: steps, i: -1, log: [], stopped: false, started: new Date(), levels: L, games: tp.list };
   }
   function buildPlacement(who) {
     var pl = getPlacement();
     if (pl.status !== "in_progress") { pl = { status: "in_progress", levels: {}, flags: [] }; save("placement", pl); }
     var queue = GAMES.filter(function (g) { return !pl.levels[g]; });
-    S = { mode: "place", who: who, steps: [], i: -1, log: [], stopped: false, started: new Date(), queue: queue, pg: null, plv: 1, blockLog: 0, off: Math.floor(Math.random() * 8), games: GAMES.slice(), results: [] };
+    S = { mode: "place", id: "p" + Date.now().toString(36), who: who, steps: [], i: -1, log: [], stopped: false, started: new Date(), queue: queue, pg: null, plv: 1, blockLog: 0, off: Math.floor(Math.random() * 8), games: GAMES.slice(), results: [] };
     return placeNextBlock();
   }
   /* Adds the next block of placement items; returns false when every game has a level. */
@@ -357,6 +433,7 @@
     var st = cur();
     S.support = 0; S.max = 0; S.start = 0; S.replayed = false; S.opts = null; S.nudge = ""; S.firstTry = true;
     S.slots = null; S.pool = null; S.wrongs = 0; S.solved = false; S.revealed = false; S.t0 = Date.now(); S.heard = [];
+    S.meas = null; S.recIds = []; S.pendingRec = null; S.paceIdx = -1;
     if (st.game === "describe") { S.support = st.lv - 1; S.max = 2; }
     if (st.game === "name") { if (st.lv <= 2) { S.support = st.lv - 1; S.max = 3; } else makeOpts(st); }
     if (st.game === "script") { S.support = st.lv - 1; S.max = 2; }
@@ -500,6 +577,7 @@
     if (st.game === "name" || st.game === "wordbuild") return st.data[lang][0];
     if (st.game === "crossword") return st.data.pz.p[st.data.wi].w.toLowerCase();
     if (st.game === "script") return st.data.phrase;
+    if (st.game === "read") return st.data;
     if (st.game === "seq") return st.data.label;
     if (st.game === "maze") return st.data.n + "×" + st.data.n;
     return st.data;
@@ -511,7 +589,7 @@
   function record(result) {
     var st = cur(), extra = Math.max(0, (S.support || 0) - (S.start || 0));
     var hasHints = (st.game === "name" && st.lv <= 2) || ["describe", "script", "crossword", "wordbuild"].indexOf(st.game) >= 0;
-    S.log.push({ game: st.game, lv: st.lv, label: itemLabel(st), hints: hasHints ? S.support : null, result: result, score: score(result, extra), ms: Date.now() - S.t0, heard: (S.heard || []).join(" / ") });
+    S.log.push({ game: st.game, lv: st.lv, label: itemLabel(st), hints: hasHints ? S.support : null, result: result, score: score(result, extra), ms: Date.now() - S.t0, heard: (S.heard || []).join(" / "), meas: S.meas || null, recIds: (S.recIds || []).slice() });
     next();
   }
   function next() {
@@ -550,13 +628,25 @@
       }
     });
     save("history", hist); save("settings", set);
+    saveSession();
     S.changes = changes; S.nextLevels = set.levels;
     screen = "summary"; render();
+  }
+  /* Keeps the last 60 sessions (results and speaking measures, no audio) for the therapist area. */
+  function saveSession() {
+    if (!S || !S.log.length) return;
+    var all = load("sessions") || [];
+    all = all.filter(function (x) { return x.id !== S.id; });
+    all.push({ id: S.id, date: S.started.toISOString(), mode: S.mode, who: S.who, items: S.log.map(function (r) {
+      return { game: r.game, lv: r.lv, label: r.label, result: r.result, hints: r.hints, ms: r.ms, heard: r.heard, meas: r.meas, recIds: r.recIds };
+    }) });
+    save("sessions", all.slice(-60));
   }
   function finishPlacement(complete) {
     stopVoice();
     var pl = getPlacement();
     if (complete) { pl.status = "done"; save("placement", pl); }
+    saveSession();
     S.complete = complete;
     screen = "summary"; render();
   }
@@ -576,7 +666,9 @@
   function rateRow() {
     var t = T[lang];
     if (S.who === "solo") return soloRow();
-    return '<div class="rate">' + nudge() +
+    var recBtn = recordingWanted()
+      ? '<button class="tool rec-toggle' + (recOn ? ' on' : '') + '" data-act="arec">' + (recOn ? '■ ' + esc(t.recStop) : '● ' + esc(t.recStart)) + '</button>' : '';
+    return '<div class="rate">' + nudge() + recBtn +
       '<p class="label">' + esc(t.rateLabel) + '</p><div class="rate-btns">' +
       '<button class="r good" data-act="rate" data-r="good">' + esc(t.good) + '</button>' +
       '<button class="r almost" data-act="rate" data-r="almost">' + esc(t.almost) + '</button>' +
@@ -611,7 +703,7 @@
       '<button class="modecard" data-act="who" data-w="solo"><span class="ico" aria-hidden="true">🙂</span><strong>' + esc(t.soloTitle) + '</strong><span>' + esc(t.soloDesc) + '</span></button>' +
       '<button class="modecard" data-act="who" data-w="assist"><span class="ico" aria-hidden="true">🤝</span><strong>' + esc(t.assistTitle) + '</strong><span>' + esc(t.assistDesc) + '</span></button>' +
       '</div>' +
-      '<p class="note">' + esc(D ? t.micNote : t.noMic) + '</p>' +
+      '<p class="note">' + esc(SP.provider === "host" ? t.micNoteHost : SP.provider === "browser" ? t.micNoteBrowser : t.noMic) + '</p>' +
       '<button class="link" data-act="home">' + esc(t.back) + '</button></section>';
   }
   function listenBtn() { return '<button class="tool" data-act="listen">' + ICON_SPEAKER + esc(T[lang].listen) + '</button>'; }
@@ -672,7 +764,8 @@
         ? '<button class="primary" data-act="place">' + esc(t.placeContinue) + '</button><button class="link" data-act="start">' + esc(t.startAnyway) + '</button>'
         : '<button class="primary" data-act="start">' + esc(t.start) + '</button>') +
       '<div class="links"><button class="link" data-act="scripts">' + esc(t.scripts) + '</button>' +
-      '<button class="link" data-act="settings">' + esc(t.settings) + '</button></div>' +
+      '<button class="link" data-act="settings">' + esc(t.settings) + '</button>' +
+      '<button class="link" data-act="therapist">' + esc(t.thArea) + '</button></div>' +
       noTtsNote() + '<p class="note">' + esc(t.proto) + '</p></section>';
   }
   function viewScripts() {
@@ -686,6 +779,126 @@
       '<button class="primary" data-act="save-scripts">' + esc(t.saveBtn) + '</button>' +
       '<button class="link" data-act="home">' + esc(t.back) + '</button>' +
       '<p class="note">' + esc(t.localNote) + '</p></section>';
+  }
+  /* ---------- consent for voice recording ---------- */
+  function viewConsent() {
+    var t = T[lang];
+    return header(false) + '<section class="card">' +
+      '<h1 class="instr">' + esc(t.consentTitle) + '</h1>' +
+      '<ul class="consent">' + t.consentPoints.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' +
+      '<label class="check"><input type="checkbox" id="consent-ok">' + esc(t.consentCheck) + '</label>' +
+      (flash ? '<p class="nudge">' + esc(flash) + '</p>' : '') +
+      '<button class="primary" data-act="consent-yes">' + esc(t.consentYes) + '</button>' +
+      '<button class="link" data-act="settings">' + esc(t.back) + '</button></section>';
+  }
+
+  /* ---------- therapist area (PIN) ---------- */
+  var TH = { unlocked: false, recs: null, urls: [], confirm: "", changing: false };
+  function hashPin(pin) {
+    var salted = "pog-pin-v1:" + pin;
+    if (window.crypto && crypto.subtle && window.TextEncoder) {
+      return crypto.subtle.digest("SHA-256", new TextEncoder().encode(salted)).then(function (b) {
+        return [].map.call(new Uint8Array(b), function (x) { return ("0" + x.toString(16)).slice(-2); }).join("");
+      });
+    }
+    var h = 5381;
+    for (var i = 0; i < salted.length; i++) h = ((h << 5) + h + salted.charCodeAt(i)) | 0;
+    return Promise.resolve("d" + (h >>> 0).toString(16));
+  }
+  function thLock() { TH.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} }); TH = { unlocked: false, recs: null, urls: [], confirm: "", changing: false }; }
+  function thLoad() {
+    RECS.list().then(function (list) { TH.recs = list; if (screen === "therapist") render(); }, function () { TH.recs = []; if (screen === "therapist") render(); });
+  }
+  function fmtS(ms) { return ms == null ? "–" : (ms / 1000).toFixed(1).replace(".", lang === "it" ? "," : "."); }
+  function avg(list) { var v = list.filter(function (x) { return x != null; }); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null; }
+  function measLine(m) {
+    var t = T[lang]; if (!m) return "";
+    var parts = [t.mOnset + " " + fmtS(m.onsetMs) + " s"];
+    if (m.wpm != null) parts.push(m.wpm + " " + t.mWpm);
+    if (m.pauses != null) parts.push(t.mPauses + " " + m.pauses + (m.pauses ? " (" + t.mLongest + " " + fmtS(m.longestPauseMs) + " s)" : ""));
+    return parts.join(" · ");
+  }
+  function viewTherapist() {
+    var t = T[lang], pin = load("pin");
+    var head = header(false) + '<section class="card"><h1 class="instr">' + esc(t.thArea) + '</h1>';
+    var foot = (flash ? '<p class="nudge">' + esc(flash) + '</p>' : '') + '<button class="link" data-act="home">' + esc(t.back) + '</button></section>';
+    if (!pin || TH.changing) {
+      return head + '<p class="sub">' + esc(t.pinCreateHelp) + '</p>' +
+        '<div class="field"><label for="th-pin1">' + esc(t.pinNew) + '</label><input id="th-pin1" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></div>' +
+        '<div class="field"><label for="th-pin2">' + esc(t.pinRepeat) + '</label><input id="th-pin2" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></div>' +
+        '<button class="primary" data-act="pin-set">' + esc(t.pinSave) + '</button><p class="note">' + esc(t.pinNote) + '</p>' + foot;
+    }
+    if (!TH.unlocked) {
+      return head + '<div class="field"><label for="th-pin">' + esc(t.pinEnter) + '</label><input id="th-pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></div>' +
+        '<button class="primary" data-act="pin-enter">' + esc(t.pinOpen) + '</button>' +
+        (TH.confirm === "forgot"
+          ? '<div class="confirm"><span>' + esc(t.pinForgotQ) + '</span><button class="secondary" data-act="pin-forgot-yes">' + esc(t.yes) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button></div>'
+          : '<button class="link" data-act="pin-forgot">' + esc(t.pinForgot) + '</button>') + foot;
+    }
+    var sessions = (load("sessions") || []).slice().reverse();
+    var rows = sessions.slice(0, 12).map(function (s) {
+      var sp = s.items.filter(function (i) { return i.meas; });
+      var d = new Date(s.date).toLocaleDateString(lang === "it" ? "it-IT" : "en-GB", { day: "numeric", month: "short" });
+      return '<tr><td>' + esc(d) + '</td><td>' + esc(s.mode === "place" ? t.placeTag : (s.who === "solo" ? t.soloTitle : t.assistTitle)) + '</td><td class="n">' + sp.length + '</td>' +
+        '<td class="n">' + fmtS(avg(sp.map(function (i) { return i.meas.onsetMs; }))) + '</td>' +
+        '<td class="n">' + (avg(sp.map(function (i) { return i.meas.wpm; })) == null ? "–" : Math.round(avg(sp.map(function (i) { return i.meas.wpm; })))) + '</td>' +
+        '<td class="n">' + (avg(sp.map(function (i) { return i.meas.pauses; })) == null ? "–" : avg(sp.map(function (i) { return i.meas.pauses; })).toFixed(1)) + '</td>' +
+        '<td class="n">' + fmtS(avg(sp.map(function (i) { return i.meas.longestPauseMs; }))) + '</td></tr>';
+    }).join("");
+    var trend = sessions.length
+      ? '<div class="tbl"><table><thead><tr><th>' + esc(t.thDate) + '</th><th>' + esc(t.thMode) + '</th><th>' + esc(t.thSpoken) + '</th><th>' + esc(t.mOnset) + ' (s)</th><th>' + esc(t.mWpm) + '</th><th>' + esc(t.mPauses) + '</th><th>' + esc(t.mLongest) + ' (s)</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+      : '<p class="sub">' + esc(t.thNoSessions) + '</p>';
+    var recHtml;
+    if (TH.recs === null) { recHtml = '<p class="sub">…</p>'; thLoad(); }
+    else if (!TH.recs.length) recHtml = '<p class="sub">' + esc(getSettings().record ? t.thNoRecs : t.thRecOff) + '</p>';
+    else {
+      TH.urls.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) {} });
+      TH.urls = [];
+      recHtml = '<ul class="recs">' + TH.recs.slice(0, 60).map(function (r) {
+        var url = r.blob ? URL.createObjectURL(r.blob) : ""; if (url) TH.urls.push(url);
+        var when = new Date(r.t).toLocaleString(lang === "it" ? "it-IT" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+        var ext = /mp4|aac/.test(r.mime || "") ? "m4a" : /ogg/.test(r.mime || "") ? "ogg" : "webm";
+        return '<li class="rec"><div class="rec-h"><strong>' + esc(t.game[r.game] || r.game) + (r.lv ? ' · ' + esc(t.level) + ' ' + r.lv : '') + '</strong><span>' + esc(when) + '</span></div>' +
+          '<p class="rec-item">' + esc(r.label) + '</p>' +
+          (r.heard ? '<p class="rec-heard"><span class="lbl">' + esc(t.colHeard) + '</span>' + esc(r.heard) + '</p>' : '') +
+          (r.measures ? '<p class="note">' + esc(measLine(r.measures)) + '</p>' : '') +
+          (url ? '<audio controls preload="none" src="' + url + '"></audio>' : '') +
+          '<div class="row-actions">' + (url && !IN_HOST ? '<a class="secondary dl" href="' + url + '" download="' + esc((r.game || "rec") + "-" + new Date(r.t).toISOString().slice(0, 16).replace(/[:T]/g, "-") + "." + ext) + '">' + esc(t.download) + '</a>' : '') +
+          (TH.confirm === r.id
+            ? '<button class="secondary danger" data-act="rec-del-yes" data-id="' + esc(r.id) + '">' + esc(t.confirmDelete) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button>'
+            : '<button class="secondary" data-act="rec-del" data-id="' + esc(r.id) + '">' + esc(t.del) + '</button>') + '</div></li>';
+      }).join("") + '</ul>';
+    }
+    return head +
+      '<div class="report"><h2>' + esc(t.thTrends) + '</h2>' + trend + '<p class="note">' + esc(t.thTrendsNote) + '</p>' +
+      '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
+      '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
+      '<div class="row-actions">' +
+      (IN_HOST ? '' : '<button class="secondary" data-act="export">' + esc(t.exportCsv) + '</button>') +
+      (TH.confirm === "clear"
+        ? '<button class="secondary danger" data-act="rec-clear-yes">' + esc(t.clearRecsQ) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button>'
+        : '<button class="secondary" data-act="rec-clear">' + esc(t.clearRecs) + '</button>') +
+      '<button class="secondary" data-act="pin-change">' + esc(t.pinChange) + '</button>' +
+      '<button class="secondary" data-act="th-lock">' + esc(t.lock) + '</button></div></div>' + foot;
+  }
+  function exportCsv() {
+    var t = T[lang], sessions = load("sessions") || [];
+    var q = function (v) { v = v == null ? "" : String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var lines = [["date", "session", "mode", "player", "game", "level", "item", "heard", "result", "hints", "time_s", "onset_s", "speech_s", "pauses", "longest_pause_s", "words", "words_per_min", "measure_source"].join(",")];
+    sessions.forEach(function (s) {
+      s.items.forEach(function (i) {
+        var m = i.meas || {};
+        lines.push([s.date, s.id, s.mode, s.who, i.game, i.lv, i.label, i.heard, i.result, i.hints, i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          m.onsetMs == null ? "" : (m.onsetMs / 1000).toFixed(2), m.speechMs == null ? "" : (m.speechMs / 1000).toFixed(2),
+          m.pauses == null ? "" : m.pauses, m.longestPauseMs == null ? "" : (m.longestPauseMs / 1000).toFixed(2), m.words == null ? "" : m.words, m.wpm == null ? "" : m.wpm, m.src || ""].map(q).join(","));
+      });
+    });
+    var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "parole-ogni-giorno-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    flash = t.exported;
   }
   function viewSettings() {
     var t = T[lang], set = getSettings(), prof = getProfile() || {};
@@ -704,6 +917,15 @@
       '<label class="check"><input type="checkbox" id="set-auto"' + (set.auto ? ' checked' : '') + '>' + esc(t.auto) + '</label>' +
       '<label class="check"><input type="checkbox" id="set-up"' + (set.allowUp ? ' checked' : '') + '>' + esc(t.allowUp) + '</label>' +
       '<p class="note">' + esc(t.ruleText) + '</p>' +
+      '<h2>' + esc(t.secVoice) + '</h2>' +
+      (IN_HOST ? '<p class="note">' + esc(t.recInHost) + '</p>'
+        : (set.record
+          ? '<p class="note">' + esc(fill(t.recOnSince, { d: set.consentAt ? new Date(set.consentAt).toLocaleDateString(lang === "it" ? "it-IT" : "en-GB") : "–" })) + '</p>' +
+            '<label class="check"><input type="checkbox" id="set-conc"' + (set.recordConcurrent ? ' checked' : '') + '>' + esc(t.recConcurrent) + '</label>' +
+            '<div class="row-actions"><button class="secondary" data-act="rec-off">' + esc(t.recTurnOff) + '</button></div>'
+          : '<p class="note">' + esc(REC.supported ? t.recOff : t.recUnsupported) + '</p>' +
+            (REC.supported ? '<div class="row-actions"><button class="secondary" data-act="rec-on">' + esc(t.recTurnOn) + '</button></div>' : ''))) +
+      '<div class="row-actions"><button class="secondary" data-act="therapist">' + esc(t.thArea) + '</button></div>' +
       '<h2>' + esc(t.secOptions) + '</h2>' +
       '<label class="check"><input type="checkbox" id="set-maze"' + (set.maze ? ' checked' : '') + '>' + esc(t.mazeOn) + '</label>' +
       '<div class="setrow"><label for="set-msize">' + esc(t.mazeSize) + '</label><select id="set-msize">' +
@@ -755,6 +977,12 @@
       if (S.support === 0) body += '<p class="instr">' + esc(t.whatSay) + '</p><p class="cue">' + esc(p.cue) + '</p>';
       else body += (p.cue ? '<p class="cue">' + esc(p.cue) + '</p>' : '') + '<p class="instr">' + esc(S.support >= 2 ? t.echoInstr : t.readAloud) + '</p><p class="phrase">' + esc(p.phrase) + '</p>';
       body += '<div class="tools">' + (S.support < S.max ? hintBtn() : listenBtn()) + '</div>' + (S.support >= 2 ? noTtsNote() : '') + rateRow();
+    } else if (st.game === "read") {
+      var words = st.data.split(/\s+/), useMic = S.who === "solo" && micReady();
+      body += '<p class="instr">' + esc(st.lv === 1 ? t.readFree : st.lv === 4 ? t.readListen : t.readPaced) + '</p>' +
+        '<p class="passage">' + words.map(function (w, i) { return '<span class="rw' + (i === S.paceIdx ? ' on' : (i < S.paceIdx ? ' done' : '')) + '">' + esc(w) + '</span>'; }).join(" ") + '</p>' +
+        '<div class="tools">' + (st.lv === 4 || S.replayed ? listenBtn() : '') +
+        (st.lv >= 2 && !useMic ? '<button class="tool" data-act="pace">' + esc(t.startPace) + '</button>' : '') + '</div>' + rateRow();
     } else if (st.game === "echo") {
       body += '<p class="instr">' + esc(t.echoInstr) + '</p><p class="phrase">' + esc(st.data) + '</p>' +
         '<div class="tools">' + listenBtn() + '</div>' + noTtsNote() + rateRow();
@@ -895,7 +1123,7 @@
   }
 
   function render() {
-    var html = screen === "mode" ? viewMode() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
+    var html = screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
     app.innerHTML = html;
     flash = "";
     window.scrollTo(0, 0);
@@ -917,7 +1145,7 @@
     if (st.game === "seq") playSeq(st.data.items);
     else if (st.game === "name") speak(st.data[lang][0]);
     else if (st.game === "script") speak(st.data.phrase);
-    else if (st.game === "echo") speak(st.data);
+    else if (st.game === "echo" || st.game === "read") speak(st.data);
   }
   function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ""; }
   function readProfile(px) {
@@ -961,7 +1189,50 @@
       S = buildSession(who); screen = "item"; next(); return;
     }
     if (act === "scripts" || act === "settings") { confirmAsk = ""; screen = act; render(); return; }
-    if (act === "home") { stopVoice(); if (S) micCancel(); confirmAsk = ""; screen = "home"; render(); return; }
+    if (act === "home") { stopVoice(); if (S) micCancel(); confirmAsk = ""; thLock(); screen = "home"; render(); return; }
+    if (act === "therapist") { confirmAsk = ""; TH.confirm = ""; screen = "therapist"; render(); return; }
+    if (act === "pin-set") {
+      var p1 = val("th-pin1"), p2 = val("th-pin2");
+      if (!/^\d{4,8}$/.test(p1)) { flash = t.pinBad; render(); return; }
+      if (p1 !== p2) { flash = t.pinMismatch; render(); return; }
+      hashPin(p1).then(function (h) { save("pin", h); TH.changing = false; TH.unlocked = true; TH.recs = null; flash = t.pinSaved; render(); });
+      return;
+    }
+    if (act === "pin-enter") {
+      var pe = val("th-pin");
+      hashPin(pe).then(function (h) {
+        if (h === load("pin")) { TH.unlocked = true; TH.recs = null; } else flash = t.pinWrong;
+        render();
+      });
+      return;
+    }
+    if (act === "pin-forgot") { TH.confirm = "forgot"; render(); return; }
+    if (act === "pin-forgot-yes") {
+      RECS.clear().catch(function () {}).then(function () { save("sessions", []); save("pin", null); thLock(); flash = t.pinReset; render(); });
+      return;
+    }
+    if (act === "th-cancel") { TH.confirm = ""; render(); return; }
+    if (act === "th-lock") { thLock(); screen = "home"; render(); return; }
+    if (act === "pin-change") { TH.changing = true; render(); return; }
+    if (act === "rec-del") { TH.confirm = b.getAttribute("data-id"); render(); return; }
+    if (act === "rec-del-yes") {
+      RECS.remove(b.getAttribute("data-id")).catch(function () {}).then(function () { TH.confirm = ""; TH.recs = null; flash = t.recDeleted; render(); });
+      return;
+    }
+    if (act === "rec-clear") { TH.confirm = "clear"; render(); return; }
+    if (act === "rec-clear-yes") {
+      RECS.clear().catch(function () {}).then(function () { TH.confirm = ""; TH.recs = null; flash = t.recsCleared; render(); });
+      return;
+    }
+    if (act === "export") { exportCsv(); render(); return; }
+    if (act === "rec-on") { screen = "consent"; render(); return; }
+    if (act === "consent-yes") {
+      if (!document.getElementById("consent-ok").checked) { flash = t.consentNeed; render(); return; }
+      var cs = getSettings(); cs.record = true; cs.consentAt = new Date().toISOString(); save("settings", cs);
+      if (!load("pin")) { flash = t.pinFirst; screen = "therapist"; } else { flash = t.recEnabled; screen = "settings"; }
+      render(); return;
+    }
+    if (act === "rec-off") { var ro = getSettings(); ro.record = false; save("settings", ro); flash = t.recDisabled; render(); return; }
     if (act === "save-scripts") {
       var lines = document.getElementById("scripts-ta").value.split("\n").map(function (s) { return s.trim(); }).filter(Boolean);
       if (!lines.length) { flash = t.emptyScripts; render(); return; }
@@ -976,6 +1247,7 @@
       set.allowUp = document.getElementById("set-up").checked;
       set.maze = document.getElementById("set-maze").checked;
       set.mazeSize = +document.getElementById("set-msize").value;
+      var conc = document.getElementById("set-conc"); if (conc) set.recordConcurrent = conc.checked;
       save("settings", set); flash = t.setSaved; render(); return;
     }
     if (act === "ask-reset" || act === "ask-redo") { confirmAsk = act === "ask-reset" ? "reset" : "redo"; render(); return; }
@@ -984,7 +1256,7 @@
       var which = confirmAsk; confirmAsk = "";
       if (which === "reset") {
         var s0 = getSettings();
-        save("history", {}); save("settings", { auto: s0.auto, allowUp: s0.allowUp, maze: s0.maze, mazeSize: s0.mazeSize });
+        save("history", {}); save("settings", { auto: s0.auto, allowUp: s0.allowUp, maze: s0.maze, mazeSize: s0.mazeSize, record: s0.record, consentAt: s0.consentAt, recordConcurrent: s0.recordConcurrent });
         flash = t.resetDone; render(); return;
       }
       save("placement", { status: "in_progress", levels: {}, flags: [] });
@@ -1040,8 +1312,35 @@
       } else { o.state = "dim"; S.firstTry = false; render(); }
       return;
     }
-    if (act === "rate") { rateAction(b.getAttribute("data-r")); }
+    if (act === "pace") { startPacer(st); return; }
+    if (act === "arec") {
+      if (!recOn) {
+        recOn = true; L.t0 = Date.now();
+        REC.start().then(function () { render(); }, function () { recOn = false; S.nudge = t.recFail; render(); });
+        render();
+      } else stopAssistRec();
+      return;
+    }
+    if (act === "rate") {
+      var rr = b.getAttribute("data-r");
+      if (S.who === "assist" && recOn) { stopAssistRec(rr).then(function () { rateAction(rr); }); return; }
+      rateAction(rr);
+    }
   });
+
+  /* Assisted mode: the helper records an answer; it is saved with the rating given. */
+  function stopAssistRec(result) {
+    if (!recOn) return Promise.resolve();
+    recOn = false;
+    var st = cur();
+    return REC.stop().then(function (r) {
+      if (r && S && cur() === st) {
+        S.meas = r.measures ? withRate(Object.assign({}, r.measures, { words: null, src: "audio" })) : null;
+        if (r.blob) { S.pendingRec = { blob: r.blob, mime: r.mime }; saveRecording(st, "", result || "unrated"); }
+      }
+      if (!result) render();
+    }, function () { if (!result) render(); });
+  }
 
   /* "Try again" never marks a failure on screen: it adds the next level of support, then replays the model once. */
   function rateAction(r) {
@@ -1059,6 +1358,7 @@
   }
 
   document.documentElement.lang = lang;
+  RECS.purge().catch(function () {});
   screen = getProfile() ? "home" : "onboard";
   render();
 })();

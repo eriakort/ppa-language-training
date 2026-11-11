@@ -147,3 +147,36 @@ and revocation are authorized by the profile-access Edge Function using the
 server-side service-role key. Owners cannot revoke another owner or remove
 themselves through this action. This increment does not delete the learner
 profile, cloud snapshot, session metrics, or authentication account.
+
+
+## Deletion requests and retention controls
+
+Migration: `supabase/migrations/202611110007_deletion_retention_controls.sql`.
+
+A cloud profile owner who is its sole owner may request deletion. The request
+has a 30-day grace period and can be cancelled by the same owner before its
+scheduled date. Shared ownership must be resolved before a request is accepted.
+When processed, the cloud learner profile is deleted; its linked profile
+snapshot, learning sessions, therapist metrics, retention settings and shared
+memberships are removed by database foreign-key cascades. The deletion request
+audit row remains with its status and timestamps. Device-local data and
+IndexedDB audio are not remotely erased by this operation.
+
+Owners and caregivers can choose a therapist aggregate-metric retention period
+of 30, 90, 180, 365 or 730 days. This policy applies only to
+`therapist_session_metrics`; it does not delete the full local session history,
+the cloud profile snapshot, or local recordings. The default is 365 days.
+Expired metrics are removed by the scheduled maintenance function.
+
+Deploy the `profile-lifecycle-worker` Edge Function with
+`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and a strong
+`LIFECYCLE_WORKER_SECRET`. Schedule a daily POST to the function and send
+the secret in `x-lifecycle-worker-secret`. The worker calls the database
+maintenance function, which processes due deletion requests and applies metric
+retention in one transaction. Do not expose the worker secret in browser code.
+A deployment is not operational until the migration, function and scheduled
+invocation are configured and verified in the Supabase project.
+
+This increment does not delete authentication accounts. Account deletion
+requires a separate account-level workflow that checks all profile memberships,
+ownership transfers and outstanding legal retention obligations.

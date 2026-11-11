@@ -97,5 +97,67 @@ Deno.serve(async (req) => {
     if (removeError) return json({ error: "Could not revoke profile access" }, 500);
     return json({ removed: true });
   }
+
+  if (["get_lifecycle", "request_profile_deletion", "cancel_profile_deletion", "set_retention"].includes(String(body.action))) {
+    const profileId = typeof body.profile_id === "string" ? body.profile_id : "";
+    if (!/^[0-9a-f-]{36}$/i.test(profileId)) return json({ error: "Invalid profile" }, 400);
+    const { data: membership, error: membershipError } = await admin.from("profile_members")
+      .select("role").eq("profile_id", profileId).eq("user_id", user.id).maybeSingle();
+    if (membershipError || !membership || !["owner", "caregiver"].includes(membership.role))
+      return json({ error: "Your role cannot manage profile lifecycle settings" }, 403);
+
+    if (body.action === "get_lifecycle") {
+      const [{ data: retention, error: retentionError }, { data: request, error: requestError }] = await Promise.all([
+        admin.from("profile_retention_settings").select("therapist_metrics_retention_days,updated_at")
+          .eq("profile_id", profileId).maybeSingle(),
+        admin.from("profile_deletion_requests").select("id,status,requested_at,scheduled_for,cancelled_at,completed_at")
+          .eq("profile_id", profileId).eq("status", "pending").maybeSingle()
+      ]);
+      if (retentionError || requestError) return json({ error: "Could not load lifecycle settings" }, 500);
+      return json({ retention_days: retention?.therapist_metrics_retention_days ?? 365,
+        deletion_request: membership.role === "owner" ? request : null });
+    }
+
+    if (body.action === "request_profile_deletion") {
+      if (membership.role !== "owner") return json({ error: "Only the profile owner can request deletion" }, 403);
+      const { data: owners, error: ownersError } = await admin.from("profile_members")
+        .select("user_id").eq("profile_id", profileId).eq("role", "owner");
+      if (ownersError) return json({ error: "Could not verify profile ownership" }, 500);
+      if (!owners || owners.length !== 1 || owners[0].user_id !== user.id)
+        return json({ error: "Transfer or resolve shared ownership before requesting profile deletion" }, 409);
+      const { data: existing } = await admin.from("profile_deletion_requests").select("id")
+        .eq("profile_id", profileId).eq("status", "pending").maybeSingle();
+      if (existing) return json({ error: "A deletion request is already pending" }, 409);
+      const { data: request, error } = await admin.from("profile_deletion_requests")
+        .insert({ profile_id: profileId, requested_by: user.id, scheduled_for: new Date(Date.now() + 30*24*60*60*1000).toISOString() })
+        .select("id,status,requested_at,scheduled_for").single();
+      if (error || !request) return json({ error: "Could not create deletion request" }, 500);
+      return json({ deletion_request: request });
+    }
+
+    if (body.action === "cancel_profile_deletion") {
+      if (membership.role !== "owner") return json({ error: "Only the profile owner can cancel deletion" }, 403);
+      const requestId = typeof body.request_id === "string" ? body.request_id : "";
+      if (!/^[0-9a-f-]{36}$/i.test(requestId)) return json({ error: "Invalid deletion request" }, 400);
+      const { data: request, error } = await admin.from("profile_deletion_requests").update({
+        status: "cancelled", cancelled_at: new Date().toISOString()
+      }).eq("id", requestId).eq("profile_id", profileId).eq("requested_by", user.id)
+        .eq("status", "pending").gt("scheduled_for", new Date().toISOString())
+        .select("id,status,cancelled_at").maybeSingle();
+      if (error) return json({ error: "Could not cancel deletion request" }, 500);
+      if (!request) return json({ error: "The request is no longer cancellable" }, 409);
+      return json({ deletion_request: request });
+    }
+
+    if (body.action === "set_retention") {
+      const days = Number(body.retention_days);
+      if (![30, 90, 180, 365, 730].includes(days)) return json({ error: "Choose a supported retention period" }, 400);
+      const { error } = await admin.from("profile_retention_settings").upsert({
+        profile_id: profileId, therapist_metrics_retention_days: days, updated_by: user.id, updated_at: new Date().toISOString()
+      }, { onConflict: "profile_id" });
+      if (error) return json({ error: "Could not update retention setting" }, 500);
+      return json({ retention_days: days, note: "The new retention period is applied by the scheduled maintenance job." });
+    }
+  }
   return json({ error: "Unknown action" }, 400);
 });

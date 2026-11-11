@@ -77,10 +77,6 @@ Deno.serve(async (req) => {
     if (!canInvite) return json({ error: "Your role cannot invite this type of member" }, 403);
 
     const siteUrl = Deno.env.get("APP_SITE_URL")!;
-    const { data: existing } = await admin.from("profile_members")
-      .select("user_id").eq("profile_id", profileId).eq("user_id", (await admin.auth.admin.listUsers()).data.users.find((u) => u.email?.toLowerCase() === email)?.id ?? "").maybeSingle();
-    if (existing) return json({ error: "This person already has access to the profile" }, 409);
-
     const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
       redirectTo: siteUrl,
       data: { invited_profile_id: profileId, invited_role: role },

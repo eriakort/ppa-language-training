@@ -129,7 +129,7 @@
     var placement=data.data.placement||{};
     var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at").single();
     if(r.error)throw r.error;
-    lastUpdated=r.data.updated_at;message=T.done;error="";render();
+    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",lastUpdated);localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.done;error="";render();
   }
   async function restore() {
     await signedIn();
@@ -142,7 +142,7 @@
       if(Object.prototype.hasOwnProperty.call(saved.data,k))localStorage.setItem(localKey(k),JSON.stringify(saved.data[k]));
       else localStorage.removeItem(localKey(k));
     });
-    lastUpdated=r.data.updated_at;message=T.restored;render();
+    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",lastUpdated);localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.restored;render();
     setTimeout(function(){window.location.reload();},500);
   }
   function bind() {
@@ -203,4 +203,66 @@
     if(root)new MutationObserver(mount).observe(root,{childList:true});
   }
   mount();
+
+  var syncTimer = null, syncState = "idle", syncing = false;
+  function syncKey(s) { return "pog_cloud_sync_" + activeId() + "_" + s; }
+  function syncEnabled() { return localStorage.getItem(syncKey("enabled")) === "1"; }
+  function queueSync() {
+    if (!syncEnabled() || !localStorage.getItem(consentKey())) return;
+    localStorage.setItem(syncKey("dirty"), "1");
+    syncState = navigator.onLine ? "queued" : "offline";
+    render();
+    if (!navigator.onLine) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncNow, 1200);
+  }
+  function applyCloudSnapshot(saved) {
+    if (!saved || saved.version !== 1 || !saved.data || typeof saved.data !== "object") throw new Error(T.none);
+    KEYS.forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(saved.data, k)) localStorage.setItem(localKey(k), JSON.stringify(saved.data[k]));
+      else localStorage.removeItem(localKey(k));
+    });
+  }
+  async function syncNow() {
+    if (syncing || !client || !navigator.onLine || !syncEnabled() || !cloudProfileId || !localStorage.getItem(consentKey())) return;
+    syncing = true; syncState = "syncing"; render();
+    try {
+      await signedIn();
+      var remote = await client.from("profile_data").select("preferences,updated_at").eq("profile_id", cloudProfileId).single();
+      if (remote.error) throw remote.error;
+      var base = localStorage.getItem(syncKey("seen")) || "";
+      var remoteTime = remote.data.updated_at || "";
+      var dirty = localStorage.getItem(syncKey("dirty")) === "1";
+      if (base && remoteTime !== base) {
+        if (dirty) { syncState = "conflict"; return; }
+        applyCloudSnapshot(remote.data.preferences);
+        localStorage.setItem(syncKey("seen"), remoteTime);
+        lastUpdated = remoteTime;
+        setTimeout(function () { window.location.reload(); }, 400);
+        return;
+      }
+      if (!dirty) { syncState = "idle"; lastUpdated = remoteTime; return; }
+      var data = snapshot(), now = new Date().toISOString();
+      var request = client.from("profile_data").update({ preferences: data, placement: data.data.placement || {}, updated_at: now }).eq("profile_id", cloudProfileId);
+      if (base) request = request.eq("updated_at", base);
+      var result = await request.select("updated_at").maybeSingle();
+      if (result.error) throw result.error;
+      if (!result.data) { syncState = "conflict"; return; }
+      lastUpdated = result.data.updated_at;
+      localStorage.setItem(syncKey("seen"), lastUpdated);
+      localStorage.removeItem(syncKey("dirty"));
+      syncState = "idle";
+    } catch (e) { syncState = navigator.onLine ? "error" : "offline"; }
+    finally { syncing = false; render(); }
+  }
+  window.addEventListener("pog:local-change", function (event) {
+    if (event.detail && event.detail.profileId === activeId()) queueSync();
+  });
+  window.addEventListener("online", function () {
+    if (localStorage.getItem(syncKey("dirty")) === "1") syncNow();
+  });
+  window.addEventListener("offline", function () {
+    if (localStorage.getItem(syncKey("dirty")) === "1") { syncState = "offline"; render(); }
+  });
+
 })();

@@ -1,10 +1,11 @@
 (function () {
   "use strict";
   var cfg=window.POG_SUPABASE_CONFIG||{}, lang=localStorage.getItem("pog_lang")==="en"?"en":"it";
-  var T={
+  var translations={
     en:{open:"Profile privacy",title:"Profile data and shared access",intro:"Export a portable copy of this device's learner profile or manage who can access its linked cloud profile.",export:"Export local profile data",exportNote:"The JSON export includes profile details, settings, progress, session history, personal phrases and the active checkpoint. Device-only audio recordings are not included.",members:"Shared cloud access",load:"Load members",none:"No cloud profile is linked to this local profile.",signedOut:"Sign in to manage shared access.",remove:"Remove access",confirm:"Remove this person's access to the cloud profile?",done:"Access removed.",exported:"Profile export prepared.",failed:"The operation could not be completed.",close:"Close",owner:"Owner",caregiver:"Caregiver",therapist:"Therapist",learner:"Learner",self:"You"},
     it:{open:"Privacy profilo",title:"Dati e accessi al profilo",intro:"Esporta una copia portatile del profilo locale o gestisci chi può accedere al profilo cloud collegato.",export:"Esporta i dati del profilo locale",exportNote:"Il file JSON include dettagli del profilo, impostazioni, progressi, storico, frasi personali e checkpoint attivo. Le registrazioni audio conservate solo sul dispositivo non sono incluse.",members:"Accessi condivisi al cloud",load:"Carica membri",none:"Nessun profilo cloud è collegato a questo profilo locale.",signedOut:"Accedi per gestire gli accessi condivisi.",remove:"Revoca accesso",confirm:"Revocare a questa persona l'accesso al profilo cloud?",done:"Accesso revocato.",exported:"Esportazione del profilo preparata.",failed:"Impossibile completare l'operazione.",close:"Chiudi",owner:"Proprietario",caregiver:"Caregiver",therapist:"Terapista",learner:"Persona che si esercita",self:"Tu"}
-  }[lang];
+  };
+  var T=translations[lang];
   if(!cfg.url||!cfg.anonKey||!window.supabase||!window.supabase.createClient)return;
   var client;try{client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});}catch(e){return;}
   var panel=null,rows=[],message="",busy=false;
@@ -55,4 +56,11 @@
   }
   var root=document.getElementById("app");if(!root)return;
   if(!root.querySelector(".profile-lifecycle-launcher")){var launch=document.createElement("button");launch.type="button";launch.className="profile-lifecycle-launcher";launch.textContent=T.open;launch.setAttribute("aria-haspopup","dialog");launch.addEventListener("click",show);root.appendChild(launch);}
-})();
+  window.addEventListener("pog:languagechange", function (ev) {
+    lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
+    T = translations[lang];
+    var root = document.getElementById("app"), launch = root && root.querySelector(".profile-lifecycle-launcher");
+    if (launch) launch.textContent = T.open;
+    if (panel && !panel.hidden) render();
+  });
+  })();

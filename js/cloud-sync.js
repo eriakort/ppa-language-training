@@ -5,7 +5,7 @@
     it: {
       title:"Backup cloud", open:"Backup cloud", intro:"Puoi conservare una copia dei progressi online e ripristinarla su un altro dispositivo.",
       privacy:"La copia può contenere nome o soprannome, anno di nascita se inserito, città e interessi, impostazioni, frasi personali, esercizi svolti, risultati e checkpoint della sessione. Le registrazioni audio non vengono mai caricate.",
-      local:"I dati restano su questo dispositivo finché non scegli esplicitamente di creare una copia. Non c'è sincronizzazione automatica.",
+      local:"I dati restano su questo dispositivo finché non scegli esplicitamente di creare una copia. Dopo la prima copia o il ripristino, le modifiche vengono sincronizzate automaticamente.",
       consent:"Ho letto le informazioni e acconsento a caricare questi dati nel mio account Supabase.",
       enable:"Acconsenti e continua", backup:"Crea / aggiorna copia", restore:"Ripristina da cloud", status:"Stato", signedOut:"Accedi prima al tuo account.",
       unavailable:"Backup online non configurato. L'app continua a funzionare in modalità locale.",
@@ -20,7 +20,7 @@
     en: {
       title:"Cloud backup", open:"Cloud backup", intro:"Keep a copy of your progress online and restore it on another device.",
       privacy:"The backup may contain a name or nickname, optional birth year, town and interests, settings, personal phrases, completed exercises, results and the active session checkpoint. Audio recordings are never uploaded.",
-      local:"Your data stays on this device until you explicitly choose to create a backup. There is no automatic synchronization.",
+      local:"Your data stays on this device until you explicitly create or restore a backup. After that, changes are synchronized automatically.",
       consent:"I have read this information and consent to uploading these data to my Supabase account.",
       enable:"Consent and continue", backup:"Create / update backup", restore:"Restore from cloud", status:"Status", signedOut:"Sign in to your account first.",
       unavailable:"Online backup is not configured. The app continues to work locally.",
@@ -270,5 +270,20 @@
   window.addEventListener("offline", function () {
     if (localStorage.getItem(syncKey("dirty")) === "1") { syncState = "offline"; render(); }
   });
+  window.addEventListener("focus", function () {
+    cloudProfileId = localStorage.getItem(mapKey()) || "";
+    if (syncEnabled()) syncNow();
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && syncEnabled()) { cloudProfileId = localStorage.getItem(mapKey()) || ""; syncNow(); }
+  });
+  window.addEventListener("pog:profile-change", function () {
+    cloudProfileId = localStorage.getItem(mapKey()) || "";
+    syncState = "idle";
+    if (syncEnabled()) syncNow();
+    render();
+  });
+  cloudProfileId = localStorage.getItem(mapKey()) || "";
+  if (syncEnabled()) syncNow();
 
 })();

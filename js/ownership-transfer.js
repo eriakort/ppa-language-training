@@ -4,7 +4,8 @@
   var T={
     en:{open:"Ownership transfer",title:"Profile ownership",intro:"Transfer ownership to an existing caregiver. The new owner must accept within 7 days; you will remain a caregiver.",members:"Eligible caregivers",load:"Load caregivers",choose:"Choose a caregiver",send:"Send transfer request",incoming:"Ownership invitations",outgoing:"Requests you sent",accept:"Accept ownership",cancel:"Cancel request",none:"No incoming ownership invitations.",sent:"Transfer request sent.",accepted:"You are now the profile owner.",cancelled:"Transfer request cancelled.",noCloud:"Link this local profile to a cloud profile first.",signedOut:"Sign in to manage ownership.",failed:"Could not complete this operation.",close:"Close",confirm:"Send this person an ownership transfer request?",expired:"Invitation expires"},
     it:{open:"Trasferimento proprietà",title:"Proprietà del profilo",intro:"Trasferisci la proprietà a un caregiver già presente. Il nuovo proprietario deve accettare entro 7 giorni; tu manterrai il ruolo di caregiver.",members:"Caregiver idonei",load:"Carica caregiver",choose:"Scegli un caregiver",send:"Invia richiesta di trasferimento",incoming:"Inviti alla proprietà",outgoing:"Richieste inviate",accept:"Accetta la proprietà",cancel:"Annulla richiesta",none:"Nessun invito alla proprietà in arrivo.",sent:"Richiesta di trasferimento inviata.",accepted:"Ora sei il proprietario del profilo.",cancelled:"Richiesta di trasferimento annullata.",noCloud:"Collega prima questo profilo locale a un profilo cloud.",signedOut:"Accedi per gestire la proprietà.",failed:"Impossibile completare l'operazione.",close:"Chiudi",confirm:"Inviare a questa persona una richiesta di trasferimento della proprietà?",expired:"L'invito scade"}
-  }[lang];
+  };
+  var T=translations[lang];
   if(!cfg.url||!cfg.anonKey||!window.supabase||!window.supabase.createClient)return;
   var client;try{client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true}});}catch(e){return;}
   var panel=null,members=[],incoming=[],outgoing=[],message="",error="",busy=false;
@@ -49,4 +50,11 @@
   }
   var root=document.getElementById("app");if(!root)return;
   if(!root.querySelector(".ownership-transfer-launcher")){var launch=document.createElement("button");launch.type="button";launch.className="profile-lifecycle-launcher ownership-transfer-launcher";launch.textContent=T.open;launch.setAttribute("aria-haspopup","dialog");launch.addEventListener("click",show);root.appendChild(launch);}
-})();
+  window.addEventListener("pog:languagechange", function (ev) {
+    lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
+    T = translations[lang];
+    var root = document.getElementById("app"), launch = root && root.querySelector(".ownership-transfer-launcher");
+    if (launch) launch.textContent = T.open;
+    if (panel && !panel.hidden) render();
+  });
+  })();

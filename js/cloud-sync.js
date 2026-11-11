@@ -208,7 +208,7 @@
 
   var syncTimer = null, syncState = "idle", syncing = false;
   function syncKey(s) { return "pog_cloud_sync_" + activeId() + "_" + s; }
-  function syncEnabled() { return localStorage.getItem(syncKey("enabled")) === "1"; }
+  function syncEnabled() { return localStorage.getItem(syncKey("enabled")) === "1" && !!localStorage.getItem(consentKey()); }
   function queueSync() {
     cloudProfileId = cloudProfileId || localStorage.getItem(mapKey()) || "";
     if (!syncEnabled() || !localStorage.getItem(consentKey()) || !cloudProfileId) return;

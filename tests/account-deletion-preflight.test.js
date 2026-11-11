@@ -6,6 +6,7 @@ const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
 const docs=fs.readFileSync(path.join(root,"docs/IDENTITY-PERSISTENCE.md"),"utf8");
 function check(ok,label){if(!ok){console.error("FAIL "+label);process.exitCode=1;}else console.log("ok   "+label);}
 check(api.includes('body.action === "account_deletion_preflight"'),"preflight is a dedicated authenticated server action");
+check((api.match(/gt\("expires_at", new Date\(\)\.toISOString\(\)\)/g)||[]).length>=2,"expired ownership invitations do not block account review");
 check(api.includes('.eq("user_id", user.id)')&&api.includes('profile_ownership_transfers'),"preflight inspects all account memberships and pending transfers");
 check(api.includes('owner_count: owners.length')&&api.includes('caregiver_count: caregivers.length'),"preflight evaluates profile ownership and available caregivers");
 check(api.includes('deletion_pending: Boolean(pendingDeletion)')&&api.includes('profile_deletion_requests'),"preflight detects pending profile deletion");

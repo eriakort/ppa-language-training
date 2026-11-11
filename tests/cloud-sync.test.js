@@ -12,3 +12,9 @@ check(cloud.includes("window.confirm(T.confirmBackup)")&&cloud.includes("window.
 check(cloud.includes('from("learner_profiles").select("id,display_name")')&&cloud.includes('data-cloud="link"'),"a second device can select and link an existing cloud profile");
 check(cloud.includes("profile_data")&&migration.includes("create table if not exists public.profile_data"),"cloud backup uses the profile-scoped data table");
 check(html.indexOf("js/account.js")<html.indexOf("js/cloud-sync.js"),"cloud controls load after account interface");
+
+check(cloud.includes("pog:local-change") && cloud.includes("queueSync"),"local changes are queued for automatic sync");
+check(cloud.includes("window.addEventListener(\"online\"") && cloud.includes("offline"),"offline changes wait for a reconnect");
+check(cloud.includes('syncState = "conflict"') && cloud.includes('.eq("updated_at", base)'),"sync detects remote changes and uses optimistic concurrency");
+check(cloud.includes("applyCloudSnapshot") && cloud.includes("syncKey(\"seen\")"),"clean devices can receive newer cloud snapshots without overwriting dirty local work");
+check(cloud.includes("syncKey(\"enabled\")") && cloud.includes("consentKey()"),"automatic sync requires prior backup/restore and active consent");

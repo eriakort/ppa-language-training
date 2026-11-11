@@ -41,9 +41,9 @@ Deno.serve(async (req) => {
       { data: incoming, error: incomingError }] = await Promise.all([
       profileIds.length ? admin.from("learner_profiles").select("id,display_name,created_at").in("id", profileIds) : Promise.resolve({ data: [], error: null }),
       admin.from("profile_ownership_transfers").select("id,profile_id,expires_at")
-        .eq("from_user_id", user.id).eq("status", "pending"),
+        .eq("from_user_id", user.id).eq("status", "pending").gt("expires_at", new Date().toISOString()),
       admin.from("profile_ownership_transfers").select("id,profile_id,expires_at")
-        .eq("to_user_id", user.id).eq("status", "pending")
+        .eq("to_user_id", user.id).eq("status", "pending").gt("expires_at", new Date().toISOString())
     ]);
     if (profilesError || outgoingError || incomingError)
       return json({ error: "Could not inspect account deletion dependencies" }, 500);

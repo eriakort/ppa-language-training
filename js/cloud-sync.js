@@ -273,6 +273,12 @@
       else if (syncState === "idle" && localStorage.getItem(localSyncKey("dirty")) === "1") { clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 1200); }
     }
   }
+  window.addEventListener("pog:languagechange", function (ev) {
+    lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";
+    T = copy[lang];
+    if (launcher) launcher.textContent = T.open;
+    if (panel && !panel.hidden) render();
+  });
   window.addEventListener("pog:local-change", function (event) {
     if (event.detail && event.detail.profileId === activeId()) queueSync();
   });

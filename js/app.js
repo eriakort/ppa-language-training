@@ -77,6 +77,7 @@
   }
 
   var lang = load("lang") === "en" ? "en" : "it";
+  var accountSignedOut = localStorage.getItem("pog_account_signed_out") === "1";
   var screen = "home";
   var S = null, flash = "", confirmAsk = "", busy = false, pending = "start";
 
@@ -805,10 +806,11 @@
   }
   function viewHome() {
     var t = T[lang], tp = todayPlan(), L = tp.set.levels, prof = getProfile(), pl = getPlacement();
+    var greeting = accountSignedOut ? t.helloGuest : fill(t.hello, { name: prof.name });
     var pending = pl.status === "in_progress";
     return header(false) +
       '<section class="card home">' +
-      '<h1>' + esc(fill(t.hello, { name: prof.name })) + '</h1><p class="sub">' + esc(t.tagline) + '</p>' + langSeg() +
+      '<h1>' + esc(greeting) + '</h1><p class="sub">' + esc(t.tagline) + '</p>' + langSeg() +
       (myPacks().length || prof.other ? '<div class="mychips" aria-label="' + esc(t.yourInterests) + '">' + myPacks().map(function (k) { return '<span>' + PACKS[k].icon + ' ' + esc(PACKS[k].label[lang]) + '</span>'; }).join("") + (prof.other ? '<span>💬 ' + esc(prof.other) + '</span>' : '') + '</div>' : '') +
       '<p class="tag">' + esc(t.planTitle) + '</p>' +
       '<div class="scale" aria-hidden="true"><span>↑ ' + esc(t.hard) + '</span></div>' +
@@ -1227,6 +1229,11 @@
     if (s.ints) [].forEach.call(app.querySelectorAll('[data-act="int"]'), function (el) { el.setAttribute("aria-pressed", String(s.ints.indexOf(el.getAttribute("data-k")) >= 0)); });
   }
   function rerenderKeep() { var s = snapForm(); render(); restoreForm(s); }
+
+  window.addEventListener("pog:authchange", function (ev) {
+    accountSignedOut = !!(ev.detail && ev.detail.signedOut);
+    if (screen === "home") render();
+  });
 
   app.addEventListener("click", function (e) {
     var b = e.target.closest("[data-act]"); if (!b || b.disabled || busy) return;

@@ -107,6 +107,31 @@ async function playThrough(page, solo) {
   await p.click('button[data-act="profile-switch"]:has-text("Test")');
   check(/Test/.test(await p.textContent(".home h1")), "switching restores the original learner profile");
   check(/Calcio/.test(await p.textContent(".mychips")), "original learner interests remain isolated after switching");
+  await p.click('[data-act="lang"][data-l="en"]');
+  check((await p.textContent(".home h1")) === "Hello, Test", "English language selection updates the learner greeting");
+  await p.evaluate(() => { localStorage.setItem("pog_account_signed_out", "1"); window.dispatchEvent(new CustomEvent("pog:authchange", { detail: { signedIn: false, signedOut: true } })); });
+  check((await p.textContent(".home h1")) === "Welcome", "signing out removes the learner name from the greeting without deleting the profile");
+  await p.evaluate(() => { localStorage.removeItem("pog_account_signed_out"); window.dispatchEvent(new CustomEvent("pog:authchange", { detail: { signedIn: true, signedOut: false } })); });
+  check((await p.textContent(".home h1")) === "Hello, Test", "signing in restores the learner greeting");
+
+  // English content and the cloud backup panel must follow the selected language.
+  const en = await open(browser, false);
+  await en.click('[data-act="lang"][data-l="en"]');
+  await en.fill("#pf-name", "English");
+  await en.click('[data-act="onboard-skip"]');
+  await en.click('[data-act="home"]');
+  check((await en.textContent(".home h1")) === "Hello, English", "new profile uses English interface text");
+  await en.click(".cloud-launcher");
+  check((await en.textContent(".cloud-card h2")) === "Cloud backup", "cloud backup opens in the selected English language");
+  await en.evaluate(() => document.querySelector('[data-act="lang"][data-l="it"]').click());
+  check((await en.textContent(".cloud-card h2")) === "Backup cloud", "open cloud backup panel refreshes to Italian");
+  await en.evaluate(() => document.querySelector('[data-act="lang"][data-l="en"]').click());
+  check((await en.textContent(".cloud-card h2")) === "Cloud backup", "open cloud backup panel refreshes back to English");
+  await en.click('[data-cloud="close"]');
+  await en.click('[data-act="start"]');
+  await en.click('[data-w="assist"]');
+  check(/Your morning/.test(await en.textContent(".instr")), "English learning session uses English exercise content");
+  check(en.errors.length === 0, "no page errors (English language and logout): " + en.errors.join("; "));
 
   // Solo session with a simulated microphone
   const q = await open(browser, true);

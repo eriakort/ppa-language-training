@@ -37,9 +37,12 @@ the same exercise.
    learner profiles. Preferences, placement, progress, history, checkpoints,
    therapist PIN and IndexedDB recordings are partitioned by profile. Existing
    single-profile browser data is migrated into the first local profile.
-3. **Identity and account access:** Supabase Auth, self-registration, and trusted
-   caregiver/therapist invitations, with clear ownership and recovery flows.
-4. **Cloud persistence:** explicit opt-in, profile-scoped session sync, conflict
+3. **Account access backend (this increment):** trusted profile creation and
+   role-limited invitations through the `profile-access` Edge Function. Client
+   role grants are revoked; the service-role key stays server-side.
+4. **Account UI and recovery:** Supabase Auth screens, email confirmation,
+   password recovery, sign-out and profile linking in the static app.
+5. **Cloud persistence:** explicit opt-in, profile-scoped session sync, conflict
    handling and cross-device resume.
 5. **Therapist access and lifecycle:** role-limited history, export, account/profile
    deletion and retention controls.
@@ -69,10 +72,16 @@ implementation is device/browser-local; it is not yet a cross-device backup.
 - This prototype remains a language-practice aid, not a medical device or validated
   clinical assessment.
 
-## Supabase setup (later increment)
+## Supabase account-access setup
 
-Create a Supabase project, apply the migration, then configure only the public
-project URL and publishable key for the static frontend. Before connecting the
-client, implement Auth, account recovery, membership bootstrap/invitations,
-consent, offline behavior and cross-device conflict handling. Do not add secrets
-to the repository.
+Create a Supabase project and apply migrations in filename order. Deploy the
+`profile-access` Edge Function with `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` and the exact `APP_SITE_URL` as server-side secrets.
+The function supports owner profile creation and invitations. Owners may invite
+caregivers, therapists or learners; caregivers may invite learners only. The
+service-role key must never be placed in frontend code or committed to Git.
+
+The app does not connect to a Supabase project yet: the next increment adds the
+sign-in/sign-up/recovery interface and configures only the public project URL and
+publishable key in the static frontend. Cloud syncing remains disabled until
+consent, offline behavior and cross-device conflict handling are implemented.

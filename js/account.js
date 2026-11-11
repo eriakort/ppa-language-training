@@ -94,6 +94,16 @@
     html += '</div>';
     panel.innerHTML = html;
   }
+  function publishAuthState(session, event) {
+    try {
+      if (event === "SIGNED_OUT") localStorage.setItem("pog_account_signed_out", "1");
+      else if (session) localStorage.removeItem("pog_account_signed_out");
+    } catch (e) {}
+    window.dispatchEvent(new CustomEvent("pog:authchange", { detail: {
+      signedIn: !!session,
+      signedOut: localStorage.getItem("pog_account_signed_out") === "1"
+    } }));
+  }
   function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[c]; }); }
   function formValues(form) { return Object.fromEntries(new FormData(form).entries()); }
   function fail(e) { error = e && e.message ? e.message : T.error; message = ""; render(); }
@@ -104,7 +114,7 @@
       if (form.dataset.form === "signin") {
         result = await client.auth.signInWithPassword({ email: v.email.trim(), password: v.password });
         if (result.error) throw result.error;
-        user = result.data.user; message = T.signedIn;
+        user = result.data.user; publishAuthState(result.data.session, "SIGNED_IN"); message = T.signedIn;
       } else if (form.dataset.form === "signup") {
         if (v.password.length < 8) throw new Error(T.passwordShort);
         if (v.password !== v.confirm) throw new Error(T.passwordMismatch);
@@ -144,7 +154,7 @@
       else if (a === "signout") {
         client.auth.signOut().then(function (r) {
           if (r.error) fail(r.error);
-          else { user = null; mode = "signin"; message = ""; render(); }
+          else { user = null; publishAuthState(null, "SIGNED_OUT"); mode = "signin"; message = ""; render(); }
         }).catch(fail);
         return;
       }
@@ -169,11 +179,13 @@
   if (client) {
     client.auth.getSession().then(function (r) {
       user = r.data && r.data.session ? r.data.session.user : null;
+      publishAuthState(r.data && r.data.session ? r.data.session : null, "INITIAL_SESSION");
       if (window.location.hash.indexOf("type=recovery") >= 0) { mode = "update"; show(); }
       else if (window.location.hash.indexOf("access_token=") >= 0) { message = user && user.user_metadata && user.user_metadata.invited_profile_id ? T.invited : T.checkEmail; show(); }
     });
     client.auth.onAuthStateChange(function (event, session) {
       user = session ? session.user : null;
+      publishAuthState(session, event);
       if (event === "PASSWORD_RECOVERY") { mode = "update"; show(); }
       else if (event === "SIGNED_IN" && user && user.user_metadata && user.user_metadata.invited_profile_id) { message = T.invited; }
       if (panel && !panel.hidden) render();

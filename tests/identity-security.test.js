@@ -14,4 +14,4 @@ check(migration.includes("set search_path = pg_catalog, public"), "security-defi
 check(fn.includes('body.action === "create_profile"') && fn.includes('role: "owner"'), "self-registration provisions the first owner via trusted server code");
 check(fn.includes('body.action === "invite_member"'), "managed invitations use a trusted server endpoint");
 check(fn.includes('membership.role === "owner"') && fn.includes('membership.role === "caregiver" && role === "learner"'), "invitation roles are restricted by inviter permissions");
-check(fn.includes("SUPABASE_SERVICE_ROLE_KEY") && !fs.readFileSync(path.join(root, ".gitignore"), "utf8").includes("SUPABASE_SERVICE_ROLE_KEY"), "service-role key is referenced only as a server environment secret");
+const frontend = ["index.html", "js/app.js", "js/strings.js"].map((file) => fs.readFileSync(path.join(root, file), "utf8")).join("\\n");\ncheck(fn.includes("SUPABASE_SERVICE_ROLE_KEY") && !frontend.includes("SUPABASE_SERVICE_ROLE_KEY"), "service-role key is never included in browser assets");

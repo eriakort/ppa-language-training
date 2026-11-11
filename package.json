@@ -5,7 +5,7 @@
   "description": "Prototype of a daily language-practice app for people with primary progressive aphasia (PPA), in Italian and English.",
   "scripts": {
     "build": "node tools/build.js",
-    "test": "node tests/content.test.js && node tests/speech.test.js",
+    "test": "node tests/content.test.js && node tests/speech.test.js && node tests/identity-security.test.js",
     "test:browser": "node tools/build.js && node tests/smoke.test.js"
   },
   "devDependencies": {

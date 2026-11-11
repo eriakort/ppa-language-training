@@ -18,3 +18,9 @@ check(cloud.includes("window.addEventListener(\"online\"") && cloud.includes("of
 check(cloud.includes('syncState = "conflict"') && cloud.includes('.eq("updated_at", base)'),"sync detects remote changes and uses optimistic concurrency");
 check(cloud.includes("applyCloudSnapshot") && cloud.includes("syncKey(\"seen\")"),"clean devices can receive newer cloud snapshots without overwriting dirty local work");
 check(cloud.includes("syncKey(\"enabled\")") && cloud.includes("consentKey()"),"automatic sync requires prior backup/restore and active consent");
+
+check(cloud.includes('select("preferences,updated_at,revision")')&&cloud.includes('.eq("revision", base)'),"automatic sync uses database revision compare-and-swap");
+check(cloud.includes('window.addEventListener("pog:local-change"')&&cloud.includes('window.addEventListener("online"'),"local changes are queued and retried after reconnect");
+check(cloud.includes('syncState === "conflict"')&&cloud.includes('data-cloud="sync"'),"sync status and manual conflict recovery are exposed in the cloud panel");
+check(migration.includes("create trigger profile_data_revision")&&migration.includes("new.revision := old.revision + 1"),"database advances a revision for every cloud update");
+check(cloud.includes('String(r.data.revision||1)')&&cloud.includes('syncKey("seen")'),"manual backup and restore establish a revision baseline");

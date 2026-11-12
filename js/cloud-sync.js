@@ -46,6 +46,7 @@
   function localKey(k) { var id=activeId(); return id ? "pog_p_"+id+"_"+k : "pog_"+k; }
   function mapKey(profileId) { return "pog_cloud_profile_"+(profileId===undefined?activeId():profileId); }
   function consentKey(profileId) { return "pog_cloud_consent_"+(profileId===undefined?activeId():profileId); }
+  function hasConsent(profileId) { return !!localStorage.getItem(consentKey(profileId)); }
   function profileName(profileId) {
     var id=profileId===undefined?activeId():profileId;
     try { var p=JSON.parse(localStorage.getItem(id?"pog_p_"+id+"_profile":"pog_profile")||"null"); if(p&&p.name)return p.name; } catch(e) {}
@@ -131,9 +132,10 @@
     var profileId=activeId();
     await signedIn();
     if(activeId()!==profileId)throw new Error(T.noProfile);
-    if(!localStorage.getItem(consentKey(profileId)))throw new Error(T.consentMissing);
+    if(!hasConsent(profileId))throw new Error(T.consentMissing);
     var id=await ensureCloudProfile(profileId);
     if(activeId()!==profileId)throw new Error(T.noProfile);
+    if(!hasConsent(profileId))throw new Error(T.consentMissing);
     var data=snapshot(profileId);
     var placement=data.data.placement||{};
     var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at,revision").single();
@@ -221,7 +223,7 @@
 
   var syncTimer = null, syncState = "idle", syncing = false;
   function syncKey(s) { return "pog_cloud_sync_" + activeId() + "_" + s; }
-  function syncEnabled() { return localStorage.getItem(syncKey("enabled")) === "1" && !!localStorage.getItem(consentKey()); }
+  function syncEnabled() { return localStorage.getItem(syncKey("enabled")) === "1" && hasConsent(); }
   function queueSync() {
     cloudProfileId = cloudProfileId || localStorage.getItem(mapKey()) || "";
     if (!syncEnabled() || !localStorage.getItem(consentKey()) || !cloudProfileId) return;
@@ -250,9 +252,11 @@
     try {
       await signedIn();
       if(activeId()!==profileId)return;
+      if(!hasConsent(profileId)){syncState="idle";return;}
       var remote = await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id", cloudId).single();
       if (remote.error) throw remote.error;
       if(activeId()!==profileId)return;
+      if(!hasConsent(profileId)){syncState="idle";return;}
       var base = Number(localStorage.getItem(localSyncKey("seen")) || 0);
       var remoteRevision = Number(remote.data.revision || 1);
       var remoteTime = remote.data.updated_at || "";

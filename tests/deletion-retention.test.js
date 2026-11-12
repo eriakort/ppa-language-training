@@ -3,6 +3,7 @@ const fs=require("fs"),path=require("path"),root=path.resolve(__dirname,"..");
 const migration=fs.readFileSync(path.join(root,"supabase/migrations/202611110007_deletion_retention_controls.sql"),"utf8");
 const api=fs.readFileSync(path.join(root,"supabase/functions/profile-access/index.ts"),"utf8");
 const worker=fs.readFileSync(path.join(root,"supabase/functions/profile-lifecycle-worker/index.ts"),"utf8");
+const config=fs.readFileSync(path.join(root,"supabase/config.toml"),"utf8");
 const ui=fs.readFileSync(path.join(root,"js/deletion-retention.js"),"utf8");
 function check(ok,label){if(!ok){console.error("FAIL "+label);process.exitCode=1;}else console.log("ok   "+label);}
 check(migration.includes("interval '30 days'")&&migration.includes("scheduled_for"),"deletion requests have a 30-day grace period");
@@ -13,6 +14,7 @@ check(api.includes('body.action === "request_profile_deletion"')&&api.includes('
 check(api.includes('body.action === "cancel_profile_deletion"')&&api.includes('.eq("requested_by", user.id)'),"only the requester can cancel a pending deletion");
 check(api.includes('body.action === "set_retention"')&&api.includes('[30, 90, 180, 365, 730]'),"retention updates are server-authorized and allowlisted");
 check(worker.includes("LIFECYCLE_WORKER_SECRET")&&worker.includes('rpc("run_profile_retention_maintenance")'),"scheduled worker is secret-protected and invokes database maintenance");
+check(/\[functions\.profile-lifecycle-worker\]\s+verify_jwt\s*=\s*false/.test(config)&&worker.indexOf('if (!expected || !supplied || supplied !== expected)') < worker.indexOf('createClient(url, serviceKey'),"worker bypasses the user-JWT gateway check only because its handler enforces the dedicated secret before creating the admin client");
 check(ui.includes("30-day grace period")&&ui.includes("Local copies on devices are not erased"),"UI explains grace period and local-data scope");
 check(ui.includes("therapist dashboard metrics")&&ui.includes("Full session history"),"UI explains exactly what retention affects");
 check(!ui.includes("SUPABASE_SERVICE_ROLE_KEY")&&!worker.includes("service_role"),"no service-role key or role credential is exposed in browser code");

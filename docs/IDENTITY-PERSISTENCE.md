@@ -52,11 +52,12 @@ The first migration is `supabase/migrations/202611110001_hybrid_identity.sql`.
    action; clean devices can receive a newer cloud snapshot automatically.
    Audio remains local. This is revision-based conflict protection, not a semantic
    merge of simultaneous exercise answers.
-7. **Therapist access and lifecycle:** the first security increment makes therapist
-   membership read-only. Therapists can read session history but cannot read the broad
-   profile snapshot or create, update or delete sessions. Owners/caregivers retain
-   profile snapshot management; learners can participate in session writes. Later
-   increments add scoped history views, export, account/profile deletion and retention controls.
+7. **Therapist access and lifecycle:** therapist membership is read-only. Therapists
+   can read the scoped aggregate metrics projection, not unrestricted session
+   checkpoints or summaries, and cannot read the broad profile snapshot or write
+   learner data. Owners/caregivers retain profile snapshot management; learners
+   can participate in session writes. Later increments add account/profile deletion
+   and retention controls.
 
 ## Local checkpoint and backup contents
 
@@ -171,7 +172,10 @@ Expired metrics are removed by the scheduled maintenance function.
 Deploy the `profile-lifecycle-worker` Edge Function with
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and a strong
 `LIFECYCLE_WORKER_SECRET`. Schedule a daily POST to the function and send
-the secret in `x-lifecycle-worker-secret`. The worker calls the database
+the secret in `x-lifecycle-worker-secret`. Its `verify_jwt = false` setting is
+required because the scheduler authenticates with this dedicated header instead
+of a user JWT; the handler rejects requests without the secret before creating
+the privileged client. The worker calls the database
 maintenance function, which processes due deletion requests and applies metric
 retention in one transaction. Do not expose the worker secret in browser code.
 A deployment is not operational until the migration, function and scheduled

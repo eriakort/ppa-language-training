@@ -1,7 +1,7 @@
 // Scheduled Supabase Edge Function for profile deletion and retention maintenance.
 // Configure LIFECYCLE_WORKER_SECRET as a server-side secret and invoke daily
 // with the same value in the x-lifecycle-worker-secret header.
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });

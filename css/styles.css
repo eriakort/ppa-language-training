@@ -417,3 +417,20 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
     padding: 7px 10px;
   }
 }
+
+/* "Account and data" menu: gathers the account, cloud, therapist and privacy launchers in the page
+   header instead of floating over the content. The launchers' own fixed positioning is undone here. */
+.util-menu { display: contents; }
+.util-menu[hidden] { display: none; }
+.util-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 16px; border-radius: 999px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 17px; }
+.util-toggle:hover, .util-toggle[aria-expanded="true"] { border-color: var(--accent); }
+.util-ico { font-size: 18px; line-height: 1; }
+.util-sheet { flex-basis: 100%; display: grid; gap: 8px; padding: 10px; border-radius: 16px; background: var(--surface); border: 2px solid var(--line); }
+.util-sheet[hidden] { display: none; }
+.util-sheet > button {
+  position: static !important; inset: auto !important; transform: none !important; margin: 0 !important;
+  z-index: auto !important; box-shadow: none !important; width: 100% !important; max-width: none !important;
+  min-height: 52px; padding: 10px 16px !important; border-radius: 12px !important; border: 0 !important;
+  background: var(--soft) !important; color: var(--ink) !important; font-size: 18px !important; font-weight: 700; text-align: left;
+}
+.util-sheet > button:hover { background: var(--line) !important; }

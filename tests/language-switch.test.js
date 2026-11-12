@@ -47,5 +47,14 @@ for (const file of fs.readdirSync(path.join(root, "js")).filter((f) => f.endsWit
 }
 if (!account.includes("window.location.reload()")) fail.push("signing out does not reload the app");
 if (!account.includes("pog_account_had_session")) fail.push("an ended session (expired or other tab) is not treated as signed out");
+{
+  const idx = read("index.html"), menu = read("js/utility-menu.js");
+  const menuAt = idx.indexOf("js/utility-menu.js");
+  for (const f of ["account", "cloud-sync", "therapist-cloud", "profile-lifecycle", "deletion-retention", "ownership-transfer", "account-deletion-review"]) {
+    const at = idx.indexOf("js/" + f + ".js");
+    if (at < 0 || menuAt < at) fail.push("js/utility-menu.js must load after js/" + f + ".js so it can collect its button");
+  }
+  if (!menu.includes("pog:languagechange")) fail.push("the account menu label does not follow the language");
+}
 if (fail.length) { fail.forEach((x) => console.error("FAIL " + x)); process.exit(1); }
 console.log("OK: main app and all account/profile panels refresh to the selected language.");

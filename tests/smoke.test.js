@@ -30,10 +30,21 @@ const MOCK_MIC = `(function(){
 
 const SCRIPT_CUES = { "Al bar": "Vorrei un caffè, per favore.", "Hai bisogno di una mano": "Puoi aiutarmi, per favore?", "Qualcuno ti chiede come stai": "Grazie, sto bene." };
 
-async function open(browser, withMic, supabaseStub) {
-  const page = await browser.newPage({ viewport: { width: 820, height: 1180 } });
+/* The app rotates topics by calendar day. Pin the day (a multiple of 4, so the first topic of every
+   list) so checks on specific topics don't depend on when the test runs. Time still moves forward. */
+const FIXED_DAY = `(function(){ var real = Date.now, shift = (20400 * 86400000 + 43200000) - real(); Date.now = function(){ return real() + shift; }; })();`;
+
+/* Account, cloud and privacy options live in the "Account and data" menu in the page header. */
+async function menuClick(page, selector) {
+  if ((await page.getAttribute(".util-toggle", "aria-expanded")) !== "true") await page.click(".util-toggle");
+  await page.click(".util-sheet " + selector);
+}
+
+async function open(browser, withMic, supabaseStub, viewport) {
+  const page = await browser.newPage({ viewport: viewport || { width: 820, height: 1180 } });
   page.errors = [];
   page.on("pageerror", (e) => page.errors.push(e.message));
+  await page.addInitScript(FIXED_DAY);
   if (withMic) await page.addInitScript(MOCK_MIC);
   if (supabaseStub) await page.route(/cdn\.jsdelivr\.net/, (r) => r.fulfill({ contentType: "application/javascript", body: supabaseStub }));
   await page.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
@@ -122,7 +133,7 @@ async function playThrough(page, solo) {
   await en.click('[data-act="onboard-skip"]');
   await en.click('[data-act="home"]');
   check((await en.textContent(".home h1")) === "Hello, English", "new profile uses English interface text");
-  await en.click(".cloud-launcher");
+  await menuClick(en, ".cloud-launcher");
   check((await en.textContent(".cloud-card h2")) === "Cloud backup", "cloud backup opens in the selected English language");
   await en.evaluate(() => document.querySelector('[data-act="lang"][data-l="it"]').click());
   check((await en.textContent(".cloud-card h2")) === "Backup cloud", "open cloud backup panel refreshes to Italian");
@@ -137,7 +148,7 @@ async function playThrough(page, solo) {
   await en.click('[data-act="home"]');
   await en.reload();
   check((await en.textContent(".home h1")) === "Hello, English", "English stays selected after reloading");
-  await en.click(".cloud-launcher");
+  await menuClick(en, ".cloud-launcher");
   check((await en.textContent(".cloud-card h2")) === "Cloud backup", "after reloading, the cloud backup panel is still in English");
   await en.click('[data-cloud="close"]');
   check(en.errors.length === 0, "no page errors (English language and logout): " + en.errors.join("; "));
@@ -160,13 +171,32 @@ async function playThrough(page, solo) {
   await so.fill("#pf-name", "Eric"); await so.click('[data-act="onboard-skip"]'); await so.click('[data-act="home"]');
   await so.waitForTimeout(300);
   check((await so.textContent(".home h1")) === "Ciao, Eric", "signed in: the greeting uses the learner's name");
-  await so.click(".account-launcher");
+  await menuClick(so, ".account-launcher");
   await Promise.all([so.waitForNavigation(), so.click('[data-action="signout"]')]);
   await so.waitForTimeout(300);
   check(!(await so.$(".account-panel:not([hidden])")), "signing out closes the account dialog and reloads the page");
   check((await so.textContent(".home h1")) === "Benvenuto", "after signing out, the learner's name is gone");
   check(!(await so.$(".mychips")), "after signing out, the learner's interests are hidden");
   check(so.errors.length === 0, "no page errors (sign-out): " + so.errors.join("; "));
+
+  // Phone screen: no button may float over the page; every account and data option is in the header menu.
+  const ph = await open(browser, false, SUPABASE_STUB, { width: 390, height: 844 });
+  const floating = () => ph.evaluate(() => [...document.querySelectorAll("button")].filter((x) => getComputedStyle(x).position === "fixed" && x.getClientRects().length).map((x) => x.textContent.trim()));
+  await ph.waitForTimeout(300);
+  check((await floating()).length === 0, "phone, first screen: no floating buttons cover the page");
+  await ph.fill("#pf-name", "Phone"); await ph.click('[data-act="onboard-skip"]'); await ph.click('[data-act="home"]');
+  await ph.click('[data-act="settings"]'); await ph.click('[data-act="home"]');
+  await ph.click(".util-toggle");
+  const items = await ph.$$eval(".util-sheet > button", (bs) => bs.map((x) => x.className));
+  check(items.length === 7, "phone: all 7 account and data options are still in the menu after changing screens (" + items.length + ")");
+  check((await floating()).length === 0, "phone, home: no floating buttons cover the page");
+  await ph.click(".util-sheet .deletion-retention-launcher");
+  check(await ph.isVisible(".account-panel"), "phone: an option in the menu opens its dialog");
+  check((await ph.getAttribute(".util-toggle", "aria-expanded")) === "false", "phone: the menu closes when an option is chosen");
+  await ph.click('[data-ret="close"]');
+  await ph.click('[data-act="start"]'); await ph.click('[data-w="assist"]');
+  check(!(await ph.isVisible(".util-toggle")), "phone: the account menu is hidden during exercises");
+  check(ph.errors.length === 0, "no page errors (phone layout): " + ph.errors.join("; "));
 
   // Solo session with a simulated microphone
   const q = await open(browser, true);

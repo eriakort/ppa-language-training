@@ -105,6 +105,8 @@ js/supabase-config.js Public Supabase URL/key configuration (empty by default)
 js/speech.js          Speech input: Claude host dictation or the browser's Web Speech API
 js/recorder.js        Microphone recording and speaking measures
 js/recordings.js      Recording storage on the device (IndexedDB), 30-day clean-up
+js/utility-menu.js    "Account and data" menu in the page header; collects the account,
+                      cloud, therapist and privacy buttons (load it after those modules)
 content/base.js       Everyday content for everyone
 content/interests.js  Interest packs (topics, words, crossword words, phrases)
 tools/build.js        Builds dist/parole-ogni-giorno.html, one self-contained file

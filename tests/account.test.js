@@ -1,6 +1,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const root = path.resolve(__dirname, "..");
 const account = fs.readFileSync(path.join(root, "js/account.js"), "utf8");
 const config = fs.readFileSync(path.join(root, "js/supabase-config.js"), "utf8");
@@ -18,5 +19,9 @@ check((config.includes('url: ""') && config.includes('anonKey: ""')) || (/url: "
 check(!config.includes("service_role") && !account.includes("SUPABASE_SERVICE_ROLE_KEY"), "browser account code contains no service-role secret");
 check(html.indexOf("supabase-js") < html.indexOf("js/account.js"), "Supabase client loads before account interface");
 const sdkTag = (html.match(/<script[^>]*supabase-js[^>]*>/) || [""])[0];
-check(sdkTag.includes("@supabase/supabase-js@2.119.0/dist/umd/supabase.js"), "browser Supabase SDK uses an exact versioned asset");
-check(sdkTag.includes('integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O"') && sdkTag.includes('crossorigin="anonymous"'), "browser Supabase SDK is protected by subresource integrity");
+const sdkPath = path.join(root, "js/vendor/supabase-js-2.119.0.js");
+const sdkHash = crypto.createHash("sha384").update(fs.readFileSync(sdkPath)).digest("base64");
+check(sdkTag.includes('src="js/vendor/supabase-js-2.119.0.js"') && !sdkTag.includes("https://"), "browser Supabase SDK is served from the app");
+check(sdkTag.includes('integrity="sha384-' + sdkHash + '"') && sdkHash === "uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O", "locally served SDK matches its pinned subresource integrity hash");
+check(fs.readFileSync(path.join(root, "js/vendor/LICENSE.supabase-js.txt"), "utf8").includes("MIT License"), "Supabase SDK license is included with the vendored asset");
+check(!/cdn\.jsdelivr\.net/.test(html), "page does not request the SDK from a third-party CDN");

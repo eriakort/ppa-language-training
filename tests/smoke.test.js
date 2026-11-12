@@ -15,6 +15,8 @@ const path = require("path");
 const { chromium } = require("playwright");
 
 const html = fs.readFileSync(path.resolve(__dirname, "../dist/parole-ogni-giorno.html"), "utf8");
+const sdkSource = fs.readFileSync(path.resolve(__dirname, "../js/vendor/supabase-js-2.119.0.js"), "utf8").replace(/<\/script/gi, "<\\/script");
+const sdkInline = "<script>\n" + sdkSource + "</script>";
 
 // Stand-in for the host's dictation capability: window.__say(text) "speaks".
 const MOCK_MIC = `(function(){
@@ -46,11 +48,9 @@ async function open(browser, withMic, supabaseStub, viewport) {
   page.on("pageerror", (e) => page.errors.push(e.message));
   await page.addInitScript(FIXED_DAY);
   if (withMic) await page.addInitScript(MOCK_MIC);
-  if (supabaseStub) await page.route(/cdn\.jsdelivr\.net/, (r) => r.fulfill({ contentType: "application/javascript", body: supabaseStub }));
-  // The simulated SDK differs from the pinned production asset, so it cannot
-  // pass that asset's SRI hash. Keep production SRI in normal browser runs;
-  // remove only those attributes when this test injects its SDK stub.
-  const pageHtml = supabaseStub ? html.replace(/(<script[^>]*supabase-js[^>]*) integrity="[^"]*" crossorigin="anonymous"/, "$1") : html;
+  // The test stub replaces the exact inlined local SDK; production retains its
+  // separately verified asset and SRI attribute in index.html.
+  const pageHtml = supabaseStub ? html.replace(sdkInline, "<script>\n" + supabaseStub + "</script>") : html;
   await page.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + pageHtml + "</body></html>" }));
   await page.goto("http://app.test/");
   return page;

@@ -44,10 +44,11 @@
   }
   function activeId() { return localStorage.getItem("pog_active_profile_id") || ""; }
   function localKey(k) { var id=activeId(); return id ? "pog_p_"+id+"_"+k : "pog_"+k; }
-  function mapKey() { return "pog_cloud_profile_"+activeId(); }
-  function consentKey() { return "pog_cloud_consent_"+activeId(); }
-  function profileName() {
-    try { var p=JSON.parse(localStorage.getItem(localKey("profile"))||"null"); if(p&&p.name)return p.name; } catch(e) {}
+  function mapKey(profileId) { return "pog_cloud_profile_"+(profileId===undefined?activeId():profileId); }
+  function consentKey(profileId) { return "pog_cloud_consent_"+(profileId===undefined?activeId():profileId); }
+  function profileName(profileId) {
+    var id=profileId===undefined?activeId():profileId;
+    try { var p=JSON.parse(localStorage.getItem(id?"pog_p_"+id+"_profile":"pog_profile")||"null"); if(p&&p.name)return p.name; } catch(e) {}
     return "";
   }
   function snapshot(profileId) {
@@ -106,14 +107,17 @@
     if(!r.data.session)throw new Error(T.signedOut);
     return r.data.session;
   }
-  async function ensureCloudProfile() {
-    if(cloudProfileId)return cloudProfileId;
-    var name=profileName(); if(!name)throw new Error(T.noProfile);
+  async function ensureCloudProfile(profileId) {
+    var existing=localStorage.getItem(mapKey(profileId))||"";
+    if(!existing&&activeId()===profileId)existing=cloudProfileId;
+    if(existing)return existing;
+    var name=profileName(profileId); if(!name)throw new Error(T.noProfile);
     var result=await client.functions.invoke("profile-access",{body:{action:"create_profile",display_name:name.slice(0,80)}});
     if(result.error)throw result.error;
     if(!result.data||!result.data.profile||!result.data.profile.id)throw new Error(T.error);
-    cloudProfileId=result.data.profile.id;localStorage.setItem(mapKey(),cloudProfileId);
-    return cloudProfileId;
+    var id=result.data.profile.id;localStorage.setItem(mapKey(profileId),id);
+    if(activeId()===profileId)cloudProfileId=id;
+    return id;
   }
   async function refreshCloudStatus() {
     try {
@@ -124,26 +128,35 @@
     }catch(e){fail(e);}
   }
   async function backup() {
+    var profileId=activeId();
     await signedIn();
-    if(!localStorage.getItem(consentKey()))throw new Error(T.consentMissing);
-    var id=await ensureCloudProfile(), data=snapshot();
+    if(activeId()!==profileId)throw new Error(T.noProfile);
+    if(!localStorage.getItem(consentKey(profileId)))throw new Error(T.consentMissing);
+    var id=await ensureCloudProfile(profileId);
+    if(activeId()!==profileId)throw new Error(T.noProfile);
+    var data=snapshot(profileId);
     var placement=data.data.placement||{};
     var r=await client.from("profile_data").update({preferences:data,placement:placement,updated_at:new Date().toISOString()}).eq("profile_id",id).select("updated_at,revision").single();
     if(r.error)throw r.error;
-    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",String(r.data.revision||1));localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.done;error="";render();
+    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+profileId+"_seen",String(r.data.revision||1));localStorage.setItem("pog_cloud_sync_"+profileId+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+profileId+"_dirty");syncState="idle";message=T.done;error="";render();
   }
   async function restore() {
+    var profileId=activeId(), cloudId=localStorage.getItem(mapKey(profileId))||"";
     await signedIn();
-    if(!localStorage.getItem(consentKey()))throw new Error(T.consentMissing);
-    var r=await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id",cloudProfileId).single();
+    if(activeId()!==profileId)throw new Error(T.noProfile);
+    if(!localStorage.getItem(consentKey(profileId)))throw new Error(T.consentMissing);
+    if(!cloudId||localStorage.getItem(mapKey(profileId))!==cloudId)throw new Error(T.noMapping);
+    var r=await client.from("profile_data").select("preferences,updated_at,revision").eq("profile_id",cloudId).single();
     if(r.error)throw r.error;
+    if(activeId()!==profileId)throw new Error(T.noProfile);
     var saved=r.data.preferences;
     if(!saved||saved.version!==1||!saved.data||typeof saved.data!=="object")throw new Error(T.none);
     KEYS.forEach(function(k){
-      if(Object.prototype.hasOwnProperty.call(saved.data,k))localStorage.setItem(localKey(k),JSON.stringify(saved.data[k]));
-      else localStorage.removeItem(localKey(k));
+      var key=profileId?"pog_p_"+profileId+"_"+k:"pog_"+k;
+      if(Object.prototype.hasOwnProperty.call(saved.data,k))localStorage.setItem(key,JSON.stringify(saved.data[k]));
+      else localStorage.removeItem(key);
     });
-    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+activeId()+"_seen",String(r.data.revision||1));localStorage.setItem("pog_cloud_sync_"+activeId()+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+activeId()+"_dirty");syncState="idle";message=T.restored;render();
+    lastUpdated=r.data.updated_at;localStorage.setItem("pog_cloud_sync_"+profileId+"_seen",String(r.data.revision||1));localStorage.setItem("pog_cloud_sync_"+profileId+"_enabled","1");localStorage.removeItem("pog_cloud_sync_"+profileId+"_dirty");syncState="idle";message=T.restored;render();
     setTimeout(function(){window.location.reload();},500);
   }
   function bind() {

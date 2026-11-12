@@ -174,6 +174,7 @@
   var lang = load("lang") === "en" ? "en" : "it";
   var accountSignedOut = localStorage.getItem("pog_account_signed_out") === "1";
   var screen = "home";
+  var lastRenderedScreen = null;
   var S = null, flash = "", confirmAsk = "", busy = false, pending = "start";
 
   function getSettings() {
@@ -1340,13 +1341,27 @@
   }
 
   function render() {
+    var resetScroll = lastRenderedScreen !== screen;
+    var savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
+    var focused = app.contains(document.activeElement) ? document.activeElement : null;
+    var focusAct = focused && focused.getAttribute("data-act");
+    var focusCh = focusAct === "key" ? focused.getAttribute("data-ch") : "";
     persistActiveSession();
     document.documentElement.setAttribute("data-patient-lock", isLocked() ? "1" : "0");
     var extView = window.POG.ext.screens[screen];
     var html = extView ? extView() : screen === "unlock" ? viewUnlock() : screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "profiles" ? viewProfiles() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
     app.innerHTML = html;
     flash = "";
-    window.scrollTo(0, 0);
+    lastRenderedScreen = screen;
+    if (resetScroll) window.scrollTo(0, 0);
+    else window.scrollTo(0, savedScrollY);
+    if (focusAct === "key" && focusCh) {
+      var nextKey = app.querySelector('.key[data-act="key"][data-ch="' + focusCh + '"]');
+      if (nextKey) nextKey.focus({ preventScroll: true });
+    } else if (focusAct === "del") {
+      var deleteKey = app.querySelector('.key[data-act="del"]');
+      if (deleteKey) deleteKey.focus({ preventScroll: true });
+    }
   }
 
   /* ---------- actions ---------- */

@@ -81,8 +81,9 @@ depends on the device.
 
 Everything stays in the browser on that device: profile, phrases, levels,
 session history (local storage) and voice recordings (IndexedDB). The app
-uploads none of it; the only outside request it makes itself is for the
-Atkinson Hyperlegible font from Google Fonts.
+does not send font requests to Google Fonts: the Atkinson Hyperlegible font is
+served with the app. Account and cloud features connect to the configured
+Supabase project when used.
 
 - **Speech recognition** sends the audio to the browser's speech service
   (Google in Chrome, Apple in Safari; Anthropic in the Claude artifact).

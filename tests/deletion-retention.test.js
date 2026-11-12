@@ -10,7 +10,7 @@ check(migration.includes("interval '30 days'")&&migration.includes("scheduled_fo
 check(migration.includes("on delete set null")&&migration.includes("status in ('pending', 'cancelled', 'completed')"),"deletion requests retain an audit record after profile removal");
 check(migration.includes("therapist_metrics_retention_days")&&migration.includes("in (30, 90, 180, 365, 730)"),"retention is constrained to explicit supported periods");
 check(migration.includes("grant execute on function public.run_profile_retention_maintenance() to service_role"),"only service role can run destructive maintenance");
-check(api.includes('body.action === "request_profile_deletion"')&&api.includes('owners.length !== 1'),"only the sole owner can request profile deletion");
+check(api.includes('body.action === "request_profile_deletion"')&&api.includes('rpc("request_profile_deletion"'),"profile deletion requests use the serialized server-side ownership check");
 check(api.includes('body.action === "cancel_profile_deletion"')&&api.includes('.eq("requested_by", user.id)'),"only the requester can cancel a pending deletion");
 check(api.includes('body.action === "set_retention"')&&api.includes('[30, 90, 180, 365, 730]'),"retention updates are server-authorized and allowlisted");
 check(worker.includes("LIFECYCLE_WORKER_SECRET")&&worker.includes('rpc("run_profile_retention_maintenance")'),"scheduled worker is secret-protected and invokes database maintenance");

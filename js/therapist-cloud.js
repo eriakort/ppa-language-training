@@ -71,7 +71,7 @@
   // recognised words, recordings, or raw session payloads leave the device.
   function average(values) { var a=values.filter(function(v){return typeof v==="number"&&isFinite(v);}); return a.length?a.reduce(function(x,y){return x+y;},0)/a.length:null; }
   async function publishLocalSessions(profileId) {
-    if(!profileId||localStorage.getItem("pog_cloud_consent_"+profileId)!=="1")return;
+    if(!profileId||!localStorage.getItem("pog_cloud_consent_"+profileId))return;
     var cloudId=localStorage.getItem("pog_cloud_profile_"+profileId);if(!cloudId)return;
     var session=await client.auth.getSession();if(!session.data||!session.data.session)return;
     var raw=localStorage.getItem("pog_p_"+profileId+"_sessions");if(!raw)return;

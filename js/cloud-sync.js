@@ -4,9 +4,9 @@
   var copy = {
     it: {
       title:"Backup cloud", open:"Backup cloud", intro:"Puoi conservare una copia dei progressi online e ripristinarla su un altro dispositivo.",
-      privacy:"La copia può contenere nome o soprannome, anno di nascita se inserito, città e interessi, impostazioni, frasi personali, esercizi svolti, risultati e checkpoint della sessione. Le registrazioni audio non vengono mai caricate.",
+      privacy:"La copia può contenere nome o soprannome, anno di nascita se inserito, città e interessi, impostazioni, frasi personali, esercizi svolti, risultati e checkpoint della sessione. Con lo stesso consenso vengono condivise con i terapisti autorizzati anche misure aggregate delle sessioni: data, modalità, numero di elementi e risposte vocali, avvio medio della risposta, parole al minuto e pause. Queste misure non includono etichette degli esercizi, frasi personali o trascrizioni. Le registrazioni audio non vengono mai caricate.",
       local:"I dati restano su questo dispositivo finché non scegli esplicitamente di creare una copia. Dopo la prima copia o il ripristino, le modifiche vengono sincronizzate automaticamente.",
-      consent:"Ho letto le informazioni e acconsento a caricare questi dati nel mio account Supabase.",
+      consent:"Ho letto queste informazioni e acconsento a caricare la copia cloud nel mio account e a condividere le misure aggregate indicate con i terapisti autorizzati che hanno accesso al profilo.",
       enable:"Acconsenti e continua", backup:"Crea / aggiorna copia", restore:"Ripristina da cloud", status:"Stato", signedOut:"Accedi prima al tuo account.",
       unavailable:"Backup online non configurato. L'app continua a funzionare in modalità locale.",
       noProfile:"Crea prima un profilo locale.", create:"Crea profilo cloud e copia i dati", done:"Copia cloud aggiornata.", restored:"Dati ripristinati. La pagina verrà ricaricata.",
@@ -19,9 +19,9 @@
     },
     en: {
       title:"Cloud backup", open:"Cloud backup", intro:"Keep a copy of your progress online and restore it on another device.",
-      privacy:"The backup may contain a name or nickname, optional birth year, town and interests, settings, personal phrases, completed exercises, results and the active session checkpoint. Audio recordings are never uploaded.",
+      privacy:"The backup may contain a name or nickname, optional birth year, town and interests, settings, personal phrases, completed exercises, results and the active session checkpoint. The same consent also shares aggregate session measures with authorised therapists who have access to the profile: date, mode, item and spoken-response counts, average response onset, words per minute and pauses. These measures do not include exercise labels, personal phrases or transcripts. Audio recordings are never uploaded.",
       local:"Your data stays on this device until you explicitly create or restore a backup. After that, changes are synchronized automatically.",
-      consent:"I have read this information and consent to uploading these data to my Supabase account.",
+      consent:"I have read this information and consent to uploading the cloud backup to my account and sharing the listed aggregate measures with authorised therapists who have access to the profile.",
       enable:"Consent and continue", backup:"Create / update backup", restore:"Restore from cloud", status:"Status", signedOut:"Sign in to your account first.",
       unavailable:"Online backup is not configured. The app continues to work locally.",
       noProfile:"Create a local learner profile first.", create:"Create cloud profile and back up data", done:"Cloud backup updated.",

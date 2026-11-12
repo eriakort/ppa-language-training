@@ -6,13 +6,13 @@
  *
  * Keep SHELL in step with index.html (tests/offline.test.js checks this). Bump VERSION when the list changes.
  */
-var VERSION = "pog-shell-v1";
+var VERSION = "pog-shell-v2";
 var SHELL = [
   "./", "index.html", "css/styles.css",
   "js/strings.js", "content/base.js", "content/interests.js",
   "js/speech.js", "js/recorder.js", "js/recordings.js",
   "js/vendor/supabase-js-2.119.0.js", "js/supabase-config.js",
-  "js/app.js", "js/album-store.js", "js/aac.js", "js/album.js",
+  "js/app.js", "js/album-store.js", "js/aac.js", "js/album.js", "js/charts.js", "js/checkin.js", "js/report.js",
   "js/account.js", "js/cloud-sync.js", "js/therapist-cloud.js", "js/profile-lifecycle.js",
   "js/deletion-retention.js", "js/ownership-transfer.js", "js/account-deletion-review.js",
   "js/utility-menu.js", "js/offline.js",

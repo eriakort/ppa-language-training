@@ -939,6 +939,8 @@
   function homeExtras() {
     var list = window.POG.ext.home || [];
     if (!list.length) return "";
+    list = list.filter(function (h) { try { return !h.show || h.show(); } catch (e) { return false; } });
+    if (!list.length) return "";
     return '<div class="homebtns">' + list.map(function (h) {
       return '<button class="homebtn" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + h.icon + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
     }).join("") + '</div>';
@@ -1078,6 +1080,7 @@
     }
     return head +
       '<div class="report"><h2>' + esc(t.thTrends) + '</h2>' + trend + '<p class="note">' + esc(t.thTrendsNote) + '</p>' +
+      '<div class="row-actions"><button class="secondary" data-act="chk-results">' + esc(t.thCheckins) + '</button><button class="secondary" data-act="report">' + esc(t.thReport) + '</button></div>' +
       '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
       '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
       '<div class="row-actions">' +
@@ -1622,7 +1625,12 @@
     flash: function (m) { flash = m; }, flashText: function () { return flash; },
     speak: speak, stopVoice: stopVoice, isLocked: isLocked,
     profileId: function () { return activeProfileId; }, getScripts: getScripts, getProfile: getProfile,
-    canRecord: function () { return REC.supported && !IN_HOST; }
+    canRecord: function () { return REC.supported && !IN_HOST; },
+    /* Recording is on and consented; with concurrent, also allowed while speech recognition listens. */
+    recordingAllowed: function (concurrent) { return recordingWanted() && (!concurrent || getSettings().recordConcurrent); },
+    therapistUnlocked: function () { return !!TH.unlocked; }, therapistView: function () { screen = "therapist"; return viewTherapist(); }, lockTherapist: function () { thLock(); },
+    settings: getSettings, games: function () { return GAMES.slice(); }, inHost: function () { return IN_HOST; },
+    history: function () { return load("history") || {}; }, sessions: function () { var s = load("sessions"); return Array.isArray(s) ? s : []; }
   };
   RECS.purge().catch(function () {});
   if (!restoreActiveSession()) screen = getProfile() ? "home" : "onboard";

@@ -532,3 +532,58 @@ html[data-patient-lock="1"] .util-menu { display: none !important; }
   .aac-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; width: 100%; padding-bottom: 4px; }
   .aac-tab { flex: none; min-height: 46px; padding: 6px 14px; }
 }
+
+/* ---------- speech check-in ---------- */
+.rate-btns.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.chk-scene { width: 100%; max-width: 560px; height: auto; border-radius: 16px; border: 2px solid var(--line); }
+.chk-left { font-size: 34px; font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
+.chk-count { font-size: 24px; font-weight: 700; margin: 0; }
+
+/* ---------- small trend charts (one measure each) ---------- */
+.chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.mini-chart { margin: 0; background: var(--soft); border-radius: 14px; padding: 12px 12px 6px; }
+.mini-chart figcaption { font-size: 16px; font-weight: 700; color: var(--ink); }
+.mini-chart figcaption span { font-weight: 400; color: var(--muted); }
+.mini-chart .note { margin: 8px 0; }
+.mc { width: 100%; height: auto; display: block; overflow: visible; }
+.mc-grid { stroke: var(--line); stroke-width: 1; }
+.mc-axis { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+.mc-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.mc-dot { fill: var(--accent); stroke: var(--soft); stroke-width: 2; }
+.mc-dot:hover { r: 6; }
+.mc-last { fill: var(--ink); font-size: 12px; font-weight: 700; font-family: var(--font); }
+
+/* ---------- printable summary ---------- */
+.rp-controls { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; }
+.rp-head h1 { font-size: 26px; margin: 0 0 4px; }
+.rp-head p { margin: 2px 0; }
+.rp-meta { color: var(--muted); font-size: 16px; }
+.rp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 0; }
+.rp-stats div { background: var(--soft); border-radius: 14px; padding: 10px 14px; }
+.rp-stats dt { font-size: 15px; color: var(--muted); }
+.rp-stats dd { margin: 2px 0 0; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.print-only { display: none; }
+.rp-notes { height: 140px; border: 1px solid #999; border-radius: 6px; }
+@media print {
+  @page { margin: 14mm; }
+  html, body { background: #fff !important; }
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; color: #000; font-size: 11pt; gap: 6px; }
+  .print-area .print-only { display: block; }
+  .print-area h2 { color: #000; font-size: 12pt; margin-top: 10px; break-after: avoid; }
+  .print-area .note, .print-area .rp-meta, .print-area .rp-stats dt { color: #333; font-size: 9.5pt; }
+  .print-area .tbl { border: 1px solid #999; overflow: visible; break-inside: avoid; }
+  .print-area table { font-size: 9.5pt; }
+  .print-area th, .print-area td { color: #000; background: #fff !important; border-color: #bbb; padding: 3px 6px; }
+  .print-area .rp-stats div, .print-area .mini-chart { background: #fff; border: 1px solid #bbb; break-inside: avoid; }
+  .print-area .rp-stats dd { font-size: 16pt; }
+  .print-area .chart-row { grid-template-columns: 1fr 1fr; }
+  .print-area .mc-line { stroke: #000; }
+  .print-area .mc-dot { fill: #000; stroke: #fff; }
+  .print-area .mc-grid { stroke: #ccc; }
+  .print-area .mc-axis { fill: #333; }
+  .print-area .mc-last, .print-area figcaption { fill: #000; color: #000; }
+}
+.mc-hit { fill: transparent; stroke: none; }
+.mc-hit:hover { fill: var(--accent); }

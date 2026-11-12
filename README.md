@@ -61,6 +61,17 @@ A prototype tablet app for short daily language practice for people with
 - **Family voices.** A relative can record board phrases and personal phrases;
   the recording plays instead of the device voice wherever that phrase is
   spoken, on the board and in the exercises.
+- **Speech check-in.** The same four short tasks every time (describe one
+  picture, name 10 pictures that are not used in the daily games, repeat 3
+  sentences, name animals for one minute), offered on the home screen every
+  14 days by default (7, 14, 28 days or manual, set in the therapist area).
+  Alone, speech recognition checks the answers; with a helper, the helper
+  rates and counts. The learner sees no score. Results, with one-measure
+  trend charts and a table, are in the therapist area. These are indicators
+  for following change, not a clinical test.
+- **Printable summary.** In the therapist area: the last 3 or 6 months of
+  activity, levels, speaking measures by month and check-ins, printed or saved
+  as PDF with the browser's print window.
 
 ## Accounts (optional)
 
@@ -115,6 +126,9 @@ used.
   and re-encoded as JPEG, which also drops location data from the original.
 - **Offline copy:** `sw.js` keeps the app's own files so it opens without
   internet. It never stores Supabase or other services' responses.
+- **Check-in results** stay on the device and are not part of the cloud
+  backup. With recording on, the description and animal tasks are recorded
+  like the exercises (same consent and 30-day clean-up).
 - Clearing the browser's site data deletes everything.
 
 ## Project structure
@@ -133,6 +147,9 @@ js/recordings.js      Recording storage on the device (IndexedDB), 30-day clean-
 js/aac.js             Communication board: essentials, own phrases, people, things
 js/album.js           Album and family voices: viewing, editing, recording
 js/album-store.js     Album storage on the device (IndexedDB)
+js/checkin.js         Speech check-in: the fixed tasks, results and frequency
+js/report.js          Printable summary for the therapist
+js/charts.js          Small one-measure trend charts (inline SVG)
 js/offline.js         Registers the offline copy (sw.js) on the website
 sw.js                 Offline copy of the app's files, network first
 js/utility-menu.js    "Account and data" menu in the page header; collects the account,
@@ -145,7 +162,8 @@ tests/speech.test.js  Speaking measures and speech engine, with a fake recognise
 tests/account.test.js Static checks for account and recovery safeguards
 tests/cloud-sync.test.js Checks consent and cloud backup privacy safeguards
 tests/smoke.test.js   Browser click-through of the built page, including patient
-                      mode, the board, the album and family voices
+                      mode, the board, the album, family voices, the check-in
+                      and the printable summary
 tests/offline.test.js Offline copy: file list matches the page, works with no network
 ```
 

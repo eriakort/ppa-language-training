@@ -398,6 +398,85 @@ async function playThrough(page, solo) {
   check(pa.errors.length === 0, "no page errors (patient mode, board, album): " + pa.errors.join("; "));
   await browser3.close();
 
+  /* Speech check-in (alone with simulated recognition, then with a helper) and the printable summary. */
+  const browser4 = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+  const ctx4 = await browser4.newContext({ viewport: { width: 900, height: 1100 } });
+  await ctx4.addInitScript(MOCK_SR);
+  await ctx4.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  const ck = await ctx4.newPage();
+  ck.errors = []; ck.on("pageerror", (e) => ck.errors.push(e.message));
+  await ck.goto("https://app.test/");
+  await ck.fill("#pf-name", "Eric"); await ck.click('[data-act="onboard-skip"]'); await ck.click('[data-act="home"]');
+  check(!(await ck.$('.homebtn[data-act="chk-start"]')), "check-in: not offered before the first session");
+  await ck.evaluate(() => { const k = Object.keys(localStorage).find((x) => /^pog_p_.+_profile$/.test(x)).replace(/_profile$/, "_sessions"); localStorage.setItem(k, JSON.stringify([{ id: "s1", date: new Date().toISOString(), mode: "daily", who: "solo", items: [{ game: "name", lv: 1, result: "good", ms: 4000, meas: { onsetMs: 1200, wpm: 110, pauses: 1 } }] }])); });
+  await ck.reload();
+  check(!!(await ck.$('.homebtn[data-act="chk-start"]')), "check-in: offered on the home screen once due");
+  await ck.click('.homebtn[data-act="chk-start"]'); await ck.click('[data-act="chk-who"][data-w="solo"]');
+  check(!!(await ck.$(".chk-scene")), "check-in: starts with the picture to describe");
+  const say = async (txt, done) => { await ck.click('[data-act="chk-mic"]'); await ck.waitForTimeout(60); await ck.evaluate((t) => window.__say(t), txt); if (done) await ck.click('[data-act="chk-done"]'); await ck.waitForTimeout(120); };
+  // a microphone failure is not scored as an answer
+  await ck.click('[data-act="chk-mic"]'); await ck.waitForTimeout(60);
+  await ck.evaluate(() => { const s = window.__sr; s.onerror && s.onerror({ error: "not-allowed" }); s.onend && s.onend(); });
+  await ck.waitForTimeout(80);
+  check(!!(await ck.$(".chk-scene")) && /microfono/.test(await ck.textContent(".card")), "check-in: a microphone error asks to try again instead of moving on");
+  await say("una signora cucina la minestra e il gatto beve il latte vicino al tavolo", true);
+  check(/1 \/ 10/.test(await ck.textContent(".tag")), "check-in: after the description come the 10 names");
+  const answers = ["bici", "pesce", "banana", "martello", "candela", "calzini", "carota", "palloncino", "farfalla"];
+  for (const a of answers) await say(a, false);
+  await ck.click('[data-act="chk-skip"]'); // "non lo so" for the bell
+  check(/1 \/ 3/.test(await ck.textContent(".tag")), "check-in: then the sentences to repeat");
+  check(!/gatto dorme/i.test(await ck.textContent(".card")), "check-in: sentences to repeat are not shown");
+  for (const r of ["il gatto dorme", "domani andiamo al mercato", "la signora con il cappello ha comprato il pane"]) await say(r, true);
+  await ck.click('[data-act="chk-flu-start"]'); await ck.waitForTimeout(60);
+  await ck.evaluate(() => window.__say("cane gatto cavallo ehm mucca cane"));
+  await ck.click('[data-act="chk-done"]'); await ck.waitForTimeout(120);
+  check(!!(await ck.$('[data-act="chk-flu-more"]')), "check-in: if listening stops early the minute can continue");
+  await ck.click('[data-act="chk-flu-end"]'); await ck.waitForTimeout(150);
+  check(/Grazie/.test(await ck.textContent(".card")) && !/\d+ \/ 10|su 10/.test(await ck.textContent(".card")), "check-in: ends with thanks and no score");
+  const saved = await ck.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_checkins")); return JSON.parse(localStorage.getItem(k)); });
+  const k1 = saved[0];
+  check(k1.naming.correct === 9 && k1.naming.total === 10, "check-in: 9 of 10 names recognised (alternatives accepted, skip counted) - got " + k1.naming.correct);
+  check(k1.rep.items.length === 3 && k1.rep.items[0].score === 1 && k1.rep.items[2].score < 1, "check-in: repetition scored by coverage");
+  check(k1.flu.count === 4, "check-in: animals count distinct words without fillers - got " + k1.flu.count);
+  check(k1.desc.words === 14, "check-in: description words counted - got " + k1.desc.words);
+  await ck.click('[data-act="chk-home"]');
+  check(!(await ck.$('.homebtn[data-act="chk-start"]')), "check-in: not offered again until the next one is due");
+  // With a helper
+  await ck.evaluate(() => window.POG.appApi.go("checkin"));
+  await ck.click('[data-act="chk-who"][data-w="assist"]');
+  await ck.click('[data-act="chk-desc-start"]'); await ck.click('[data-act="chk-desc-end"]'); await ck.waitForTimeout(100);
+  for (let i = 0; i < 10; i++) await ck.click('[data-act="chk-name"][data-ok="' + (i < 7 ? 1 : 0) + '"]');
+  for (const sc of ["1", "0.5", "0"]) await ck.click('[data-act="chk-rep"][data-s="' + sc + '"]');
+  await ck.click('[data-act="chk-flu-start"]');
+  for (let i = 0; i < 6; i++) await ck.click('[data-act="chk-plus"]');
+  await ck.click('[data-act="chk-minus"]'); await ck.click('[data-act="chk-flu-end"]'); await ck.waitForTimeout(150);
+  const k2 = (await ck.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_checkins")); return JSON.parse(localStorage.getItem(k)); }))[1];
+  check(k2 && k2.who === "assist" && k2.naming.correct === 7 && k2.rep.avg === 0.5 && k2.flu.count === 5, "check-in with a helper: ratings and count saved");
+  // Results and summary are behind the PIN
+  await ck.evaluate(() => window.POG.appApi.go("report"));
+  check(!!(await ck.$("#th-pin1")), "summary: without the PIN, the therapist area opens instead");
+  await ck.fill("#th-pin1", "1234"); await ck.fill("#th-pin2", "1234"); await ck.click('[data-act="pin-set"]');
+  await ck.click('[data-act="chk-results"]');
+  const resInfo = { rows: (await ck.$$("tbody tr")).length, charts: (await ck.$$(".mini-chart")).length };
+  check(resInfo.rows === 2 && resInfo.charts === 3, "check-in results: table of both and three charts " + JSON.stringify(resInfo));
+  await ck.selectOption("#chk-every", "28"); await ck.click('[data-act="chk-freq"]');
+  check((await ck.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_checkin_settings")); return JSON.parse(localStorage.getItem(k)).every; })) === 28, "check-in frequency saved");
+  await ck.click('[data-act="therapist"]'); await ck.click('[data-act="report"]');
+  const rp = await ck.textContent(".print-area");
+  check(/Eric/.test(rp) && /Sessioni/.test(rp) && /Controlli del parlato/.test(rp) && /non è una valutazione clinica/i.test(rp), "summary: name, activity, check-ins and disclaimer: " + rp.slice(0, 400));
+  check((await ck.$$(".print-area .mini-chart")).length === 4 && (await ck.$$(".print-area .mini-chart svg")).length >= 3, "summary: two speaking charts and two check-in charts");
+  await ck.click('[data-act="rp-period"][data-m="6"]');
+  check((await ck.getAttribute('[data-act="rp-period"][data-m="6"]', "aria-pressed")) === "true", "summary: period can be 6 months");
+  await ck.emulateMedia({ media: "print" });
+  const printVis = await ck.evaluate(() => ({ menu: [...document.querySelectorAll(".no-print, .bar")].some((x) => getComputedStyle(x).visibility === "visible"), area: getComputedStyle(document.querySelector(".print-area h2")).visibility }));
+  check(!printVis.menu && printVis.area === "visible", "summary: printing shows only the summary");
+  await ck.emulateMedia({ media: "screen" });
+  await ck.screenshot({ path: path.join(__dirname, "..", "dist", "report-screen.png"), fullPage: true });
+  await ck.emulateMedia({ media: "print" });
+  await ck.pdf({ path: path.join(__dirname, "..", "dist", "report-print.pdf") }).catch(() => {});
+  check(ck.errors.length === 0, "no page errors (check-in, summary): " + ck.errors.join("; "));
+  await browser4.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

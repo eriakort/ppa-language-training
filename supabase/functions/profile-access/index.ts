@@ -183,19 +183,11 @@ Deno.serve(async (req) => {
     }
 
     if (body.action === "request_profile_deletion") {
-      if (membership.role !== "owner") return json({ error: "Only the profile owner can request deletion" }, 403);
-      const { data: owners, error: ownersError } = await admin.from("profile_members")
-        .select("user_id").eq("profile_id", profileId).eq("role", "owner");
-      if (ownersError) return json({ error: "Could not verify profile ownership" }, 500);
-      if (!owners || owners.length !== 1 || owners[0].user_id !== user.id)
-        return json({ error: "Transfer or resolve shared ownership before requesting profile deletion" }, 409);
-      const { data: existing } = await admin.from("profile_deletion_requests").select("id")
-        .eq("profile_id", profileId).eq("status", "pending").maybeSingle();
-      if (existing) return json({ error: "A deletion request is already pending" }, 409);
-      const { data: request, error } = await admin.from("profile_deletion_requests")
-        .insert({ profile_id: profileId, requested_by: user.id, scheduled_for: new Date(Date.now() + 30*24*60*60*1000).toISOString() })
-        .select("id,status,requested_at,scheduled_for").single();
-      if (error || !request) return json({ error: "Could not create deletion request" }, 500);
+      const { data: request, error } = await admin.rpc("request_profile_deletion", {
+        p_profile_id: profileId, p_requester_id: user.id
+      });
+      if (error) return json({ error: "Could not create profile deletion request" }, error.code === "P0001" ? 409 : 500);
+      if (!request) return json({ error: "Could not create profile deletion request" }, 500);
       return json({ deletion_request: request });
     }
 
@@ -229,21 +221,19 @@ Deno.serve(async (req) => {
     const targetId = typeof body.user_id === "string" ? body.user_id : "";
     if (!/^[0-9a-f-]{36}$/i.test(profileId) || !/^[0-9a-f-]{36}$/i.test(targetId) || targetId === user.id)
       return json({ error: "Invalid profile or member" }, 400);
-    const { data: owner } = await admin.from("profile_members").select("role")
+    const { data: owner, error: ownerError } = await admin.from("profile_members").select("role")
       .eq("profile_id", profileId).eq("user_id", user.id).maybeSingle();
+    if (ownerError) return json({ error: "Could not verify profile ownership" }, 500);
     if (owner?.role !== "owner") return json({ error: "Only the current owner can transfer ownership" }, 403);
-    const { data: target } = await admin.from("profile_members").select("role")
+    const { data: target, error: targetError } = await admin.from("profile_members").select("role")
       .eq("profile_id", profileId).eq("user_id", targetId).maybeSingle();
+    if (targetError) return json({ error: "Could not verify the new owner's eligibility" }, 500);
     if (target?.role !== "caregiver") return json({ error: "The new owner must already be a caregiver on this profile" }, 409);
-    const { data: deletion } = await admin.from("profile_deletion_requests").select("id")
-      .eq("profile_id", profileId).eq("status", "pending").maybeSingle();
-    if (deletion) return json({ error: "Cancel the pending profile deletion before transferring ownership" }, 409);
-    await admin.from("profile_ownership_transfers").update({ status: "expired" })
-      .eq("profile_id", profileId).eq("status", "pending").lte("expires_at", new Date().toISOString());
-    const { data: transfer, error } = await admin.from("profile_ownership_transfers")
-      .insert({ profile_id: profileId, from_user_id: user.id, to_user_id: targetId })
-      .select("id,status,expires_at").single();
-    if (error || !transfer) return json({ error: "Could not create ownership transfer request" }, 500);
+    const { data: transfer, error } = await admin.rpc("request_profile_ownership_transfer", {
+      p_profile_id: profileId, p_from_user_id: user.id, p_to_user_id: targetId
+    });
+    if (error) return json({ error: "Could not create ownership transfer request" }, error.code === "P0001" ? 409 : 500);
+    if (!transfer) return json({ error: "Could not create ownership transfer request" }, 500);
     return json({ transfer });
   }
 

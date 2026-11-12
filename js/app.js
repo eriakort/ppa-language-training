@@ -31,8 +31,11 @@
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
   function csvCell(value) {
     var text = value == null ? "" : String(value);
-    if (typeof value === "string" && /^[\u0000-\u0020]*[=+\-@]/.test(value)) text = "'" + text;
-    return /[",\n;]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    if (typeof value === "string") {
+      if (/^[\u0000-\u0020]*[=+\-@＝＋－＠]/.test(value)) text = "\t" + text;
+      else if (/^[\t\r\n]/.test(value)) text = "'" + text;
+    }
+    return /[",;\u0000-\u001f]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
   }
   function fill(s, o) { return s.replace(/\{(\w+)\}/g, function (_, k) { return o[k]; }); }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var x = a[i]; a[i] = a[j]; a[j] = x; } return a; }

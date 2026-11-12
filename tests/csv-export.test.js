@@ -13,9 +13,10 @@ function check(ok, label) {
   else console.log("ok   " + label);
 }
 
-check(csvCell("=1+1") === "'=1+1", "formula cells beginning with equals are treated as text");
-check(csvCell(" +SUM(1,1)") === "\"' +SUM(1,1)\"", "leading whitespace and formula prefixes are neutralized before CSV quoting");
-check(csvCell("@cmd") === "'@cmd" && csvCell("-cmd") === "'-cmd", "at-sign and plus/minus formula prefixes are neutralized");
-check(csvCell("\t=1+1") === "'\t=1+1", "leading control characters do not bypass formula neutralization");
+check(csvCell("=1+1") === "\"\t=1+1\"", "formula cells beginning with equals get an Excel-safe tab prefix inside quotes");
+check(csvCell(" +SUM(1,1)") === "\"\t +SUM(1,1)\"", "leading whitespace and formula prefixes are neutralized before CSV quoting");
+check(csvCell("@cmd") === "\"\t@cmd\"" && csvCell("-cmd") === "\"\t-cmd\"", "at-sign and plus/minus formula prefixes are neutralized");
+check(csvCell("＝1+1") === "\"\t＝1+1\"", "full-width formula prefixes are neutralized");
+check(csvCell("\t=1+1") === "\"\t\t=1+1\"" && csvCell("\tplain") === "\"'\tplain\"", "leading control characters do not bypass formula neutralization");
 check(csvCell(-2) === "-2", "numeric values remain numeric");
 check(csvCell('say "hello", world') === '"say ""hello"", world"', "ordinary CSV quoting remains intact");

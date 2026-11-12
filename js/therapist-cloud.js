@@ -74,13 +74,14 @@
     if(!profileId||!localStorage.getItem("pog_cloud_consent_"+profileId))return;
     var cloudId=localStorage.getItem("pog_cloud_profile_"+profileId);if(!cloudId)return;
     var session=await client.auth.getSession();if(!session.data||!session.data.session)return;
+    if(!localStorage.getItem("pog_cloud_consent_"+profileId))return;
     var raw=localStorage.getItem("pog_p_"+profileId+"_sessions");if(!raw)return;
     var sessions;try{sessions=JSON.parse(raw);}catch(e){return;}if(!Array.isArray(sessions))return;
     var payload=sessions.slice(-60).filter(function(s){return s&&s.id&&s.date&&Array.isArray(s.items);}).map(function(s){
       var items=s.items, measured=items.map(function(i){return i.meas||{};});
       return {profile_id:cloudId,session_id:String(s.id),started_at:new Date(s.date).toISOString(),mode:s.mode==="place"?"place":"session",player_mode:s.who==="solo"?"solo":"assisted",item_count:items.length,spoken_count:measured.filter(function(m){return m.onsetMs!=null||m.wpm!=null||m.pauses!=null;}).length,avg_onset_ms:average(measured.map(function(m){return m.onsetMs;})),avg_wpm:average(measured.map(function(m){return m.wpm;})),avg_pauses:average(measured.map(function(m){return m.pauses;})),avg_longest_pause_ms:average(measured.map(function(m){return m.longestPauseMs;}))};
     });
-    if(payload.length){var saved=await client.rpc("upsert_therapist_session_metrics",{p_metrics:payload});if(saved.error)throw saved.error;}
+    if(payload.length&&localStorage.getItem("pog_cloud_consent_"+profileId)){var saved=await client.rpc("upsert_therapist_session_metrics",{p_metrics:payload});if(saved.error)throw saved.error;}
   }
   function publishActive() { var id=localStorage.getItem("pog_active_profile_id");publishLocalSessions(id).catch(function(){}); }
   window.addEventListener("pog:local-change",function(ev){var id=ev.detail&&ev.detail.profileId;if(id&&ev.detail.key==="sessions")publishLocalSessions(id).catch(function(){});});

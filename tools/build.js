@@ -17,7 +17,10 @@ const html = read("index.html");
 
 const inline = (s) => s
   .replace(/<link rel="stylesheet" href="((?!https?:)[^"]+)">/g, (_, href) => "<style>\n" + read(href) + "</style>")
-  .replace(/<script src="((?!https?:)[^"]+)"><\/script>/g, (_, src) => "<script>\n" + read(src).replace(/<\/script/gi, "<\\/script") + "</script>");
+  .replace(/<script\b([^>]*)\s+src="((?!https?:)[^"]+)"([^>]*)><\/script>/g, (_, before, src, after) => {
+    const attributes = (before + after).replace(/\s+(?:integrity|crossorigin)="[^"]*"/g, "");
+    return "<script" + attributes + ">\n" + read(src).replace(/<\/script/gi, "<\\/script") + "</script>";
+  });
 
 const head = html.match(/<head>([\s\S]*?)<\/head>/)[1]
   .replace(/<meta charset[^>]*>\n?/, "")

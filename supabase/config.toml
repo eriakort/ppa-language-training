@@ -2,3 +2,8 @@ project_id = "ppa-language-training"
 
 [functions.profile-access]
 verify_jwt = false
+
+# The scheduled worker authenticates with its own x-lifecycle-worker-secret
+# header instead of a user JWT. The handler rejects requests before any work.
+[functions.profile-lifecycle-worker]
+verify_jwt = false

@@ -108,6 +108,17 @@ async function playThrough(page, solo) {
   await p.reload();
   check(await p.textContent(".instr") === resumePrompt, "refresh restores the exact active exercise");
   await playThrough(p, false);
+  const gameLengths = await p.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith("pog_p_") && k.endsWith("_sessions"));
+    const sessions = key ? JSON.parse(localStorage.getItem(key)) : [];
+    const items = sessions.length ? sessions[sessions.length - 1].items : [];
+    return {
+      crossword: items.filter((item) => item.game === "crossword").length,
+      readings: items.filter((item) => item.game === "read").map((item) => item.label.trim().split(/\s+/).length)
+    };
+  });
+  check(gameLengths.crossword >= 8 && gameLengths.crossword <= 10, "crossword session solves 8–10 clue words (" + gameLengths.crossword + ")");
+  check(gameLengths.readings.length === 4 && gameLengths.readings.every((words) => words >= 24), "reading session includes four longer passages (" + gameLengths.readings.join(", ") + " words)");
   check((await p.$$("tbody tr")).length >= 10, "assisted session completes with a summary");
   check(p.errors.length === 0, "no page errors (assisted): " + p.errors.join("; "));
 
@@ -355,7 +366,7 @@ async function playThrough(page, solo) {
   // Album photo in the games
   await pa.click('[data-act="home"]'); await pa.click('[data-act="start"]'); await pa.click('[data-w="assist"]');
   let sawAlbumPhoto = false;
-  for (let i = 0; i < 40 && !sawAlbumPhoto; i++) {
+  for (let i = 0; i < 120 && !sawAlbumPhoto; i++) {
     if (await pa.$(".pic img")) { sawAlbumPhoto = true; break; }
     if (await pa.$('[data-act="advance"]')) { await pa.click('[data-act="advance"]'); continue; }
     if (await pa.$('[data-act="reveal"]')) { await pa.click('[data-act="reveal"]'); continue; }

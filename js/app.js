@@ -51,41 +51,124 @@
   var RULE = { down: 0.6, downN: 3, up: 0.9, upN: 5, flag: 0.4, place: 0.6 };
 
   var T = window.POG.strings, C = window.POG.content;
-  var DESCRIBE = C.DESCRIBE, NAMING = C.NAMING, CROSS = C.CROSS, ECHO = C.ECHO, SEQ = C.SEQ, DEFAULT_SCRIPTS = C.DEFAULT_SCRIPTS;
+  var DESCRIBE = C.DESCRIBE, NAMING = C.NAMING, CROSS = C.CROSS_WORDS, ECHO = C.ECHO, SEQ = C.SEQ, DEFAULT_SCRIPTS = C.DEFAULT_SCRIPTS;
   var PACKS = C.PACKS, PACK_KEYS = C.PACK_KEYS;
   var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
   var ALL_NAMES = NAMING.concat.apply(NAMING, PACK_KEYS.map(function (k) { return PACKS[k].name; }));
 
-  /* Builds a 3-word crossword: word 1 across, word 2 down through it, word 3 across through word 2
-     at least two rows away, so no letters touch except at the crossings. */
-  function genCross(list, seed, icon) {
-    var res = [], n = list.length;
-    for (var a = 0; a < n; a++) for (var b = 0; b < n; b++) for (var c = 0; c < n; c++) {
-      if (a === b || b === c || a === c) continue;
-      var w1 = list[a][0], w2 = list[b][0], w3 = list[c][0];
-      for (var i = 0; i < w1.length; i++) for (var j = 0; j < w2.length; j++) {
-        if (w1[i] !== w2[j]) continue;
-        for (var k = 0; k < w2.length; k++) {
-          if (Math.abs(k - j) < 2) continue;
-          for (var m = 0; m < w3.length; m++) {
-            if (w3[m] !== w2[k]) continue;
-            var ws = [
-              { w: w1, r: 0, c: 0, d: "a", clue: list[a][1] },
-              { w: w2, r: -j, c: i, d: "d", clue: list[b][1] },
-              { w: w3, r: k - j, c: i - m, d: "a", clue: list[c][1] }
-            ];
-            var minR = Math.min(0, -j, k - j), minC = Math.min(0, i - m);
-            var maxR = Math.max(0, w2.length - 1 - j, k - j), maxC = Math.max(w1.length - 1, i, i - m + w3.length - 1);
-            if (maxC - minC + 1 > 9 || maxR - minR + 1 > 8) continue;
-            ws.forEach(function (x) { x.r -= minR; x.c -= minC; x.pic = icon; });
-            res.push(ws);
-          }
+  /* Builds an 8–10 word crossword by adding perpendicular words at matching letters. */
+  function genCross(list, seed, icon, extra) {
+    var bank = [], seen = {};
+    function addWords(words, group) {
+      (words || []).forEach(function (item) {
+        var w = String(item[0] || "").toUpperCase();
+        if (!/^[A-Z]+$/.test(w) || !item[1] || seen[w]) return;
+        seen[w] = true; bank.push({ w: w, clue: item[1], pic: icon, group: group });
+      });
+    }
+    addWords(list, 0); addWords(extra, 1);
+    if (bank.length < 8) return null;
+    var shift = Math.abs(seed || 0) % bank.length;
+    bank = bank.slice(shift).concat(bank.slice(0, shift));
+    bank.sort(function (a, b) { return a.group - b.group; });
+    var nodes = 0, maxNodes = 18000;
+    function cellsFor(word) {
+      var out = [];
+      for (var i = 0; i < word.w.length; i++) out.push({
+        r: word.r + (word.d === "d" ? i : 0), c: word.c + (word.d === "a" ? i : 0), ch: word.w[i]
+      });
+      return out;
+    }
+    function footprint(placed, candidate) {
+      var all = [], minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity;
+      placed.concat([candidate]).forEach(function (word) { cellsFor(word).forEach(function (cell) {
+        all.push(cell); minR = Math.min(minR, cell.r); minC = Math.min(minC, cell.c);
+        maxR = Math.max(maxR, cell.r); maxC = Math.max(maxC, cell.c);
+      }); });
+      return { cells: all, minR: minR, minC: minC, maxR: maxR, maxC: maxC,
+        area: (maxR - minR + 1) * (maxC - minC + 1) };
+    }
+    function placementOptions(placed, item) {
+      var occupied = {}, options = {}, out = [];
+      placed.forEach(function (word) { cellsFor(word).forEach(function (cell) {
+        var key = cell.r + "," + cell.c;
+        if (!occupied[key]) occupied[key] = { ch: cell.ch, dirs: [word.d] };
+        else if (occupied[key].dirs.indexOf(word.d) < 0) occupied[key].dirs.push(word.d);
+      }); });
+      placed.forEach(function (word) {
+        for (var wi = 0; wi < word.w.length; wi++) for (var ni = 0; ni < item.w.length; ni++) {
+          if (word.w[wi] !== item.w[ni]) continue;
+          var d = word.d === "a" ? "d" : "a";
+          var r = word.r + (word.d === "d" ? wi : (d === "a" ? 0 : -ni));
+          var c = word.c + (word.d === "a" ? wi : (d === "a" ? -ni : 0));
+          if (word.d === "a" && d === "d") { r = word.r - ni; c = word.c + wi; }
+          if (word.d === "d" && d === "a") { r = word.r + wi; c = word.c - ni; }
+          var key = d + ":" + r + ":" + c;
+          if (options[key]) continue;
+          var candidate = { w: item.w, r: r, c: c, d: d, clue: item.clue, pic: item.pic, group: item.group };
+          var crossed = [], valid = true;
+          cellsFor(candidate).forEach(function (cell) {
+            var k = cell.r + "," + cell.c, prior = occupied[k];
+            if (prior) {
+              if (prior.ch !== cell.ch || prior.dirs.indexOf(d) >= 0 || prior.dirs.length !== 1) valid = false;
+              else crossed.push(k);
+            }
+          });
+          if (!valid || crossed.length !== 1) continue;
+          var crossing = crossed[0], dc = d === "a" ? 1 : 0, dr = d === "d" ? 1 : 0;
+          var first = { r: r, c: c }, last = { r: r + dr * (item.w.length - 1), c: c + dc * (item.w.length - 1) };
+          if (occupied[(first.r - dr) + "," + (first.c - dc)] || occupied[(last.r + dr) + "," + (last.c + dc)]) continue;
+          cellsFor(candidate).forEach(function (cell) {
+            var k = cell.r + "," + cell.c;
+            if (k === crossing) return;
+            var sideA = d === "a" ? (cell.r - 1) + "," + cell.c : cell.r + "," + (cell.c - 1);
+            var sideB = d === "a" ? (cell.r + 1) + "," + cell.c : cell.r + "," + (cell.c + 1);
+            if (occupied[sideA] || occupied[sideB]) valid = false;
+          });
+          if (!valid) continue;
+          var box = footprint(placed, candidate);
+          if (box.maxR - box.minR + 1 > 16 || box.maxC - box.minC + 1 > 16) continue;
+          options[key] = true;
+          out.push({ word: candidate, area: box.area });
+        }
+      });
+      return out;
+    }
+    function extend(placed, used, target) {
+      if (placed.length >= target) return placed;
+      if (++nodes > maxNodes) return null;
+      var options = [];
+      bank.forEach(function (item, idx) {
+        if (used[item.w]) return;
+        placementOptions(placed, item).forEach(function (option) {
+          option.word.rank = idx; options.push(option);
+        });
+      });
+      options.sort(function (a, b) { return a.word.group - b.word.group || a.area - b.area || a.word.rank - b.word.rank; });
+      for (var i = 0; i < options.length; i++) {
+        var word = options[i].word, nextUsed = Object.assign({}, used); nextUsed[word.w] = true;
+        var result = extend(placed.concat([word]), nextUsed, target);
+        if (result) return result;
+        if (nodes > maxNodes) return null;
+      }
+      return null;
+    }
+    var targets = [Math.min(10, bank.length), 9, 8];
+    for (var t = 0; t < targets.length; t++) {
+      var target = targets[t]; if (target < 8 || (t && target === targets[t - 1])) continue;
+      for (var root = 0; root < bank.length && nodes <= maxNodes; root++) {
+        var first = bank[root], result = extend([{ w: first.w, r: 0, c: 0, d: "a", clue: first.clue, pic: first.pic, group: first.group }], (function () { var used = {}; used[first.w] = true; return used; })(), target);
+        if (result) {
+          var minR = Infinity, minC = Infinity;
+          result.forEach(function (word) { cellsFor(word).forEach(function (cell) {
+            minR = Math.min(minR, cell.r); minC = Math.min(minC, cell.c);
+          }); });
+          result.forEach(function (word) { word.r -= minR; word.c -= minC; delete word.group; delete word.rank; });
+          return result.sort(function (a, b) { return a.r - b.r || a.c - b.c; });
         }
       }
     }
-    if (!res.length) return null;
-    var p = res[Math.abs(seed * 7919) % res.length];
-    return p.slice().sort(function (x, y) { return x.r - y.r || x.c - y.c; });
+    return null;
   }
 
   var lang = load("lang") === "en" ? "en" : "it";
@@ -439,10 +522,10 @@
   function pickCross(off) {
     var ks = myPacks();
     if (ks.length) {
-      var k = ks[off % ks.length], gen = genCross(PACKS[k].cw[lang], off, PACKS[k].icon);
+      var k = ks[off % ks.length], gen = genCross(PACKS[k].cw[lang], off, PACKS[k].icon, CROSS[lang]);
       if (gen) return gen;
     }
-    return CROSS[lang][off % CROSS[lang].length];
+    return genCross(CROSS[lang], off, "");
   }
   function pickEcho(lv, n, off) {
     var ks = myPacks();
@@ -450,15 +533,9 @@
     return src[lv - 1].slice(0, n);
   }
 
-  /* Reading passages: two sentences at levels 1-2, one short sentence at levels 3-4. */
+  /* A reading session uses several longer passages, paced according to the learner's level. */
   function pickRead(lv, n, off) {
-    var ks = myPacks(), long = [], short = [], out = [];
-    ks.forEach(function (k) {
-      var s1 = PACKS[k].echo[lang][0];
-      s1.forEach(function (x, i) { long.push(x + " " + s1[(i + 1) % s1.length]); short.push(x); });
-    });
-    if (!long.length) { long = C.READ[lang].long; short = C.READ[lang].short; }
-    var pool = lv <= 2 ? long : short;
+    var pool = C.READ[lang].long, out = [];
     for (var i = 0; i < n; i++) out.push(pool[(off + i) % pool.length]);
     return out;
   }
@@ -467,7 +544,7 @@
     if (g === "describe") { var dp = describePool(); for (i = 0; i < n; i++) out.push({ game: g, lv: lv, data: dp[(off + i) % dp.length] }); }
     if (g === "crossword") {
       var pz = { p: pickCross(off), letters: {} };
-      for (i = 0; i < Math.min(n, pz.p.length); i++) out.push({ game: g, lv: lv, data: { pz: pz, wi: i } });
+      for (i = 0; i < pz.p.length; i++) out.push({ game: g, lv: lv, data: { pz: pz, wi: i } });
     }
     if (g === "name") pickNames(n, off).forEach(function (x) { out.push({ game: g, lv: lv, data: x }); });
     if (g === "wordbuild") pickBuild(n, off).forEach(function (x) { out.push({ game: g, lv: lv, data: x }); });
@@ -496,7 +573,7 @@
     var tp = todayPlan(), L = tp.set.levels, d = tp.day, steps = [];
     tp.list.forEach(function (g) {
       if (g === "maze") { steps.push({ game: "maze", lv: null, data: { n: tp.set.mazeSize } }); return; }
-      var n = { describe: 1, crossword: 3, wordbuild: 3, name: 4, script: 2, read: 1, echo: 2, seq: 1 }[g];
+      var n = { describe: 1, crossword: 10, wordbuild: 3, name: 4, script: 2, read: 4, echo: 2, seq: 1 }[g];
       steps = steps.concat(makeSteps(g, L[g], n, d));
     });
     return { mode: "session", id: "s" + Date.now().toString(36), who: who, steps: steps, i: -1, log: [], stopped: false, started: new Date(), levels: L, games: tp.list };
@@ -1111,7 +1188,10 @@
       body += '<div class="tools">' + (S.support < S.max ? hintBtn() : listenBtn()) + '</div>' + (S.support >= 2 ? noTtsNote() : '') + rateRow();
     } else if (st.game === "read") {
       var words = st.data.split(/\s+/), useMic = S.who === "solo" && micReady();
+      var readSteps = S.steps.filter(function (step) { return step.game === "read"; });
+      var readPosition = readSteps.indexOf(st) + 1;
       body += '<p class="instr">' + esc(st.lv === 1 ? t.readFree : st.lv === 4 ? t.readListen : t.readPaced) + '</p>' +
+        '<p class="sub">' + esc(fill(t.readProgress, { current: readPosition, total: readSteps.length })) + '</p>' +
         '<p class="passage">' + words.map(function (w, i) { return '<span class="rw' + (i === S.paceIdx ? ' on' : (i < S.paceIdx ? ' done' : '')) + '">' + esc(w) + '</span>'; }).join(" ") + '</p>' +
         '<div class="tools">' + (st.lv === 4 || S.replayed ? listenBtn() : '') +
         (st.lv >= 2 && !useMic ? '<button class="tool" data-act="pace">' + esc(t.startPace) + '</button>' : '') + '</div>' + rateRow();
@@ -1161,7 +1241,7 @@
       }
     }
     var showPic = S.support >= 2;
-    return '<p class="instr">' + esc(t.cwInstr) + '</p>' +
+    return '<p class="instr">' + esc(t.cwInstr) + '</p><p class="sub">' + esc(fill(t.cwProgress, { current: st.data.wi + 1, total: pz.p.length })) + '</p>' +
       '<p class="clue"><b>' + (st.data.wi + 1) + ' ' + (w.d === "a" ? t.across : t.down) + '</b>' + esc(w.clue) + '</p>' +
       (showPic ? '<div class="pic sm" aria-hidden="true">' + w.pic + '</div>' : '') +
       '<div class="cwbox"><div class="cw" style="--cols:' + C + '">' + html + '</div></div>' + letterInput(st);

@@ -147,7 +147,7 @@
   function list() { var l = api.load("checkins"); return Array.isArray(l) ? l : []; }
   function due() {
     var every = settingsCk().every; if (!every) return false;
-    var l = list(); if (!l.length) return !!api.getProfile() && api.sessions().length > 0; /* first one after the first session */
+    var l = list(); if (!l.length) return !!api.getProfile() && api.sessions().some(function (x) { return x.mode !== "place"; }); /* first one after the first daily session, not right after the starting check */
     return Date.now() - new Date(l[l.length - 1].date).getTime() >= every * 86400000;
   }
   function begin(who) {

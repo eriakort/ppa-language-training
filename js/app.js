@@ -1052,7 +1052,7 @@
       return '<tr><td>' + esc(d) + '</td><td>' + esc(s.mode === "place" ? t.placeTag : (s.who === "solo" ? t.soloTitle : t.assistTitle)) + '</td><td class="n">' + sp.length + '</td>' +
         '<td class="n">' + fmtS(avg(sp.map(function (i) { return i.meas.onsetMs; }))) + '</td>' +
         '<td class="n">' + (avg(sp.map(function (i) { return i.meas.wpm; })) == null ? "–" : Math.round(avg(sp.map(function (i) { return i.meas.wpm; })))) + '</td>' +
-        '<td class="n">' + (avg(sp.map(function (i) { return i.meas.pauses; })) == null ? "–" : avg(sp.map(function (i) { return i.meas.pauses; })).toFixed(1)) + '</td>' +
+        '<td class="n">' + (avg(sp.map(function (i) { return i.meas.pauses; })) == null ? "–" : avg(sp.map(function (i) { return i.meas.pauses; })).toFixed(1).replace(".", lang === "it" ? "," : ".")) + '</td>' +
         '<td class="n">' + fmtS(avg(sp.map(function (i) { return i.meas.longestPauseMs; }))) + '</td></tr>';
     }).join("");
     var trend = sessions.length

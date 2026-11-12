@@ -466,3 +466,69 @@ td.n { font-variant-numeric: tabular-nums; text-align: center; }
   background: var(--soft) !important; color: var(--ink) !important; font-size: 18px !important; font-weight: 700; text-align: left;
 }
 .util-sheet > button:hover { background: var(--line) !important; }
+
+/* Patient mode: the account and data menu stays hidden while the app is locked. */
+html[data-patient-lock="1"] .util-menu { display: none !important; }
+
+/* Big buttons on the home screen (communication board, album). */
+.homebtns { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; width: 100%; max-width: 520px; }
+.homebtn { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 72px; padding: 12px 18px; border-radius: 18px; background: var(--soft); color: var(--ink); border: 2px solid transparent; font-size: 22px; font-weight: 700; }
+.homebtn:hover { border-color: var(--accent); }
+.hb-ico { font-size: 30px; line-height: 1; }
+
+/* Communication board */
+.aac { gap: 18px; }
+.aac-bar { width: 100%; display: flex; flex-direction: column; gap: 10px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); padding-block: 4px; }
+.aac-msg { margin: 0; min-height: 84px; display: flex; align-items: center; justify-content: center; padding: 14px 18px; border-radius: 16px; background: var(--hl); color: var(--ink); font-size: clamp(26px, 5vw, 38px); font-weight: 700; text-wrap: balance; }
+.aac-msg.empty { background: var(--soft); color: var(--muted); font-size: 20px; font-weight: 400; }
+.aac-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.aac-tools .tool { min-height: 52px; padding: 8px 16px; }
+.aac-tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.aac-tab { min-height: 52px; padding: 8px 18px; border-radius: 999px; background: var(--soft); color: var(--ink); font-weight: 700; border: 2px solid transparent; }
+.aac-tab[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.aac-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.aac-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 150px; padding: 12px 8px; border-radius: 18px; background: var(--soft); color: var(--ink); border: 3px solid transparent; }
+.aac-tile:hover, .aac-tile:focus-visible { border-color: var(--accent); }
+.aac-tile:active { background: var(--hl); }
+.aac-pic { width: 84px; height: 84px; display: grid; place-items: center; font-size: 60px; line-height: 1; }
+.aac-pic img { width: 84px; height: 84px; object-fit: cover; border-radius: 14px; }
+.aac-label { font-size: 19px; font-weight: 700; line-height: 1.25; text-wrap: balance; }
+.aac-tile small { color: var(--muted); font-size: 14px; }
+.aac-big { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: max(24px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px)); background: var(--surface); color: var(--ink); text-align: center; cursor: pointer; }
+.aac-big p { margin: 0; font-size: clamp(44px, 11vw, 110px); font-weight: 700; line-height: 1.1; text-wrap: balance; }
+.aac-big small { color: var(--muted); font-size: 18px; }
+@media (max-width: 420px) { .aac-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .aac-tile { min-height: 136px; } .aac-pic, .aac-pic img { width: 70px; height: 70px; font-size: 50px; } }
+
+/* Album */
+.album-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.album-card { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px; border-radius: 18px; background: var(--soft); color: var(--ink); border: 3px solid transparent; text-align: center; }
+.album-card:hover, .album-card:focus-visible { border-color: var(--accent); }
+.album-pic { width: 100%; aspect-ratio: 1; max-width: 100%; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: var(--surface); font-size: 64px; }
+.album-pic img { width: 100%; height: 100%; object-fit: cover; }
+.album-card strong { font-size: 20px; }
+.album-card span:not(.album-pic) { color: var(--muted); font-size: 16px; }
+.alb-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.alb-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; background: var(--soft); border-radius: 14px; padding: 10px 12px; }
+.alb-row .row-actions { width: auto; justify-content: flex-end; }
+.alb-row audio { max-width: 100%; }
+.alb-thumb { width: 56px; height: 56px; flex: none; border-radius: 10px; overflow: hidden; display: grid; place-items: center; background: var(--surface); font-size: 34px; }
+.alb-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.alb-txt { flex: 1 1 160px; min-width: 0; display: flex; flex-direction: column; }
+.alb-txt small { color: var(--muted); }
+.alb-preview { width: 160px; height: 160px; max-width: 100%; object-fit: cover; border-radius: 14px; }
+.alb-select { font: inherit; font-size: 20px; min-height: 60px; padding: 8px 12px; border-radius: 14px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); width: 100%; }
+.field input[type="file"] { font-size: 17px; min-height: 0; padding: 10px; }
+.alb-rec { justify-content: flex-start; }
+
+/* Album photos inside the games */
+.pic img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.opt.pico img { width: 100px; height: 100px; object-fit: cover; border-radius: 12px; }
+/* Board on phones: compact controls and one scrolling row of tabs, so the pictures start higher up. */
+@media (max-width: 520px) {
+  .aac { gap: 12px; }
+  .aac-msg { min-height: 64px; padding: 10px 14px; }
+  .aac-tools { flex-wrap: nowrap; }
+  .aac-tools .tool { min-height: 44px; padding: 6px 10px; font-size: 15px; flex: 1 1 0; justify-content: center; }
+  .aac-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; width: 100%; padding-bottom: 4px; }
+  .aac-tab { flex: none; min-height: 46px; padding: 6px 14px; }
+}

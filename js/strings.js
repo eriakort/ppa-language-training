@@ -104,7 +104,13 @@ window.POG.strings = {
     thNoSessions: "Nessuna sessione ancora.", thRecs: "Registrazioni", thNoRecs: "Nessuna registrazione ancora.", thRecOff: "La registrazione della voce è disattivata (si attiva in «Livelli e impostazioni»).",
     thRetention: "Le registrazioni più vecchie di {n} giorni vengono cancellate da sole.", download: "Scarica", confirmDelete: "Sì, cancella",
     recDeleted: "Registrazione cancellata.", clearRecs: "Cancella tutte le registrazioni", clearRecsQ: "Sì, cancella tutto", recsCleared: "Registrazioni cancellate.",
-    exportCsv: "Scarica i dati (CSV)", exported: "File CSV scaricato."
+    exportCsv: "Scarica i dati (CSV)", exported: "File CSV scaricato.",
+    secPatient: "Modalità paziente", patientMode: "Modalità paziente: impostazioni e strumenti si aprono solo con il PIN",
+    patientHelp: "La persona vede solo gli esercizi, la tabella per comunicare e l'album. Impostazioni, frasi, profili, lingua, account e area logopedista chiedono il PIN.",
+    patientNeedsPin: "Per la modalità paziente serve un PIN: crealo qui, poi attivala di nuovo nelle impostazioni.",
+    patientOn: "Modalità paziente attivata. Resta sbloccata per 10 minuti.",
+    caregiver: "🔒 Per chi assiste", relock: "🔒 Blocca di nuovo",
+    unlockTitle: "Per chi assiste", unlockHelp: "Inserisci il PIN per aprire impostazioni e strumenti.", unlockBtn: "Sblocca", cancel: "Annulla"
   },
   en: {
     appName: "Words every day", tagline: "Daily language practice · about 10 minutes",
@@ -200,6 +206,12 @@ window.POG.strings = {
     thNoSessions: "No sessions yet.", thRecs: "Recordings", thNoRecs: "No recordings yet.", thRecOff: "Voice recording is off (turn it on in “Levels and settings”).",
     thRetention: "Recordings older than {n} days are deleted automatically.", download: "Download", confirmDelete: "Yes, delete",
     recDeleted: "Recording deleted.", clearRecs: "Delete all recordings", clearRecsQ: "Yes, delete everything", recsCleared: "Recordings deleted.",
-    exportCsv: "Download the data (CSV)", exported: "CSV file downloaded."
+    exportCsv: "Download the data (CSV)", exported: "CSV file downloaded.",
+    secPatient: "Patient mode", patientMode: "Patient mode: settings and tools open only with the PIN",
+    patientHelp: "The person sees only the exercises, the communication board and the album. Settings, phrases, profiles, language, accounts and the therapist area ask for the PIN.",
+    patientNeedsPin: "Patient mode needs a PIN: create it here, then turn patient mode on again in the settings.",
+    patientOn: "Patient mode is on. It stays unlocked for 10 minutes.",
+    caregiver: "🔒 For carers", relock: "🔒 Lock again",
+    unlockTitle: "For carers", unlockHelp: "Enter the PIN to open settings and tools.", unlockBtn: "Unlock", cancel: "Cancel"
   }
 };

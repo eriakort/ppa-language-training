@@ -1,6 +1,10 @@
 (function () {
   "use strict";
   var app = document.getElementById("app");
+  /* Extension points for modules loaded after this file (communication board, album):
+     extra screens, click actions, actions that need the PIN in patient mode, and big buttons on home. */
+  window.POG = window.POG || {};
+  window.POG.ext = window.POG.ext || { screens: {}, actions: {}, locked: {}, home: [] };
 
   var activeProfileId = (function () { try { return localStorage.getItem("pog_active_profile_id") || ""; } catch (e) { return ""; } })();
   var GLOBAL_KEYS = { lang: true, profiles: true, active_profile_id: true };
@@ -95,7 +99,25 @@
     GAMES.forEach(function (g) { var n = +lv[g]; lv[g] = (n >= 1 && n <= MAXLV[g]) ? n : 1; });
     var size = [4, 6, 8].indexOf(+s.mazeSize) >= 0 ? +s.mazeSize : 4;
     return { levels: lv, auto: s.auto !== false, allowUp: s.allowUp !== false, maze: s.maze === true, mazeSize: size,
-      record: s.record === true, consentAt: s.consentAt || null, recordConcurrent: s.recordConcurrent == null ? !isMobile() : !!s.recordConcurrent };
+      record: s.record === true, consentAt: s.consentAt || null, recordConcurrent: s.recordConcurrent == null ? !isMobile() : !!s.recordConcurrent,
+      patientMode: s.patientMode === true };
+  }
+
+  /* ---------- patient mode ----------
+     The learner sees exercises, the communication board and the album. Settings, phrases, profiles,
+     language, the therapist area and the account menu need the PIN. Unlocking lasts 10 minutes, or
+     until "Lock again" or a reload. */
+  var UNLOCK_MS = 10 * 60 * 1000, unlockedAt = 0, afterUnlock = null;
+  var LOCKED_ACTS = { settings: 1, scripts: 1, therapist: 1, profiles: 1, "profile-add": 1, "profile-switch": 1, lang: 1, caregiver: 1 };
+  function isLocked() { return getSettings().patientMode && !(unlockedAt && Date.now() - unlockedAt < UNLOCK_MS); }
+  function needsUnlock(act) { return isLocked() && !!(LOCKED_ACTS[act] || window.POG.ext.locked[act]); }
+  /* Re-runs a click that was held back by the PIN screen. */
+  function dispatchAct(spec) {
+    var b = document.createElement("button");
+    b.hidden = true; b.setAttribute("data-act", spec.act);
+    Object.keys(spec.attrs || {}).forEach(function (k) { if (spec.attrs[k]) b.setAttribute(k, spec.attrs[k]); });
+    app.appendChild(b); b.click();
+    if (b.parentNode) b.parentNode.removeChild(b);
   }
   function getHistory() { var h = load("history"); return (h && typeof h === "object") ? h : {}; }
   function getProfile() { var p = load("profile"); return (p && p.name) ? p : null; }
@@ -138,7 +160,22 @@
     } catch (e) {}
     return null;
   }
+  /* A family member's recording of this exact text, if one was made in the album, plays instead of the device voice. */
+  var familyAudio = null;
   function speak(text, onend) {
+    var fv = window.POG.familyVoice && window.POG.familyVoice.get(text);
+    if (fv) {
+      stopVoice();
+      var done = false, a = new Audio(fv);
+      var end = function () { if (!done) { done = true; if (familyAudio === a) familyAudio = null; if (onend) onend(); } };
+      var fallback = function () { if (done) return; done = true; if (familyAudio === a) familyAudio = null; ttsSpeak(text, onend); };
+      familyAudio = a; a.onended = end; a.onerror = fallback;
+      var pl = a.play(); if (pl && pl.catch) pl.catch(fallback);
+      return;
+    }
+    ttsSpeak(text, onend);
+  }
+  function ttsSpeak(text, onend) {
     if (!tts) { if (onend) setTimeout(onend, 900); return; }
     var fired = false;
     function fin() { if (!fired) { fired = true; if (onend) onend(); } }
@@ -152,7 +189,10 @@
       setTimeout(fin, 1500 + text.length * 140);
     } catch (e) { fin(); }
   }
-  function stopVoice() { if (tts) { try { speechSynthesis.cancel(); } catch (e) {} } }
+  function stopVoice() {
+    if (familyAudio) { try { familyAudio.pause(); } catch (e) {} familyAudio = null; }
+    if (tts) { try { speechSynthesis.cancel(); } catch (e) {} }
+  }
   var ICON_SPEAKER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>';
   var ICON_MIC = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3.5 3.5 0 0 0 3.5-3.5v-6a3.5 3.5 0 0 0-7 0v6A3.5 3.5 0 0 0 12 15zm6-3.5a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.9V22h2v-2.6a8 8 0 0 0 7-7.9h-2z"/></svg>';
 
@@ -377,17 +417,20 @@
   }
   function interestNames() { var list = []; myPacks().forEach(function (k) { list = list.concat(PACKS[k].name); }); return list; }
   /* Mostly the person's interests, plus one everyday object so the vocabulary stays broad. */
+  /* Up to two of the person's own album photos (family, familiar things) come first. */
+  function albumNames() { return window.POG.album && window.POG.album.namingItems ? window.POG.album.namingItems() : []; }
   function pickNames(n, off) {
-    var I = interestNames(), out = [], i;
-    if (!I.length) { for (i = 0; i < n; i++) out.push(NAMING[(off + i) % NAMING.length]); return out; }
-    var fromI = Math.min(n - 1, I.length);
+    var A = albumNames(), I = interestNames(), out = [], i;
+    for (i = 0; i < Math.min(2, A.length, n - 1); i++) out.push(A[(off + i) % A.length]);
+    if (!I.length) { for (i = 0; out.length < n; i++) out.push(NAMING[(off + i) % NAMING.length]); return out; }
+    var fromI = Math.min(n - 1 - out.length, I.length);
     for (i = 0; i < fromI; i++) out.push(I[(off + i) % I.length]);
     for (i = 0; out.length < n; i++) out.push(NAMING[(off + i) % NAMING.length]);
     return out;
   }
   function pickBuild(n, off) {
     var ok = function (x) { var w = x[lang][0]; return w.length <= 8 && !/\s/.test(w); };
-    var I = interestNames().filter(ok), G = NAMING.filter(ok), out = [], i;
+    var I = albumNames().filter(ok).concat(interestNames().filter(ok)), G = NAMING.filter(ok), out = [], i;
     var fromI = I.length ? Math.min(n - 1, I.length) : 0;
     for (i = 0; i < fromI; i++) out.push(I[(off + 2 + i) % I.length]);
     for (i = 0; out.length < n; i++) out.push(G[(off + 5 + i) % G.length]);
@@ -504,7 +547,7 @@
     S.start = S.support;
   }
   function makeOpts(st) {
-    var others = shuffle(ALL_NAMES.filter(function (n) { return n !== st.data && n.pic !== st.data.pic; })).slice(0, 2);
+    var others = shuffle(ALL_NAMES.filter(function (n) { return n !== st.data && n.pic !== st.data.pic && n[lang][0] !== st.data[lang][0]; })).slice(0, 2);
     S.opts = shuffle([st.data].concat(others)).map(function (n) { return { n: n, ok: n === st.data }; });
   }
   function target(st) {
@@ -807,6 +850,22 @@
       field("team", t.fTeam, '<input id="' + px + 'team" type="text" autocomplete="off" value="' + esc(p.team || "") + '">') +
       field("other", t.fOther, '<input id="' + px + 'other" type="text" autocomplete="off" placeholder="' + esc(t.otherPh) + '" value="' + esc(p.other || "") + '">');
   }
+  function viewUnlock() {
+    var t = T[lang];
+    return header(false) + '<section class="card"><h1 class="instr">' + esc(t.unlockTitle) + '</h1><p class="sub">' + esc(t.unlockHelp) + '</p>' +
+      '<div class="field"><label for="un-pin">' + esc(t.pinEnter) + '</label><input id="un-pin" type="password" inputmode="numeric" autocomplete="current-password" maxlength="8"></div>' +
+      (flash ? '<p class="nudge">' + esc(flash) + '</p>' : '') +
+      '<button class="primary" data-act="unlock-try">' + esc(t.unlockBtn) + '</button>' +
+      '<button class="link" data-act="unlock-cancel">' + esc(t.cancel) + '</button></section>';
+  }
+  /* Big buttons on the home screen added by modules (communication board, album). */
+  function homeExtras() {
+    var list = window.POG.ext.home || [];
+    if (!list.length) return "";
+    return '<div class="homebtns">' + list.map(function (h) {
+      return '<button class="homebtn" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + h.icon + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
+    }).join("") + '</div>';
+  }
   function langSeg() {
     return '<div class="seg" role="group" aria-label="Lingua / Language">' +
       '<button data-act="lang" data-l="it" aria-pressed="' + (lang === "it") + '">Italiano</button>' +
@@ -815,10 +874,10 @@
   function viewHome() {
     var t = T[lang], tp = todayPlan(), L = tp.set.levels, prof = getProfile(), pl = getPlacement();
     var greeting = accountSignedOut ? t.helloGuest : fill(t.hello, { name: prof.name });
-    var pending = pl.status === "in_progress";
+    var pending = pl.status === "in_progress", locked = isLocked(), patient = tp.set.patientMode;
     return header(false) +
       '<section class="card home">' +
-      '<h1>' + esc(greeting) + '</h1><p class="sub">' + esc(t.tagline) + '</p>' + langSeg() +
+      '<h1>' + esc(greeting) + '</h1><p class="sub">' + esc(t.tagline) + '</p>' + (locked ? '' : langSeg()) +
       (myPacks().length || prof.other ? '<div class="mychips" aria-label="' + esc(t.yourInterests) + '">' + myPacks().map(function (k) { return '<span>' + PACKS[k].icon + ' ' + esc(PACKS[k].label[lang]) + '</span>'; }).join("") + (prof.other ? '<span>💬 ' + esc(prof.other) + '</span>' : '') + '</div>' : '') +
       '<p class="tag">' + esc(t.planTitle) + '</p>' +
       '<div class="scale" aria-hidden="true"><span>↑ ' + esc(t.hard) + '</span></div>' +
@@ -830,9 +889,13 @@
       (pending
         ? '<button class="primary" data-act="place">' + esc(t.placeContinue) + '</button><button class="link" data-act="start">' + esc(t.startAnyway) + '</button>'
         : '<button class="primary" data-act="start">' + esc(t.start) + '</button>') +
-      '<div class="links"><button class="link" data-act="profiles">' + esc(t.changeProfile) + '</button><button class="link" data-act="scripts">' + esc(t.scripts) + '</button>' +
-      '<button class="link" data-act="settings">' + esc(t.settings) + '</button>' +
-      '<button class="link" data-act="therapist">' + esc(t.thArea) + '</button></div>' +
+      homeExtras() +
+      (locked
+        ? '<div class="links"><button class="link" data-act="caregiver">' + esc(t.caregiver) + '</button></div>'
+        : '<div class="links"><button class="link" data-act="profiles">' + esc(t.changeProfile) + '</button><button class="link" data-act="scripts">' + esc(t.scripts) + '</button>' +
+          '<button class="link" data-act="settings">' + esc(t.settings) + '</button>' +
+          '<button class="link" data-act="therapist">' + esc(t.thArea) + '</button>' +
+          (patient ? '<button class="link" data-act="relock">' + esc(t.relock) + '</button>' : '') + '</div>') +
       noTtsNote() + '<p class="note">' + esc(t.proto) + '</p></section>';
   }
   function viewScripts() {
@@ -992,6 +1055,9 @@
           : '<p class="note">' + esc(REC.supported ? t.recOff : t.recUnsupported) + '</p>' +
             (REC.supported ? '<div class="row-actions"><button class="secondary" data-act="rec-on">' + esc(t.recTurnOn) + '</button></div>' : ''))) +
       '<div class="row-actions"><button class="secondary" data-act="therapist">' + esc(t.thArea) + '</button></div>' +
+      '<h2>' + esc(t.secPatient) + '</h2>' +
+      '<label class="check"><input type="checkbox" id="set-patient"' + (set.patientMode ? ' checked' : '') + '>' + esc(t.patientMode) + '</label>' +
+      '<p class="note">' + esc(t.patientHelp) + '</p>' +
       '<h2>' + esc(t.secOptions) + '</h2>' +
       '<label class="check"><input type="checkbox" id="set-maze"' + (set.maze ? ' checked' : '') + '>' + esc(t.mazeOn) + '</label>' +
       '<div class="setrow"><label for="set-msize">' + esc(t.mazeSize) + '</label><select id="set-msize">' +
@@ -1028,12 +1094,12 @@
       if (S.support >= 2) h += '<div class="hint"><b>2</b><span>' + esc(t.startsWith) + ' «' + esc(w[2]) + '»</span></div>';
       if (S.support >= 3) h += '<div class="hint word">' + esc(w[0]) + '</div>';
       body += '<p class="instr">' + esc(t.nameInstr) + '</p>' +
-        '<div class="pic" role="img" aria-label="' + esc(w[0]) + '">' + st.data.pic + '</div>' +
+        '<div class="pic" role="img" aria-label="' + esc(w[0]) + '">' + picHtml(st.data) + '</div>' +
         (h ? '<div class="hints">' + h + '</div>' : '') + optsHtml(false) +
         '<div class="tools">' + hintBtn() + '<button class="tool" data-act="choice"' + (S.opts ? ' disabled' : '') + '>' + esc(t.choiceBtn) + '</button></div>' + rateRow();
     } else if (st.game === "name" && st.lv === 3) {
       body += '<p class="instr">' + esc(t.pickWord) + '</p>' +
-        '<div class="pic" role="img" aria-label="?">' + st.data.pic + '</div>' + optsHtml(false);
+        '<div class="pic" role="img" aria-label="?">' + picHtml(st.data) + '</div>' + optsHtml(false);
     } else if (st.game === "name") {
       body += '<p class="instr">' + esc(t.matchInstr) + '</p>' +
         '<div class="tools">' + listenBtn() + '</div>' + noTtsNote() +
@@ -1107,7 +1173,7 @@
       return '<button class="' + cls + '" data-act="slot" data-i="' + i + '" aria-label="' + (i + 1) + '">' + (s ? esc(s.ch) : "") + '</button>';
     }).join("") + '</div>';
     return '<p class="instr">' + esc(t.wbInstr) + '</p><p class="sub">' + esc(d[1]) + '</p>' +
-      (S.support >= 1 ? '<div class="pic sm" aria-hidden="true">' + st.data.pic + '</div>' : '') +
+      (S.support >= 1 ? '<div class="pic sm" aria-hidden="true">' + picHtml(st.data) + '</div>' : '') +
       (S.support >= 3 && !S.solved && !S.revealed ? '<p class="model" aria-label="' + esc(W) + '">' + esc(W) + '</p>' : '') +
       slots + letterInput(st);
   }
@@ -1122,10 +1188,12 @@
       '<div class="cwbox"><div class="maze" style="--n:' + n + '">' + html + '</div></div>' +
       (S.solved ? '' : '<div class="tools"><button class="tool" data-act="maze-skip">' + esc(t.mazeSkip) + '</button></div>');
   }
+  /* An item's picture: the album photo when there is one, otherwise its icon. */
+  function picHtml(d) { return d && d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : (d && d.pic) || ""; }
   function optsHtml(pictures) {
     if (!S.opts) return "";
     return '<div class="opts">' + S.opts.map(function (o, i) {
-      var label = pictures ? o.n.pic : esc(o.n[lang][0]);
+      var label = pictures ? picHtml(o.n) : esc(o.n[lang][0]);
       var aria = pictures ? ' aria-label="' + (i + 1) + '"' : '';
       return '<button class="opt' + (pictures ? ' pico' : '') + ' ' + (o.state || "") + '" data-act="opt" data-i="' + i + '"' + aria + (o.state ? ' disabled' : '') + '>' + label + '</button>';
     }).join("") + '</div>';
@@ -1190,7 +1258,9 @@
 
   function render() {
     persistActiveSession();
-    var html = screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "profiles" ? viewProfiles() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
+    document.documentElement.setAttribute("data-patient-lock", isLocked() ? "1" : "0");
+    var extView = window.POG.ext.screens[screen];
+    var html = extView ? extView() : screen === "unlock" ? viewUnlock() : screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "profiles" ? viewProfiles() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
     app.innerHTML = html;
     flash = "";
     window.scrollTo(0, 0);
@@ -1245,6 +1315,27 @@
   app.addEventListener("click", function (e) {
     var b = e.target.closest("[data-act]"); if (!b || b.disabled || busy) return;
     var act = b.getAttribute("data-act"), t = T[lang];
+    if (unlockedAt && Date.now() - unlockedAt >= UNLOCK_MS) unlockedAt = 0;
+    if (needsUnlock(act)) {
+      afterUnlock = { act: act === "caregiver" ? "settings" : act, attrs: { "data-id": b.getAttribute("data-id"), "data-l": b.getAttribute("data-l") } };
+      stopVoice(); screen = "unlock"; render();
+      var pinIn = document.getElementById("un-pin"); if (pinIn) pinIn.focus();
+      return;
+    }
+    if (act === "caregiver") { screen = "settings"; render(); return; }
+    if (act === "unlock-cancel") { afterUnlock = null; screen = "home"; render(); return; }
+    if (act === "relock") { unlockedAt = 0; screen = "home"; render(); return; }
+    if (act === "unlock-try") {
+      hashPin(val("un-pin")).then(function (h) {
+        if (h && h === load("pin")) {
+          unlockedAt = Date.now();
+          var next = afterUnlock; afterUnlock = null; screen = "home";
+          if (next) dispatchAct(next); else render();
+        } else { flash = t.pinWrong; render(); }
+      });
+      return;
+    }
+    if (window.POG.ext.actions[act]) { window.POG.ext.actions[act](b, e); return; }
     if (act === "lang") { lang = b.getAttribute("data-l") === "en" ? "en" : "it"; save("lang", lang); document.documentElement.lang = lang; window.dispatchEvent(new CustomEvent("pog:languagechange", { detail: { lang: lang } })); rerenderKeep(); return; }
     if (act === "int") { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }
     if (act === "onboard-place" || act === "onboard-skip") {
@@ -1324,7 +1415,14 @@
       set.maze = document.getElementById("set-maze").checked;
       set.mazeSize = +document.getElementById("set-msize").value;
       var conc = document.getElementById("set-conc"); if (conc) set.recordConcurrent = conc.checked;
-      save("settings", set); flash = t.setSaved; render(); return;
+      var pm = document.getElementById("set-patient"), wantPatient = !!(pm && pm.checked);
+      if (wantPatient && !load("pin")) {
+        /* Patient mode without a PIN would lock everyone out: create the PIN first. */
+        set.patientMode = false; save("settings", set); flash = t.patientNeedsPin; screen = "therapist"; render(); return;
+      }
+      if (wantPatient && !set.patientMode) unlockedAt = Date.now();
+      set.patientMode = wantPatient;
+      save("settings", set); flash = wantPatient ? t.patientOn : t.setSaved; render(); return;
     }
     if (act === "ask-reset" || act === "ask-redo") { confirmAsk = act === "ask-reset" ? "reset" : "redo"; render(); return; }
     if (act === "confirm-no") { confirmAsk = ""; render(); return; }
@@ -1436,6 +1534,16 @@
   initializeLocalProfiles();
   RECS.assignLegacy(activeProfileId).catch(function () {});
   document.documentElement.lang = lang;
+  /* What the communication board and album modules may use. */
+  window.POG.appApi = {
+    t: function () { return T[lang]; }, lang: function () { return lang; }, esc: esc, fill: fill,
+    load: load, save: save, header: header, render: render,
+    go: function (s) { screen = s; render(); }, screen: function () { return screen; },
+    flash: function (m) { flash = m; }, flashText: function () { return flash; },
+    speak: speak, stopVoice: stopVoice, isLocked: isLocked,
+    profileId: function () { return activeProfileId; }, getScripts: getScripts, getProfile: getProfile,
+    canRecord: function () { return REC.supported && !IN_HOST; }
+  };
   RECS.purge().catch(function () {});
   if (!restoreActiveSession()) screen = getProfile() ? "home" : "onboard";
   render();

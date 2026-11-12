@@ -22,7 +22,8 @@ A prototype tablet app for short daily language practice for people with
   form, and moves to an easier level when it becomes too hard (average under
   60% over the last 3 sessions). It can move back up after 5 sessions over 90%.
   A family member or therapist can set levels by hand.
-- **Shared tablet profiles:** create several learner profiles and switch between them; each profile keeps its own preferences, levels, session history, resumable exercise and local voice recordings. Existing single-profile data is migrated to the first profile on this device.\n- **First-time setup:** name, optional year of birth, town, interests,
+- **Shared tablet profiles:** create several learner profiles and switch between them; each profile keeps its own preferences, levels, session history, resumable exercise and local voice recordings. Existing single-profile data is migrated to the first profile on this device.
+- **First-time setup:** name, optional year of birth, town, interests,
   favourite team, and an untimed placement check that picks a starting level
   for each game. It can be paused, resumed or skipped.
 - **Interests** (football, politics and current affairs, fashion, showbiz and
@@ -44,6 +45,22 @@ A prototype tablet app for short daily language practice for people with
   not clinical measurements.
 - **Therapist area behind a PIN** with speaking trends, recordings to play,
   download or delete, and a CSV export of all results.
+- **Patient mode (optional, needs the PIN).** The learner sees only the
+  exercises, the communication board and the album. Settings, phrases,
+  profiles, language, accounts, the therapist area and editing the board or
+  album ask for the PIN. Unlocking lasts 10 minutes, or until "Lock again" or
+  a reload.
+- **Communication board ("Comunica").** Tap a picture to say a phrase out loud;
+  the phrase also appears in large text and can be shown full screen. Tabs:
+  essentials (editable by a carer), the person's own phrases, and people and
+  things from the album. Works offline after one visit online.
+- **My album.** Family, familiar things and places with a photo and an
+  optional voice clip recorded by a relative. The learner taps a photo to hear
+  who or what it is. Album photos are used in the naming and word-building
+  games.
+- **Family voices.** A relative can record board phrases and personal phrases;
+  the recording plays instead of the device voice wherever that phrase is
+  spoken, on the board and in the exercises.
 
 ## Accounts (optional)
 
@@ -92,6 +109,12 @@ used.
   deleted after 30 days, and can be deleted any time from the therapist area.
 - **The PIN** keeps the patient out of the therapist area. It is not strong
   security: anyone with the device and browser tools could read the data.
+- **Album photos and family voices** stay on the device (IndexedDB) and are
+  not included in the cloud backup or the profile export. Saving a photo or a
+  voice clip needs a consent tick from the carer. Photos are shrunk to 640 px
+  and re-encoded as JPEG, which also drops location data from the original.
+- **Offline copy:** `sw.js` keeps the app's own files so it opens without
+  internet. It never stores Supabase or other services' responses.
 - Clearing the browser's site data deletes everything.
 
 ## Project structure
@@ -107,6 +130,11 @@ js/supabase-config.js Public Supabase URL/key configuration (empty by default)
 js/speech.js          Speech input: Claude host dictation or the browser's Web Speech API
 js/recorder.js        Microphone recording and speaking measures
 js/recordings.js      Recording storage on the device (IndexedDB), 30-day clean-up
+js/aac.js             Communication board: essentials, own phrases, people, things
+js/album.js           Album and family voices: viewing, editing, recording
+js/album-store.js     Album storage on the device (IndexedDB)
+js/offline.js         Registers the offline copy (sw.js) on the website
+sw.js                 Offline copy of the app's files, network first
 js/utility-menu.js    "Account and data" menu in the page header; collects the account,
                       cloud, therapist and privacy buttons (load it after those modules)
 content/base.js       Everyday content for everyone
@@ -114,8 +142,11 @@ content/interests.js  Interest packs (topics, words, crossword words, phrases)
 tools/build.js        Builds dist/parole-ogni-giorno.html, one self-contained file
 tests/content.test.js Checks content and every generated crossword
 tests/speech.test.js  Speaking measures and speech engine, with a fake recogniser
-tests/account.test.js Static checks for account and recovery safeguards\ntests/cloud-sync.test.js Checks consent and cloud backup privacy safeguards
-tests/smoke.test.js   Browser click-through of the built page
+tests/account.test.js Static checks for account and recovery safeguards
+tests/cloud-sync.test.js Checks consent and cloud backup privacy safeguards
+tests/smoke.test.js   Browser click-through of the built page, including patient
+                      mode, the board, the album and family voices
+tests/offline.test.js Offline copy: file list matches the page, works with no network
 ```
 
 ## Working on it
@@ -148,6 +179,10 @@ Most updates only touch `content/`:
 
 Run `npm test` after any content change: it checks that every crossword the
 app can build from the new words has correct crossings.
+
+**Adding or renaming a script, stylesheet or font:** also add it to `SHELL` in
+`sw.js` and change `VERSION`, so the offline copy stays complete.
+`tests/offline.test.js` fails if the list and the page disagree.
 
 ## Publishing
 

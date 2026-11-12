@@ -302,6 +302,91 @@ async function playThrough(page, solo) {
   check(w.errors.length === 0, "no page errors (website version): " + w.errors.join("; "));
   await browser2.close();
 
+  /* Patient mode, communication board, album and family voices (fake microphone, test photo). */
+  const browser3 = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
+  const ctx3 = await browser3.newContext({ viewport: { width: 900, height: 1100 } });
+  const SPEECH_SPY = `window.__said = []; window.__played = [];
+    (function () {
+      var RealAudio = window.Audio;
+      window.Audio = function (src) { var a = new RealAudio(src); window.__played.push(src); a.play = function () { var me = this; setTimeout(function () { me.onended && me.onended(); }, 30); return Promise.resolve(); }; return a; };
+      if (window.speechSynthesis) window.speechSynthesis.speak = function (u) { window.__said.push(u.text); setTimeout(function () { u.onend && u.onend(); }, 20); };
+    })();`;
+  await ctx3.addInitScript(FIXED_DAY); await ctx3.addInitScript(SPEECH_SPY);
+  await ctx3.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  const pa = await ctx3.newPage();
+  pa.errors = []; pa.on("pageerror", (e) => pa.errors.push(e.message));
+  await pa.goto("https://app.test/");
+  await pa.fill("#pf-name", "Eric"); await pa.click('[data-act="onboard-skip"]'); await pa.click('[data-act="home"]');
+  check((await pa.$$eval(".homebtn", (bs) => bs.length)) === 2, "home offers the communication board and the album");
+  // Board
+  await pa.click('[data-act="board"]');
+  await pa.click('.aac-tile:has-text("Ho sete")');
+  check((await pa.textContent(".aac-msg")) === "Ho sete", "board: tapping a picture shows the phrase");
+  check((await pa.evaluate(() => window.__said.slice(-1)[0])) === "Ho sete", "board: tapping a picture says the phrase");
+  await pa.click('[data-act="aac-big"]');
+  check((await pa.textContent(".aac-big p")) === "Ho sete", "board: the phrase can be shown full screen");
+  await pa.click(".aac-big");
+  // Album entry with photo and voice
+  await pa.click('[data-act="home"]'); await pa.click('[data-act="album"]'); await pa.click('[data-act="alb-edit"]'); await pa.click('[data-act="alb-new"]');
+  await pa.fill("#alb-name", "Anna"); await pa.fill("#alb-note", "tua figlia");
+  const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAQElEQVR4nO3PQQ0AAAjEMM6/aMDGPqSGlcwBs0YKNVKokUKNFGqkUCOFGinUSKFGCjVSqJFCjRRqpFAjhRop1EjxrnUBAWUgcn8AAAAASUVORK5CYII=", "base64");
+  await pa.setInputFiles("#alb-photo", { name: "anna.png", mimeType: "image/png", buffer: PNG });
+  await pa.waitForSelector(".alb-preview");
+  check((await pa.inputValue("#alb-name")) === "Anna", "album: choosing a photo keeps what was typed");
+  await pa.click('[data-act="alb-rec"]'); await pa.waitForTimeout(1200); await pa.click('[data-act="alb-rec-stop"]'); await pa.waitForSelector(".card audio");
+  await pa.click('[data-act="alb-save"]');
+  check(/consenso/.test(await pa.textContent(".nudge")), "album: a photo or voice can't be saved without consent");
+  await pa.check("#alb-consent"); await pa.click('[data-act="alb-save"]'); await pa.waitForSelector(".alb-row");
+  const stored = await pa.evaluate(() => new Promise((res) => { const rq = indexedDB.open("pog-album"); rq.onsuccess = () => { const g = rq.result.transaction("items").objectStore("items").getAll(); g.onsuccess = () => { const x = g.result[0] || {}; res({ photoType: x.photo && x.photo.type, audioSize: x.audio ? x.audio.size : 0 }); }; }; }));
+  check(stored.photoType === "image/jpeg" && stored.audioSize > 0, "album: photo (re-encoded as JPEG) and voice are stored on the device");
+  await pa.click('[data-act="album"]');
+  const playedBefore = await pa.evaluate(() => window.__played.length);
+  await pa.click(".album-card");
+  check((await pa.evaluate(() => window.__played.length)) > playedBefore, "album: tapping a photo plays the family voice");
+  // Family voice for a board phrase
+  await pa.click('[data-act="alb-edit"]'); await pa.click('[data-act="alb-voices"]');
+  await pa.check("#alb-vconsent-ok"); await pa.click('[data-act="alb-vconsent"]');
+  await pa.click('.voice-row:has-text("Ho sete") [data-act="alb-rec"]'); await pa.waitForTimeout(1000); await pa.click('[data-act="alb-rec-stop"]'); await pa.waitForSelector(".voice-row audio");
+  const playedBoard = await pa.evaluate(() => window.__played.length);
+  await pa.click('[data-act="home"]'); await pa.click('[data-act="board"]'); await pa.click('.aac-tile:has-text("Ho sete")');
+  check((await pa.evaluate(() => window.__played.length)) > playedBoard, "board: a phrase recorded by a relative plays in their voice");
+  await pa.click('[data-act="aac-tab"][data-t="people"]');
+  check(!!(await pa.$(".aac-tile img")) && /Anna/.test(await pa.textContent(".aac-grid")), "board: people from the album appear with their photo");
+  // Album photo in the games
+  await pa.click('[data-act="home"]'); await pa.click('[data-act="start"]'); await pa.click('[data-w="assist"]');
+  let sawAlbumPhoto = false;
+  for (let i = 0; i < 40 && !sawAlbumPhoto; i++) {
+    if (await pa.$(".pic img")) { sawAlbumPhoto = true; break; }
+    if (await pa.$('[data-act="advance"]')) { await pa.click('[data-act="advance"]'); continue; }
+    if (await pa.$('[data-act="reveal"]')) { await pa.click('[data-act="reveal"]'); continue; }
+    if ((await pa.$(".cw")) || (await pa.$(".slots"))) { await pa.click('[data-act="hint"]'); continue; }
+    const o = await pa.$$('[data-act="opt"]:not([disabled])'); if (o.length) { await o[0].click(); await pa.waitForTimeout(1700); continue; }
+    if (await pa.$(".sumhead")) break;
+    await pa.click('[data-r="good"]');
+  }
+  check(sawAlbumPhoto, "games: album photos are used in the exercises");
+  await pa.click('[data-act="stop"]'); await pa.click('[data-act="home"]');
+  // Patient mode
+  await pa.click('[data-act="settings"]'); await pa.check("#set-patient"); await pa.click('[data-act="save-settings"]');
+  check(!!(await pa.$("#th-pin1")), "patient mode: asks for a PIN first when there is none");
+  await pa.fill("#th-pin1", "2468"); await pa.fill("#th-pin2", "2468"); await pa.click('[data-act="pin-set"]');
+  await pa.click('[data-act="home"]'); await pa.click('[data-act="settings"]'); await pa.check("#set-patient"); await pa.click('[data-act="save-settings"]');
+  await pa.click('[data-act="home"]'); await pa.click('[data-act="relock"]');
+  const lockedLinks = await pa.$$eval(".links button", (bs) => bs.map((x) => x.getAttribute("data-act")));
+  check(lockedLinks.length === 1 && lockedLinks[0] === "caregiver", "patient mode: only the carer link remains on home");
+  check(!(await pa.$(".seg")) && !(await pa.isVisible(".util-toggle")), "patient mode: language switch and account menu are hidden");
+  await pa.click('[data-act="board"]'); await pa.click('[data-act="aac-edit"]');
+  check(!!(await pa.$("#un-pin")), "patient mode: editing the board asks for the PIN");
+  await pa.fill("#un-pin", "1111"); await pa.click('[data-act="unlock-try"]'); await pa.waitForTimeout(100);
+  check(/corretto/.test(await pa.textContent(".nudge")), "patient mode: a wrong PIN is refused");
+  await pa.fill("#un-pin", "2468"); await pa.click('[data-act="unlock-try"]'); await pa.waitForTimeout(150);
+  check(!!(await pa.$("#aac-text")), "patient mode: the right PIN continues to what was asked for");
+  await pa.reload(); await pa.waitForTimeout(200);
+  await pa.click('[data-act="album"]'); await pa.click('[data-act="alb-edit"]');
+  check(!!(await pa.$("#un-pin")), "patient mode: after a reload, editing the album asks for the PIN again");
+  check(pa.errors.length === 0, "no page errors (patient mode, board, album): " + pa.errors.join("; "));
+  await browser3.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

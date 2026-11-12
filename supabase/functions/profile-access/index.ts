@@ -1,7 +1,7 @@
 // Supabase Edge Function: profile-access
 // Required secrets: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
 // APP_SITE_URL (origin only) and AUTH_REDIRECT_URL (complete app URL).
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "@supabase/supabase-js";
 
 const cors = {
   "Access-Control-Allow-Origin": Deno.env.get("APP_SITE_URL") ?? "null",

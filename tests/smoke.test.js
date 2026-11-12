@@ -47,7 +47,11 @@ async function open(browser, withMic, supabaseStub, viewport) {
   await page.addInitScript(FIXED_DAY);
   if (withMic) await page.addInitScript(MOCK_MIC);
   if (supabaseStub) await page.route(/cdn\.jsdelivr\.net/, (r) => r.fulfill({ contentType: "application/javascript", body: supabaseStub }));
-  await page.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  // The simulated SDK differs from the pinned production asset, so it cannot
+  // pass that asset's SRI hash. Keep production SRI in normal browser runs;
+  // remove only those attributes when this test injects its SDK stub.
+  const pageHtml = supabaseStub ? html.replace(/(<script[^>]*supabase-js[^>]*) integrity="[^"]*" crossorigin="anonymous"/, "$1") : html;
+  await page.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + pageHtml + "</body></html>" }));
   await page.goto("http://app.test/");
   return page;
 }

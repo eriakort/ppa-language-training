@@ -24,5 +24,9 @@ check(cloud.includes('select("preferences,updated_at,revision")')&&cloud.include
 check(cloud.includes('window.addEventListener("pog:local-change"')&&cloud.includes('window.addEventListener("online"'),"local changes are queued and retried after reconnect");
 check(cloud.includes('syncState === "conflict"')&&cloud.includes('data-cloud="sync"'),"sync status and manual conflict recovery are exposed in the cloud panel");
 check(syncMigration.includes("create trigger profile_data_revision")&&syncMigration.includes("new.revision := old.revision + 1"),"database advances a revision for every cloud update");
-check(cloud.includes('String(r.data.revision||1)')&&cloud.includes('pog_cloud_sync_"+activeId()+"_seen'),"manual backup and restore establish a revision baseline");
+check(cloud.includes('String(r.data.revision||1)')&&cloud.includes('pog_cloud_sync_"+profileId+"_seen'),"manual backup and restore establish a revision baseline for the captured profile");
 check(cloud.includes("snapshot(profileId)")&&cloud.includes("localSyncKey"),"in-flight sync is isolated to the learner profile that started it");
+const manualBackup=cloud.match(/async function backup\(\) \{([\s\S]*?)\n  \}/);
+const manualRestore=cloud.match(/async function restore\(\) \{([\s\S]*?)\n  \}/);
+check(manualBackup&&manualBackup[1].includes("var profileId=activeId()")&&manualBackup[1].includes("activeId()!==profileId")&&manualBackup[1].includes("snapshot(profileId)")&&manualBackup[1].includes('"pog_cloud_sync_"+profileId'),"manual backup keeps its starting profile across asynchronous work");
+check(manualRestore&&manualRestore[1].includes('var profileId=activeId(), cloudId=localStorage.getItem(mapKey(profileId))||""')&&manualRestore[1].includes("activeId()!==profileId")&&manualRestore[1].includes('"pog_p_"+profileId+"_"+k')&&manualRestore[1].includes('"pog_cloud_sync_"+profileId'),"manual restore cannot apply cloud data or metadata to a profile selected during its request");

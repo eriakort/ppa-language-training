@@ -16,7 +16,7 @@
       error: "Non è stato possibile completare l'operazione. Riprova.",
       passwordShort: "La password deve contenere almeno 8 caratteri.",
       passwordMismatch: "Le password non coincidono.",
-      terms: "L'account serve per l'accesso. I dati degli esercizi restano su questo dispositivo: la sincronizzazione cloud non è attiva.",
+      terms: "Il solo accesso all'account non carica i dati della persona. Il backup e la sincronizzazione cloud, comprese le misure aggregate visibili ai terapisti autorizzati, richiedono il consenso esplicito nel pannello Backup cloud. Registrazioni audio, foto dell'album e voci familiari restano sul dispositivo.",
       modeHint: "Puoi creare un account o accedere a uno esistente."
     },
     en: {
@@ -33,7 +33,7 @@
       error: "We couldn't complete that action. Please try again.",
       passwordShort: "Password must be at least 8 characters.",
       passwordMismatch: "The passwords do not match.",
-      terms: "The account is for sign-in. Exercise data stays on this device: cloud sync is not enabled.",
+      terms: "Signing in alone does not upload learner data. Cloud backup and synchronisation, including aggregate measures visible to authorised therapists, require explicit consent in Cloud backup. Audio recordings, album photos and family voices stay on this device.",
       modeHint: "Create an account or sign in to an existing one."
     }
   };

@@ -211,6 +211,18 @@ async function playThrough(page, solo) {
   await ph.click('[data-ret="close"]');
   await ph.click('[data-act="start"]'); await ph.click('[data-w="assist"]');
   check(!(await ph.isVisible(".util-toggle")), "phone: the account menu is hidden during exercises");
+  await ph.click('[data-r="good"]');
+  await ph.locator(".kb").scrollIntoViewIfNeeded();
+  const keyboardTop = await ph.evaluate(() => window.scrollY);
+  await ph.click('.key[data-ch="A"]');
+  const keyboardAfterKey = await ph.evaluate(() => ({
+    scrollY: window.scrollY,
+    focused: document.activeElement && document.activeElement.getAttribute("data-ch"),
+    keyboard: { top: document.querySelector(".kb").getBoundingClientRect().top, bottom: document.querySelector(".kb").getBoundingClientRect().bottom },
+    viewport: window.innerHeight
+  }));
+  check(Math.abs(keyboardAfterKey.scrollY - keyboardTop) < 3, "phone: entering a crossword letter keeps the keyboard at the same scroll position");
+  check(keyboardAfterKey.focused === "A" && keyboardAfterKey.keyboard.top >= 0 && keyboardAfterKey.keyboard.bottom <= keyboardAfterKey.viewport, "phone: the crossword keyboard stays visible and keeps focus after a letter");
   check(ph.errors.length === 0, "no page errors (phone layout): " + ph.errors.join("; "));
 
   // Solo session with a simulated microphone

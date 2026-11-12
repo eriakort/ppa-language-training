@@ -29,6 +29,11 @@
     if (activeProfileId && !list.some(function (p) { return p.id === activeProfileId; })) setActiveProfile(list.length ? list[0].id : "");
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function csvCell(value) {
+    var text = value == null ? "" : String(value);
+    if (typeof value === "string" && /^[\u0000-\u0020]*[=+\-@]/.test(value)) text = "'" + text;
+    return /[",\n;]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+  }
   function fill(s, o) { return s.replace(/\{(\w+)\}/g, function (_, k) { return o[k]; }); }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
 
@@ -942,14 +947,13 @@
   }
   function exportCsv() {
     var t = T[lang], sessions = load("sessions") || [];
-    var q = function (v) { v = v == null ? "" : String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
     var lines = [["date", "session", "mode", "player", "game", "level", "item", "heard", "result", "hints", "time_s", "onset_s", "speech_s", "pauses", "longest_pause_s", "words", "words_per_min", "measure_source"].join(",")];
     sessions.forEach(function (s) {
       s.items.forEach(function (i) {
         var m = i.meas || {};
         lines.push([s.date, s.id, s.mode, s.who, i.game, i.lv, i.label, i.heard, i.result, i.hints, i.ms == null ? "" : (i.ms / 1000).toFixed(1),
           m.onsetMs == null ? "" : (m.onsetMs / 1000).toFixed(2), m.speechMs == null ? "" : (m.speechMs / 1000).toFixed(2),
-          m.pauses == null ? "" : m.pauses, m.longestPauseMs == null ? "" : (m.longestPauseMs / 1000).toFixed(2), m.words == null ? "" : m.words, m.wpm == null ? "" : m.wpm, m.src || ""].map(q).join(","));
+          m.pauses == null ? "" : m.pauses, m.longestPauseMs == null ? "" : (m.longestPauseMs / 1000).toFixed(2), m.words == null ? "" : m.words, m.wpm == null ? "" : m.wpm, m.src || ""].map(csvCell).join(","));
       });
     });
     var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });

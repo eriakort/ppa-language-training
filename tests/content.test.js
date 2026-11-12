@@ -2,9 +2,9 @@
 /*
  * Checks the content files without a browser:
  *  - every crossword word is capitals only (no accents, no spaces)
- *  - every crossword the generator can build from each interest has correct
+ *  - every generated crossword has at least eight words with correct
  *    crossings and no letters touching outside a crossing
- *  - the hand-made base crosswords are valid too
+ *  - both base answer banks can generate valid large crosswords
  *  - every interest has the parts each game needs, in both languages
  *
  *   node tests/content.test.js
@@ -23,12 +23,19 @@ const C = ctx.window.POG.content;
 // genCross lives in the app code; load just that function.
 const app = fs.readFileSync(path.join(root, "js/app.js"), "utf8");
 const start = app.indexOf("  function genCross(");
-const end = app.indexOf("\n  }\n", start) + 4;
+const end = app.indexOf("  var lang = load", start);
 vm.runInContext(app.slice(start, end) + "\nthis.genCross = genCross;", ctx);
 const genCross = ctx.genCross;
 
 let failures = 0;
 const fail = (msg) => { failures++; console.error("FAIL " + msg); };
+
+for (const lang of ["it", "en"]) {
+  if (C.READ[lang].long.length < 4) fail(lang + ": long reading needs at least four passages");
+  C.READ[lang].long.forEach((passage, i) => {
+    if (passage.trim().split(/\s+/).length < 24) fail(lang + ": long reading passage " + i + " is too short");
+  });
+}
 
 function checkGrid(p, label) {
   const g = {}, owner = {};
@@ -61,14 +68,21 @@ for (const k of C.PACK_KEYS) {
     pk.name.forEach((n) => { if (!n[lang] || n[lang].length !== 3) fail(k + "/" + lang + ": name item needs [word, hint, first sound]"); });
     for (const [w] of pk.cw[lang]) if (!/^[A-Z]+$/.test(w)) fail(k + "/" + lang + ": bad crossword word " + w);
     for (let seed = 0; seed < 60; seed++) {
-      const p = genCross(pk.cw[lang], seed, pk.icon);
+      const p = genCross(pk.cw[lang], seed, pk.icon, C.CROSS_WORDS[lang]);
       generated++;
       if (!p) { fail(k + "/" + lang + ": no crossword for seed " + seed); continue; }
+      if (p.length < 8) fail(k + "/" + lang + ": expected at least 8 words, got " + p.length);
       checkGrid(p, k + "/" + lang + "/seed " + seed);
     }
   }
 }
-for (const lang of ["it", "en"]) C.CROSS[lang].forEach((p, i) => checkGrid(p, "base/" + lang + "/" + i));
+for (const lang of ["it", "en"]) {
+  for (let seed = 0; seed < 60; seed++) {
+    const p = genCross(C.CROSS_WORDS[lang], seed, "");
+    if (!p || p.length < 8) fail("base/" + lang + ": expected a crossword with at least 8 words for seed " + seed);
+    else checkGrid(p, "base/" + lang + "/seed " + seed);
+  }
+}
 
 if (failures) { console.error(failures + " problem(s) found."); process.exit(1); }
-console.log("OK: " + generated + " generated crosswords and " + (C.CROSS.it.length + C.CROSS.en.length) + " base crosswords are valid; all interests complete.");
+console.log("OK: " + generated + " generated 8+ word crosswords and both base answer banks are valid; all interests complete.");

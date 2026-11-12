@@ -22,29 +22,23 @@ window.POG = window.POG || {};
     { pic: "☕", it: ["tazza", "Si usa per bere il caffè.", "ta…"], en: ["cup", "You drink coffee from it.", "c…"] },
     { pic: "⌚", it: ["orologio", "Si porta al polso per sapere l'ora.", "o-ro…"], en: ["watch", "You wear it to tell the time.", "wa…"] }
   ];
-  /* Hand-checked mini crosswords: r/c = start cell, d = a (across) or d (down). Crossing letters match. */
-  C.CROSS = {
+  /* Everyday answer banks for 8–10 word crosswords when no interest pack is selected. */
+  C.CROSS_WORDS = {
     it: [
-      [{ w: "CASA", r: 0, c: 0, d: "a", clue: "Il luogo dove abiti", pic: "🏠" },
-       { w: "ACQUA", r: 0, c: 1, d: "d", clue: "Si beve quando si ha sete", pic: "💧" },
-       { w: "LUNA", r: 3, c: 0, d: "a", clue: "Si vede in cielo di notte", pic: "🌙" }],
-      [{ w: "PANE", r: 0, c: 0, d: "a", clue: "Si compra dal fornaio", pic: "🍞" },
-       { w: "ESTATE", r: 0, c: 3, d: "d", clue: "La stagione più calda", pic: "☀️" },
-       { w: "GATTO", r: 2, c: 1, d: "a", clue: "Animale che fa «miao»", pic: "🐈" }],
-      [{ w: "SOLE", r: 0, c: 0, d: "a", clue: "Splende in cielo di giorno", pic: "🌞" },
-       { w: "LATTE", r: 0, c: 2, d: "d", clue: "Bevanda bianca della colazione", pic: "🥛" },
-       { w: "MELA", r: 4, c: 1, d: "a", clue: "Frutto rosso o verde", pic: "🍎" }]
+      ["CASA", "Il luogo dove abiti"], ["ACQUA", "Si beve quando si ha sete"],
+      ["PANE", "Si compra dal fornaio"], ["LUNA", "Si vede in cielo di notte"],
+      ["GATTO", "Animale che fa «miao»"], ["SOLE", "Splende in cielo di giorno"],
+      ["MELA", "Frutto rosso o verde"], ["TRENO", "Viaggia sui binari"],
+      ["FIORE", "Cresce in giardino e profuma"], ["NOTTE", "Arriva dopo il tramonto"],
+      ["LIBRO", "Si apre per leggere"], ["PORTA", "Si apre per entrare in una stanza"]
     ],
     en: [
-      [{ w: "HOME", r: 0, c: 0, d: "a", clue: "Where you live", pic: "🏠" },
-       { w: "ORANGE", r: 0, c: 1, d: "d", clue: "A round fruit and a colour", pic: "🍊" },
-       { w: "SNOW", r: 3, c: 0, d: "a", clue: "White and cold, it falls in winter", pic: "❄️" }],
-      [{ w: "BREAD", r: 0, c: 0, d: "a", clue: "You buy it at the bakery", pic: "🍞" },
-       { w: "APPLE", r: 0, c: 3, d: "d", clue: "A crunchy red fruit", pic: "🍎" },
-       { w: "CLOCK", r: 3, c: 2, d: "a", clue: "It tells you the time", pic: "🕰️" }],
-      [{ w: "SUN", r: 0, c: 0, d: "a", clue: "It shines in the sky by day", pic: "🌞" },
-       { w: "NOSE", r: 0, c: 2, d: "d", clue: "You smell with it", pic: "👃" },
-       { w: "TEA", r: 3, c: 1, d: "a", clue: "A hot drink, often with milk", pic: "🍵" }]
+      ["HOME", "Where you live"], ["WATER", "You drink it when you are thirsty"],
+      ["BREAD", "You buy it at the bakery"], ["MOON", "You see it in the night sky"],
+      ["CAT", "An animal that says meow"], ["SUN", "It shines in the sky by day"],
+      ["APPLE", "A fruit that can be red or green"], ["TRAIN", "It travels on rails"],
+      ["FLOWER", "It grows in a garden and can smell sweet"], ["NIGHT", "It comes after sunset"],
+      ["BOOK", "You open it to read"], ["DOOR", "You open it to enter a room"]
     ]
   };
   C.ECHO = {
@@ -71,15 +65,19 @@ window.POG = window.POG || {};
     it: ["Al bar | Vorrei un caffè, per favore.", "Hai bisogno di una mano | Puoi aiutarmi, per favore?", "Qualcuno ti chiede come stai | Grazie, sto bene."],
     en: ["At a café | I'd like a coffee, please.", "You need a hand | Can you help me, please?", "Someone asks how you are | Thank you, I'm fine."]
   };
-  /* Reading aloud: two-sentence passages (levels 1-2) and short sentences (levels 3-4). Interest packs add their own. */
+  /* Longer reading passages used in four-reading sessions. */
   C.READ = {
-    it: { long: ["Oggi è una bella giornata. Dopo pranzo faccio una passeggiata in piazza.",
-                 "Mia sorella mi ha telefonato ieri sera. Domenica veniamo a pranzo da te.",
-                 "Il pane caldo profuma tutta la cucina. Ne taglio una fetta per la colazione."],
+    it: { long: [
+                 "Al mattino apro la finestra e guardo la piazza. Il bar all'angolo è già pieno. Due amici parlano del mercato. Compro il pane e torno a casa con calma.",
+                 "La domenica la famiglia si ritrova a tavola. Ognuno porta qualcosa da mangiare. Dopo pranzo restiamo a chiacchierare. Poi facciamo una passeggiata prima che faccia sera.",
+                 "In primavera il giardino cambia colore. I primi fiori spuntano vicino al muro. Ogni giorno annaffio le piante e tolgo le foglie secche. La sera mi siedo fuori e ascolto gli uccelli.",
+                 "Il treno parte presto dalla stazione. Dal finestrino vedo campi, paesi e colline. Una signora legge un libro accanto a me. Quando arriviamo al mare, l'aria profuma di sale."],
           short: ["Apro la finestra.", "Il caffè è pronto.", "Andiamo al mercato."] },
-    en: { long: ["Today is a lovely day. After lunch I'll go for a walk in the square.",
-                 "My sister phoned me last night. On Sunday we're coming to lunch at yours.",
-                 "The warm bread makes the whole kitchen smell good. I'll cut a slice for breakfast."],
+    en: { long: [
+                 "In the morning I open the window and look at the square. The café on the corner is already busy. Two friends talk about the market. I buy some bread and walk home slowly.",
+                 "On Sunday the family gathers around the table. Everyone brings something to eat. After lunch we sit and talk for a while. Then we go for a walk before evening.",
+                 "In spring the garden changes colour. The first flowers appear beside the wall. Each day I water the plants and clear away dry leaves. In the evening I sit outside and listen to the birds.",
+                 "The train leaves the station early. From the window I see fields, villages and hills. A woman beside me reads a book. When we reach the sea, the air smells of salt."],
           short: ["I open the window.", "The coffee is ready.", "Let's go to the market."] }
   };
 })(window.POG.content = window.POG.content || {});

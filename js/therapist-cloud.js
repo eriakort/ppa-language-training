@@ -47,7 +47,7 @@
   async function loadRows() {
     rows=[];
     if(!selected){render();return;}
-    var result=await client.from("therapist_session_metrics").select("session_id,started_at,mode,item_count,spoken_count,avg_onset_ms,avg_wpm,avg_pauses,avg_longest_pause_ms").eq("profile_id",selected).order("started_at",{ascending:false}).limit(60);
+    var result=await client.from("therapist_session_metrics").select("profile_id,started_at,mode,item_count,spoken_count,avg_onset_ms,avg_wpm,avg_pauses,avg_longest_pause_ms").eq("profile_id",selected).order("started_at",{ascending:false}).limit(60);
     if(result.error) throw result.error;
     rows=result.data||[]; render();
   }
@@ -78,10 +78,9 @@
     var sessions;try{sessions=JSON.parse(raw);}catch(e){return;}if(!Array.isArray(sessions))return;
     var payload=sessions.slice(-60).filter(function(s){return s&&s.id&&s.date&&Array.isArray(s.items);}).map(function(s){
       var items=s.items, measured=items.map(function(i){return i.meas||{};});
-      var counts={};items.forEach(function(i){var k=["good","almost","retry","unrated"].indexOf(i.result)>=0?i.result:"other";counts[k]=(counts[k]||0)+1;});
-      return {profile_id:cloudId,session_id:String(s.id),started_at:new Date(s.date).toISOString(),mode:s.mode==="place"?"place":"session",player_mode:s.who==="solo"?"solo":"assisted",item_count:items.length,spoken_count:measured.filter(function(m){return m.onsetMs!=null||m.wpm!=null||m.pauses!=null;}).length,result_counts:counts,avg_onset_ms:average(measured.map(function(m){return m.onsetMs;})),avg_wpm:average(measured.map(function(m){return m.wpm;})),avg_pauses:average(measured.map(function(m){return m.pauses;})),avg_longest_pause_ms:average(measured.map(function(m){return m.longestPauseMs;}))};
+      return {profile_id:cloudId,session_id:String(s.id),started_at:new Date(s.date).toISOString(),mode:s.mode==="place"?"place":"session",player_mode:s.who==="solo"?"solo":"assisted",item_count:items.length,spoken_count:measured.filter(function(m){return m.onsetMs!=null||m.wpm!=null||m.pauses!=null;}).length,avg_onset_ms:average(measured.map(function(m){return m.onsetMs;})),avg_wpm:average(measured.map(function(m){return m.wpm;})),avg_pauses:average(measured.map(function(m){return m.pauses;})),avg_longest_pause_ms:average(measured.map(function(m){return m.longestPauseMs;}))};
     });
-    if(payload.length){var saved=await client.from("therapist_session_metrics").upsert(payload,{onConflict:"profile_id,session_id"});if(saved.error)throw saved.error;}
+    if(payload.length){var saved=await client.rpc("upsert_therapist_session_metrics",{p_metrics:payload});if(saved.error)throw saved.error;}
   }
   function publishActive() { var id=localStorage.getItem("pog_active_profile_id");publishLocalSessions(id).catch(function(){}); }
   window.addEventListener("pog:local-change",function(ev){var id=ev.detail&&ev.detail.profileId;if(id&&ev.detail.key==="sessions")publishLocalSessions(id).catch(function(){});});

@@ -738,6 +738,53 @@ async function playThrough(page, solo) {
   check(lg.errors.length === 0, "no page errors (language switch): " + lg.errors.join("; "));
   await browser9.close();
 
+  /* A refresh keeps you where you were; a finished session or a new tab starts from home. */
+  const browser10 = await chromium.launch();
+  const ctx10 = await browser10.newContext({ viewport: { width: 900, height: 700 } });
+  await ctx10.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  const rf = await ctx10.newPage();
+  rf.errors = []; rf.on("pageerror", (e) => rf.errors.push(e.message));
+  await rf.goto("http://app.test/");
+  await rf.fill("#pf-name", "Test"); await rf.click('[data-act="onboard-skip"]');
+  // settings, scrolled down
+  await rf.evaluate(() => window.scrollTo(0, 600)); await rf.waitForTimeout(400);
+  await rf.reload(); await rf.waitForTimeout(300);
+  check(!!(await rf.$("#set-name")), "refresh: the settings screen stays open");
+  check((await rf.evaluate(() => window.scrollY)) > 300, "refresh: the scroll position comes back");
+  // a screen added by a module
+  await rf.click('[data-act="home"]'); await rf.click('[data-act="board"]'); await rf.reload(); await rf.waitForTimeout(300);
+  check(!!(await rf.$(".aac-grid")), "refresh: the communication board stays open");
+  // the game checklist
+  await rf.click('[data-act="home"]'); await rf.click('[data-act="start"]'); await rf.reload(); await rf.waitForTimeout(300);
+  check(!!(await rf.$(".picklist")), "refresh: the game checklist stays open");
+  // in the middle of an exercise: same exercise
+  await rf.click('[data-act="pick-next"]'); await rf.click('[data-w="assist"]'); await rf.click('[data-r="good"]');
+  const tagBefore = await rf.textContent(".tag");
+  await rf.reload(); await rf.waitForTimeout(300);
+  check((await rf.textContent(".tag")) === tagBefore, "refresh: an exercise in progress continues where it was");
+  // a finished session goes back to home
+  await rf.click('[data-act="stop"]'); check(!!(await rf.$(".sumhead")), "refresh: (session ended)");
+  await rf.reload(); await rf.waitForTimeout(300);
+  check(!!(await rf.$('[data-act="start"]')) && !(await rf.$(".sumhead")), "refresh: after a session has ended you start from home");
+  // behind the therapist PIN: asks again, then continues to the same screen
+  await rf.click('[data-act="therapist"]'); await rf.fill("#th-pin1", "2468"); await rf.fill("#th-pin2", "2468"); await rf.click('[data-act="pin-set"]');
+  await rf.click('[data-act="progress"]'); await rf.reload(); await rf.waitForTimeout(300);
+  check(!!(await rf.$("#th-pin")), "refresh: screens behind the therapist PIN ask for it again");
+  await rf.fill("#th-pin", "2468"); await rf.click('[data-act="pin-enter"]'); await rf.waitForTimeout(200);
+  check(!!(await rf.$(".pr-controls")), "refresh: after the PIN you are back on the same screen");
+  // patient mode: a locked screen is not reopened by a refresh
+  await rf.click('[data-act="pr-back"]'); await rf.click('[data-act="home"]'); await rf.click('[data-act="settings"]');
+  await rf.check("#set-patient"); await rf.click('[data-act="save-settings"]');
+  await rf.click('[data-act="home"]'); await rf.click('[data-act="relock"]');
+  await rf.evaluate(() => { const u = JSON.parse(sessionStorage.getItem("pog_ui")); u.s = "settings"; sessionStorage.setItem("pog_ui", JSON.stringify(u)); });
+  await rf.reload(); await rf.waitForTimeout(300);
+  check(!(await rf.$("#set-name")) && !!(await rf.$('[data-act="caregiver"]')), "refresh: in patient mode a locked screen is not reopened without the PIN");
+  // a new tab starts from home
+  const rf2 = await ctx10.newPage(); await rf2.goto("http://app.test/"); await rf2.waitForTimeout(300);
+  check(!!(await rf2.$('[data-act="start"]')), "refresh: a new tab starts from the home screen");
+  check(rf.errors.length === 0, "no page errors (refresh): " + rf.errors.join("; "));
+  await browser10.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

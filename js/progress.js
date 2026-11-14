@@ -332,6 +332,6 @@
 
   function openRemote(data) { SRC = { name: data.name, log: data.log || [], checkins: data.checkins || [] }; V = { preset: "4w", who: "all", measure: "ability", custom: null }; api.go("progress"); }
   function localAlerts() { var keep = SRC; SRC = null; try { return alerts("all"); } finally { SRC = keep; } }
-  window.POG.progress = { record: record, backfill: backfill, log: log, alerts: alerts, localAlerts: localAlerts, openRemote: openRemote, compareTable: compareTable, activityRow: activityRow, summarise: summarise, label: function () { return T().btn; } };
+  window.POG.progress = { isRemote: function () { return !!SRC; }, record: record, backfill: backfill, log: log, alerts: alerts, localAlerts: localAlerts, openRemote: openRemote, compareTable: compareTable, activityRow: activityRow, summarise: summarise, label: function () { return T().btn; } };
   try { backfill(); } catch (e) {}
 })();

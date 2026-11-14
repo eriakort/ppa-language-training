@@ -16,6 +16,11 @@ A prototype tablet app for short daily language practice for people with
   telling (a story on a topic) → mystery word → crossword or word building
   (alternate days) → naming pictures → personal phrases → reading aloud
   → repeating → optional maze, calculations and letter path → sequences.
+- **A refresh keeps your place:** the current screen and scroll position are
+  kept for the browser tab, and an exercise in progress continues where it
+  was. After a session has ended, after signing out or in a new tab, the app
+  opens on the home screen. In patient mode locked screens are not reopened,
+  and screens behind the therapist PIN ask for it again first.
 - **Language anywhere:** a small IT | EN switch sits in the top bar of every
   screen. In the middle of a session the current and remaining exercises are
   made again in the new language at the same levels; answers already given

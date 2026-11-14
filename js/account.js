@@ -163,6 +163,7 @@
           else {
             /* Leave the signed-in view completely: close the dialog and reload so every panel starts signed out. */
             user = null; publishAuthState(null, "SIGNED_OUT"); hide();
+            try { sessionStorage.removeItem("pog_ui"); } catch (e) {} /* signed out: start again from the home screen */
             window.location.reload();
           }
         }).catch(fail);
@@ -214,7 +215,7 @@
   mount();
   /* Signed out in another tab: reload this one too. */
   window.addEventListener("storage", function (ev) {
-    if (ev.key === "pog_account_signed_out" && ev.newValue === "1") window.location.reload();
+    if (ev.key === "pog_account_signed_out" && ev.newValue === "1") { try { sessionStorage.removeItem("pog_ui"); } catch (e) {} window.location.reload(); }
   });
   window.addEventListener("pog:languagechange", function (ev) {
     lang = ev.detail && ev.detail.lang === "en" ? "en" : "it";

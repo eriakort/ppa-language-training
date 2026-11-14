@@ -224,6 +224,48 @@
       try { localStorage.removeItem(storageKey("active_session")); } catch (e) {}
     }
   }
+  /* ---------- where you are, kept across a page refresh ----------
+     The current screen (and scroll position) is kept for this browser tab in sessionStorage. A refresh
+     returns to it; a finished exercise session, signing out or a new tab starts from the home screen.
+     Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
+     therapist PIN ask for it again, then continue to where you were. */
+  var UI_KEY = "pog_ui";
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, pick: 1, "pick-ask": 1 };
+  var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
+  var UI_PIN = { "chk-results": 1, report: 1, progress: 1 };
+  function saveUi() {
+    try {
+      var remote = !!(window.POG.progress && window.POG.progress.isRemote && window.POG.progress.isRemote());
+      sessionStorage.setItem(UI_KEY, JSON.stringify({ p: activeProfileId, s: screen, y: Math.round(window.scrollY || 0), remote: remote }));
+    } catch (e) {}
+  }
+  function restoreUi() {
+    var u = null;
+    try { u = JSON.parse(sessionStorage.getItem(UI_KEY) || "null"); } catch (e) {}
+    if (!u || u.p !== activeProfileId || !getProfile() || typeof u.s !== "string") return false;
+    var s = u.s, locked = isLocked();
+    var target = null;
+    if (UI_FREE[s]) {
+      if (s === "pick-ask" && !savedChoice()) s = "pick";
+      if (s === "pick") pickDraft = (savedChoice() || todayPlan().list).slice();
+      target = s;
+    } else if (UI_UNLOCKED[s] && !locked) {
+      target = typeof UI_UNLOCKED[s] === "string" ? UI_UNLOCKED[s] : s;
+    }
+    if (target) {
+      /* Screens added by modules (board, album, check-in…) exist only once those scripts have loaded. */
+      if (window.POG.ext.screens[target] || /^(home|pick|pick-ask|settings|scripts|profiles|therapist)$/.test(target)) screen = target;
+      else { screen = "home"; deferredScreen = target; }
+    } else if (UI_PIN[s] && !locked && !u.remote) {
+      screen = "therapist"; TH.after = s;
+    } else return false;
+    restoreScrollY = +u.y || 0;
+    return true;
+  }
+  var restoreScrollY = 0, deferredScreen = null;
+  window.addEventListener("scroll", function () { if (scrollTimer) return; scrollTimer = setTimeout(function () { scrollTimer = null; saveUi(); }, 300); }, { passive: true });
+  var scrollTimer = null;
+  window.addEventListener("pagehide", saveUi);
   function restoreActiveSession() {
     var checkpoint = load("active_session");
     if (!checkpoint || checkpoint.version !== 1 || checkpoint.screen !== "item" || !checkpoint.session) return false;
@@ -1584,6 +1626,7 @@
     lastRenderedScreen = screen;
     if (resetScroll) window.scrollTo(0, 0);
     else window.scrollTo(0, savedScrollY);
+    saveUi();
     if (focusAct === "key" && focusCh) {
       var nextKey = app.querySelector('.key[data-act="key"][data-ch="' + focusCh + '"]');
       if (nextKey) nextKey.focus({ preventScroll: true });
@@ -1726,7 +1769,7 @@
     if (act === "pin-enter") {
       var pe = val("th-pin");
       hashPin(pe).then(function (h) {
-        if (h === load("pin")) { TH.unlocked = true; TH.recs = null; } else flash = t.pinWrong;
+        if (h === load("pin")) { TH.unlocked = true; TH.recs = null; if (TH.after) { screen = TH.after; TH.after = null; } } else flash = t.pinWrong;
         render();
       });
       return;
@@ -1919,6 +1962,14 @@
     history: function () { return load("history") || {}; }, sessions: function () { var s = load("sessions"); return Array.isArray(s) ? s : []; }
   };
   RECS.purge().catch(function () {});
-  if (!restoreActiveSession()) screen = getProfile() ? "home" : "onboard";
+  if (!restoreActiveSession() && !restoreUi()) screen = getProfile() ? "home" : "onboard";
+  (function finishRestore() {
+    function go() {
+      if (deferredScreen && window.POG.ext.screens[deferredScreen]) { screen = deferredScreen; render(); }
+      deferredScreen = null;
+      if (restoreScrollY) setTimeout(function () { window.scrollTo(0, restoreScrollY); restoreScrollY = 0; }, 60);
+    }
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", go); else setTimeout(go, 0);
+  })();
   render();
 })();

@@ -873,8 +873,32 @@
   /* ---------- views ---------- */
   function header(stopBtn) {
     var t = T[lang];
-    return '<header class="bar"><div class="brand">' + esc(t.appName) + '</div>' +
+    return '<header class="bar"><div class="brand">' + esc(t.appName) + '</div>' + langToggle() +
       (stopBtn ? '<button class="stop" data-act="stop">' + esc(t.stop) + '</button>' : '') + '</header>';
+  }
+  /* A small IT | EN switch in the top bar of every screen (hidden while patient mode is locked). */
+  function langToggle() {
+    if (isLocked()) return '';
+    return '<div class="langmini" role="group" aria-label="Lingua / Language">' +
+      '<button data-act="lang" data-l="it" aria-pressed="' + (lang === "it") + '" title="Italiano" lang="it">IT</button>' +
+      '<button data-act="lang" data-l="en" aria-pressed="' + (lang === "en") + '" title="English" lang="en">EN</button></div>';
+  }
+  /* Switching language in the middle of a session: the steps still to come (including the current one)
+     are made again in the new language, at the same levels. Answers already given stay as they are. */
+  function relanguageSession() {
+    if (!S || S.i < 0 || S.i >= S.steps.length) return;
+    var rest = S.steps.slice(S.i), out = [], counts = {}, order = [], day = Math.floor(Date.now() / 86400000);
+    rest.forEach(function (st) { if (!counts[st.game]) { counts[st.game] = 0; order.push(st); } counts[st.game]++; });
+    order.forEach(function (first) {
+      var g = first.game, n = counts[g], same = rest.filter(function (st) { return st.game === g; });
+      if (g === "maze" || g === "describe" || g === "name" || g === "wordbuild") { out = out.concat(same); return; }  /* bilingual or language-free */
+      if (g === "calc") { var set = getSettings(); makeCalc(set.calcLevel, n).forEach(function (q) { out.push({ game: "calc", lv: null, data: q }); }); return; }
+      if (g === "path") { out.push({ game: "path", lv: null, data: makePath(first.data.n, day) }); return; }
+      var made = makeSteps(g, first.lv, n, S.mode === "place" && S.off ? S.off - 1 : day);
+      out = out.concat(g === "crossword" ? made : made.slice(0, n));
+    });
+    S.steps = S.steps.slice(0, S.i).concat(out);
+    enterStep();
   }
   function progress(game) {
     var t = T[lang], list = S.games, ci = list.indexOf(game);
@@ -969,7 +993,7 @@
 
   function viewProfiles() {
     var t = T[lang], list = profileList();
-    return header(false) + '<section class="card home"><h1>' + esc(t.profilesTitle) + '</h1><p class="sub">' + esc(t.profilesHelp) + '</p>' + langSeg() +
+    return header(false) + '<section class="card home"><h1>' + esc(t.profilesTitle) + '</h1><p class="sub">' + esc(t.profilesHelp) + '</p>' +
       '<div class="profile-list">' + list.map(function (p) { return '<button class="modecard profile-card" data-act="profile-switch" data-id="' + esc(p.id) + '"><strong>' + esc(p.name || t.unnamedProfile) + '</strong><span>' + esc(p.id === activeProfileId ? t.profileCurrent : t.profileChoose) + '</span></button>'; }).join("") + '</div>' +
       '<button class="primary" data-act="profile-add">' + esc(t.profileAdd) + '</button><button class="link" data-act="home">' + esc(t.back) + '</button><p class="note">' + esc(t.localNote) + '</p></section>';
   }
@@ -1028,7 +1052,7 @@
     var pending = pl.status === "in_progress", locked = isLocked(), patient = tp.set.patientMode;
     return header(false) +
       '<section class="card home">' +
-      '<h1>' + esc(greeting) + '</h1><p class="sub">' + esc(t.tagline) + '</p>' + (locked ? '' : langSeg()) +
+      '<h1>' + esc(greeting) + '</h1><p class="sub">' + esc(t.tagline) + '</p>' +
       (myPacks().length || prof.other ? '<div class="mychips" aria-label="' + esc(t.yourInterests) + '">' + myPacks().map(function (k) { return '<span>' + PACKS[k].icon + ' ' + esc(PACKS[k].label[lang]) + '</span>'; }).join("") + (prof.other ? '<span>💬 ' + esc(prof.other) + '</span>' : '') + '</div>' : '') +
       '<p class="tag">' + esc(t.planTitle) + '</p>' +
       '<div class="scale" aria-hidden="true"><span>↑ ' + esc(t.hard) + '</span></div>' +
@@ -1641,7 +1665,15 @@
       return;
     }
     if (window.POG.ext.actions[act]) { window.POG.ext.actions[act](b, e); return; }
-    if (act === "lang") { lang = b.getAttribute("data-l") === "en" ? "en" : "it"; save("lang", lang); document.documentElement.lang = lang; window.dispatchEvent(new CustomEvent("pog:languagechange", { detail: { lang: lang } })); rerenderKeep(); return; }
+    if (act === "lang") {
+      var nl = b.getAttribute("data-l") === "en" ? "en" : "it";
+      if (nl === lang) return;
+      if (screen === "item" && S) { stopVoice(); micCancel(); stopPacer(); }
+      lang = nl; save("lang", lang); document.documentElement.lang = lang;
+      if (screen === "item" && S) relanguageSession();
+      window.dispatchEvent(new CustomEvent("pog:languagechange", { detail: { lang: lang } }));
+      rerenderKeep(); return;
+    }
     if (act === "int") { b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true")); return; }
     if (act === "onboard-place" || act === "onboard-skip") {
       var p = readProfile("pf-"); if (!p) { rerenderKeep(); return; }
@@ -1879,7 +1911,7 @@
     flash: function (m) { flash = m; }, flashText: function () { return flash; },
     speak: speak, stopVoice: stopVoice, isLocked: isLocked,
     profileId: function () { return activeProfileId; }, getScripts: getScripts, getProfile: getProfile,
-    canRecord: function () { return REC.supported && !IN_HOST; },
+    canRecord: function () { return REC.supported && !IN_HOST; }, langToggle: function () { return langToggle(); },
     /* Recording is on and consented; with concurrent, also allowed while speech recognition listens. */
     recordingAllowed: function (concurrent) { return recordingWanted() && (!concurrent || getSettings().recordConcurrent); },
     therapistUnlocked: function () { return !!TH.unlocked; }, therapistView: function () { screen = "therapist"; return viewTherapist(); }, lockTherapist: function () { thLock(); },

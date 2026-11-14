@@ -267,7 +267,7 @@
     return (CK.micError ? '<p class="nudge" role="status">' + esc(t.micErr) + '</p>' : '') + '<button class="micbtn" data-act="chk-mic">' + esc(label || t.micBtn) + '</button>';
   }
   function head() {
-    return '<header class="bar"><div class="brand">' + esc(api.t().appName) + '</div><button class="stop" data-act="chk-quit">' + esc(T().quit) + '</button></header>';
+    return '<header class="bar"><div class="brand">' + esc(api.t().appName) + '</div>' + (api.langToggle ? api.langToggle() : '') + '<button class="stop" data-act="chk-quit">' + esc(T().quit) + '</button></header>';
   }
   function viewCheckin() {
     var t = T();

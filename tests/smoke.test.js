@@ -711,6 +711,33 @@ async function playThrough(page, solo) {
   check(cl.errors.length === 0, "no page errors (cloud statistics): " + cl.errors.join("; "));
   await browser8.close();
 
+  /* The language can be switched from the top bar on any screen, also in the middle of a session. */
+  const browser9 = await chromium.launch();
+  const lg = await open(browser9, false, null, { width: 900, height: 1100 });
+  await lg.fill("#pf-name", "Test"); await lg.click('[data-act="onboard-skip"]');
+  // settings screen (after onboarding): switch keeps what was typed
+  await lg.fill("#set-name", "Prova");
+  await lg.click('.langmini [data-l="en"]');
+  check(/Levels and settings|Profile/.test(await lg.textContent(".card")) && (await lg.inputValue("#set-name")) === "Prova", "language: switching on the settings screen keeps what was typed");
+  await lg.click('.langmini [data-l="it"]');
+  await lg.click('[data-act="home"]');
+  check(!!(await lg.$(".bar .langmini")) && !(await lg.$(".home .seg")), "language: the switch is in the top bar of the home screen");
+  await startSession(lg); await lg.click('[data-w="assist"]');
+  await lg.click('[data-r="good"]'); // telling
+  const before = await lg.$$eval(".clues .chip", (c) => c.map((x) => x.textContent));
+  await lg.click('.langmini [data-l="en"]');
+  const after = await lg.$$eval(".clues .chip", (c) => c.map((x) => x.textContent));
+  const tagEn = await lg.textContent(".tag");
+  check(/Mystery word/.test(tagEn) && after.length === 5 && after.join() !== before.join(), "language: in the middle of a session the current exercise switches to English (" + after.join(", ") + ")");
+  check(/Telling/.test(await lg.textContent(".steps")) && /Stop for today/.test(await lg.textContent(".bar")), "language: progress steps and buttons follow the new language");
+  for (let i = 0; i < 2; i++) await lg.click('[data-r="good"]');
+  check(/Crossword|Word building/.test(await lg.textContent(".tag")), "language: the session carries on in English");
+  await lg.click('[data-act="stop"]');
+  const logRows = await lg.$$eval("tbody tr td:first-child", (x) => x.map((td) => td.textContent));
+  check(logRows.length >= 3, "language: answers given before the switch are kept (" + logRows.length + ")");
+  check(lg.errors.length === 0, "no page errors (language switch): " + lg.errors.join("; "));
+  await browser9.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

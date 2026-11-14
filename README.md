@@ -13,9 +13,21 @@ A prototype tablet app for short daily language practice for people with
 
 - **Daily session, about 10 minutes**, ordered from the most demanding game to
   the easiest, so it always ends on something the person can do:
-  telling (a story on a topic) → crossword or word building (alternate days)
-  → naming pictures → personal phrases → reading aloud → repeating
-  → optional maze → sequences.
+  telling (a story on a topic) → mystery word → crossword or word building
+  (alternate days) → naming pictures → personal phrases → reading aloud
+  → repeating → optional maze, calculations and letter path → sequences.
+- **Mystery word:** five clue words point to one word ("waves, beach, salt,
+  sailing, shells" → sea). Levels: the clues only, with some letters shown, a
+  choice of three words, then listen and choose from two. Hints on request
+  give the first letter, then some letters, then a choice.
+- **Word building** includes one month or day to unscramble each time.
+- **Optional extras, outside the language levels** (turned on in settings):
+  the maze; calculations (the double or the half of a number, choose from
+  four; easy, medium or with decimals); and a letter path, where a word of a
+  category (fruit, flowers, animals…) is hidden as a path of neighbouring
+  letters in a 4×4 or 5×5 grid.
+- These exercise types follow common paper workbooks for cognitive
+  stimulation; all items in the app are written for it, not copied from them.
 - **Reading aloud** with words highlighted one at a time at a steady pace
   (levels: whole passage, word by word, slowly word by word, listen then read).
 - **Levels that step down over time.** Each game starts at level 1, its hardest

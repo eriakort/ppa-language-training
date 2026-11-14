@@ -80,4 +80,116 @@ window.POG = window.POG || {};
                  "The train leaves the station early. From the window I see fields, villages and hills. A woman beside me reads a book. When we reach the sea, the air smells of salt."],
           short: ["I open the window.", "The coffee is ready.", "Let's go to the market."] }
   };
+
+  /* Mystery word: five clue words that all relate to one word. [word, [five clues], [other accepted answers]].
+     Original sets written for this app. */
+  C.MYSTERY = {
+    it: [
+      ["mare", ["onda", "spiaggia", "sale", "ombrellone", "barca"], []],
+      ["pane", ["forno", "farina", "fetta", "briciola", "fornaio"], ["pagnotta"]],
+      ["sole", ["caldo", "estate", "luce", "tramonto", "abbronzatura"], []],
+      ["libro", ["pagina", "copertina", "biblioteca", "capitolo", "leggere"], ["romanzo"]],
+      ["chiave", ["serratura", "porta", "mazzo", "girare", "aprire"], ["chiavi"]],
+      ["orologio", ["ore", "lancette", "polso", "minuti", "puntuale"], ["orologi"]],
+      ["pioggia", ["ombrello", "nuvola", "gocce", "temporale", "bagnato"], []],
+      ["treno", ["binario", "stazione", "biglietto", "vagone", "ritardo"], []],
+      ["pizza", ["mozzarella", "margherita", "impasto", "pomodoro", "Napoli"], []],
+      ["letto", ["cuscino", "lenzuolo", "materasso", "dormire", "coperta"], []],
+      ["calcio", ["pallone", "gol", "arbitro", "squadra", "rigore"], ["partita"]],
+      ["telefono", ["chiamata", "numero", "squillo", "rispondere", "messaggio"], ["cellulare", "telefonino"]],
+      ["giardino", ["fiori", "prato", "siepe", "annaffiare", "vialetto"], []],
+      ["latte", ["mucca", "bianco", "biberon", "formaggio", "cappuccino"], []],
+      ["musica", ["canzone", "orchestra", "ritmo", "concerto", "ascoltare"], []],
+      ["scuola", ["maestra", "banco", "lavagna", "compiti", "zaino"], []],
+      ["ospedale", ["medico", "infermiera", "reparto", "ambulanza", "ricovero"], []],
+      ["matrimonio", ["sposi", "anelli", "chiesa", "torta", "invitati"], ["nozze"]],
+      ["inverno", ["freddo", "cappotto", "sciarpa", "gennaio", "camino"], []],
+      ["cucina", ["fornelli", "pentola", "frigorifero", "ricetta", "grembiule"], []],
+      ["albero", ["tronco", "rami", "foglie", "radici", "ombra"], []],
+      ["cane", ["guinzaglio", "abbaiare", "cuccia", "osso", "coda"], ["cagnolino"]],
+      ["mano", ["dita", "unghie", "guanto", "palmo", "stretta"], ["mani"]],
+      ["natale", ["presepe", "regali", "dicembre", "panettone", "Babbo"], []],
+      ["fuoco", ["fiamma", "legna", "cenere", "accendino", "scintilla"], []],
+      ["luna", ["notte", "stelle", "piena", "falce", "astronauta"], []],
+      ["cappello", ["testa", "visiera", "paglia", "cilindro", "togliersi"], ["berretto"]],
+      ["specchio", ["riflesso", "bagno", "immagine", "vetro", "pettinarsi"], []],
+      ["mercato", ["bancarelle", "frutta", "verdura", "prezzo", "piazza"], []],
+      ["automobile", ["volante", "benzina", "patente", "parcheggio", "ruote"], ["macchina", "auto"]],
+      ["compleanno", ["candeline", "torta", "auguri", "regalo", "festa"], []],
+      ["gelato", ["cono", "coppetta", "cioccolato", "gusti", "estate"], []],
+      ["occhiali", ["lenti", "vista", "montatura", "ottico", "astuccio"], []],
+      ["teatro", ["palco", "sipario", "attori", "applausi", "platea"], []]
+    ],
+    en: [
+      ["sea", ["waves", "beach", "salt", "sailing", "shells"], ["ocean", "seaside"]],
+      ["bread", ["oven", "flour", "slice", "crumbs", "baker"], ["loaf"]],
+      ["sun", ["summer", "light", "dawn", "rays", "warm"], ["sunshine"]],
+      ["book", ["page", "cover", "library", "chapter", "read"], ["novel"]],
+      ["key", ["lock", "door", "turn", "open", "bunch"], ["keys"]],
+      ["clock", ["hours", "hands", "minutes", "alarm", "tick"], ["watch"]],
+      ["rain", ["umbrella", "cloud", "drops", "storm", "wet"], []],
+      ["train", ["platform", "station", "ticket", "carriage", "rails"], []],
+      ["pizza", ["mozzarella", "tomato", "slice", "dough", "Naples"], []],
+      ["bed", ["pillow", "sheets", "mattress", "sleep", "blanket"], []],
+      ["football", ["kick", "goal", "referee", "team", "penalty"], ["soccer", "match"]],
+      ["phone", ["call", "number", "ring", "answer", "message"], ["telephone", "mobile"]],
+      ["garden", ["flowers", "lawn", "hedge", "watering", "path"], []],
+      ["milk", ["cow", "white", "bottle", "cheese", "cereal"], []],
+      ["music", ["song", "orchestra", "rhythm", "concert", "listen"], []],
+      ["school", ["teacher", "desk", "blackboard", "homework", "lessons"], []],
+      ["hospital", ["doctor", "nurse", "ward", "ambulance", "patient"], []],
+      ["wedding", ["bride", "rings", "church", "cake", "guests"], ["marriage"]],
+      ["winter", ["cold", "coat", "scarf", "January", "snowman"], []],
+      ["kitchen", ["stove", "saucepan", "fridge", "recipe", "apron"], []],
+      ["tree", ["trunk", "branches", "leaves", "roots", "shade"], []],
+      ["dog", ["lead", "bark", "kennel", "bone", "tail"], ["puppy"]],
+      ["hand", ["fingers", "nails", "glove", "palm", "wave"], ["hands"]],
+      ["Christmas", ["presents", "December", "stocking", "carols", "Santa"], []],
+      ["fire", ["flame", "wood", "ashes", "smoke", "sparks"], []],
+      ["moon", ["night", "stars", "full", "astronaut", "crescent"], []],
+      ["hat", ["head", "brim", "straw", "bowler", "panama"], ["cap"]],
+      ["mirror", ["reflection", "bathroom", "glass", "face", "comb"], []],
+      ["market", ["stalls", "fruit", "vegetables", "price", "square"], []],
+      ["car", ["steering wheel", "petrol", "licence", "parking", "tyres"], ["automobile"]],
+      ["birthday", ["candles", "cake", "cards", "present", "party"], []],
+      ["ice cream", ["cone", "scoop", "chocolate", "flavours", "van"], ["icecream"]],
+      ["glasses", ["lenses", "sight", "frames", "optician", "case"], ["spectacles"]],
+      ["theatre", ["stage", "curtain", "actors", "applause", "seats"], ["theater"]]
+    ]
+  };
+  /* Months and days to unscramble in Word building (same format as NAMING). */
+  C.ANAGRAMS = [
+    { pic: "📅", it: ["gennaio", "Il primo mese dell'anno.", "gen…"], en: ["january", "The first month of the year.", "ja…"] },
+    { pic: "📅", it: ["febbraio", "Il mese più corto dell'anno.", "feb…"], en: ["february", "The shortest month of the year.", "fe…"] },
+    { pic: "📅", it: ["marzo", "Il mese in cui comincia la primavera.", "ma…"], en: ["march", "The month when spring begins.", "ma…"] },
+    { pic: "📅", it: ["aprile", "Il mese dopo marzo.", "a…"], en: ["april", "The month after March.", "a…"] },
+    { pic: "📅", it: ["maggio", "Il mese delle rose, dopo aprile.", "ma…"], en: ["may", "The month after April.", "m…"] },
+    { pic: "📅", it: ["giugno", "Il mese in cui comincia l'estate.", "giu…"], en: ["june", "The month when summer begins.", "ju…"] },
+    { pic: "📅", it: ["luglio", "Il mese dopo giugno, in piena estate.", "lu…"], en: ["july", "The month after June.", "ju…"] },
+    { pic: "📅", it: ["agosto", "Il mese delle ferie e di Ferragosto.", "a…"], en: ["august", "The last month of summer.", "au…"] },
+    { pic: "📅", it: ["ottobre", "Il mese dopo settembre.", "ot…"], en: ["october", "The month of Halloween.", "oc…"] },
+    { pic: "📅", it: ["novembre", "Il mese prima di dicembre.", "no…"], en: ["november", "The month before December.", "no…"] },
+    { pic: "📅", it: ["dicembre", "L'ultimo mese dell'anno.", "di…"], en: ["december", "The last month of the year.", "de…"] },
+    { pic: "📅", it: ["sabato", "Il giorno prima della domenica.", "sa…"], en: ["saturday", "The day before Sunday.", "sa…"] },
+    { pic: "📅", it: ["domenica", "L'ultimo giorno della settimana.", "do…"], en: ["sunday", "The day after Saturday.", "su…"] }
+  ];
+  /* Letter path: words to trace through a grid of letters, grouped by category. Plain letters, no accents. */
+  C.PATH_WORDS = {
+    it: [
+      ["Frutta", ["MELA", "PERA", "BANANA", "CILIEGIA", "ARANCIA", "FRAGOLA", "PESCA", "LIMONE", "ANGURIA", "PRUGNA"]],
+      ["Fiori", ["ROSA", "TULIPANO", "GIRASOLE", "VIOLA", "GIGLIO", "ORCHIDEA", "CICLAMINO", "MIMOSA"]],
+      ["Animali", ["GATTO", "CAVALLO", "MUCCA", "CONIGLIO", "LEONE", "PECORA", "GALLINA", "ASINO"]],
+      ["Verdure", ["CAROTA", "PATATA", "ZUCCHINA", "CIPOLLA", "POMODORO", "INSALATA", "SEDANO"]],
+      ["Mestieri", ["MEDICO", "CUOCO", "SARTO", "FORNAIO", "PITTORE", "MAESTRO", "POSTINO"]],
+      ["Colori", ["ROSSO", "VERDE", "GIALLO", "AZZURRO", "BIANCO", "NERO", "MARRONE"]]
+    ],
+    en: [
+      ["Fruit", ["APPLE", "PEAR", "BANANA", "CHERRY", "ORANGE", "LEMON", "PEACH", "GRAPE", "PLUM", "MELON"]],
+      ["Flowers", ["ROSE", "TULIP", "DAISY", "LILY", "ORCHID", "VIOLET", "POPPY", "PANSY"]],
+      ["Animals", ["CAT", "HORSE", "COW", "RABBIT", "LION", "SHEEP", "GOAT", "DONKEY"]],
+      ["Vegetables", ["CARROT", "POTATO", "ONION", "TOMATO", "LETTUCE", "PEPPER", "CELERY"]],
+      ["Jobs", ["DOCTOR", "COOK", "TAILOR", "BAKER", "PAINTER", "TEACHER", "POSTMAN"]],
+      ["Colours", ["RED", "GREEN", "YELLOW", "BLUE", "WHITE", "BLACK", "BROWN"]]
+    ]
+  };
 })(window.POG.content = window.POG.content || {});

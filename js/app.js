@@ -44,15 +44,16 @@
   function fill(s, o) { return s.replace(/\{(\w+)\}/g, function (_, k) { return o[k]; }); }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
 
-  /* Language games, hardest first. The maze is optional and sits outside language scoring. */
-  var GAMES = ["describe", "crossword", "name", "wordbuild", "script", "read", "echo", "seq"];
-  var MAXLV = { describe: 3, crossword: 4, name: 4, wordbuild: 4, script: 3, read: 4, echo: 3, seq: 3 };
-  var PLACE_N = { describe: 1, crossword: 2, name: 2, wordbuild: 2, script: 2, read: 1, echo: 2, seq: 1 };
+  /* Language games, hardest first. The maze, calculations and letter path are optional and sit outside language scoring. */
+  var GAMES = ["describe", "mystery", "crossword", "name", "wordbuild", "script", "read", "echo", "seq"];
+  var MAXLV = { describe: 3, mystery: 4, crossword: 4, name: 4, wordbuild: 4, script: 3, read: 4, echo: 3, seq: 3 };
+  var PLACE_N = { describe: 1, mystery: 2, crossword: 2, name: 2, wordbuild: 2, script: 2, read: 1, echo: 2, seq: 1 };
+  var EXTRAS = ["maze", "calc", "path"];
   var RULE = { down: 0.6, downN: 3, up: 0.9, upN: 5, flag: 0.4, place: 0.6 };
 
   var T = window.POG.strings, C = window.POG.content;
   var DESCRIBE = C.DESCRIBE, NAMING = C.NAMING, CROSS = C.CROSS_WORDS, ECHO = C.ECHO, SEQ = C.SEQ, DEFAULT_SCRIPTS = C.DEFAULT_SCRIPTS;
-  var PACKS = C.PACKS, PACK_KEYS = C.PACK_KEYS;
+  var PACKS = C.PACKS, PACK_KEYS = C.PACK_KEYS, MYSTERY = C.MYSTERY, ANAGRAMS = C.ANAGRAMS, PATH_WORDS = C.PATH_WORDS;
   var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
   var ALL_NAMES = NAMING.concat.apply(NAMING, PACK_KEYS.map(function (k) { return PACKS[k].name; }));
 
@@ -183,6 +184,8 @@
     GAMES.forEach(function (g) { var n = +lv[g]; lv[g] = (n >= 1 && n <= MAXLV[g]) ? n : 1; });
     var size = [4, 6, 8].indexOf(+s.mazeSize) >= 0 ? +s.mazeSize : 4;
     return { levels: lv, auto: s.auto !== false, allowUp: s.allowUp !== false, maze: s.maze === true, mazeSize: size,
+      calc: s.calc === true, calcLevel: [1, 2, 3].indexOf(+s.calcLevel) >= 0 ? +s.calcLevel : 1,
+      path: s.path === true, pathSize: [4, 5].indexOf(+s.pathSize) >= 0 ? +s.pathSize : 4,
       record: s.record === true, consentAt: s.consentAt || null, recordConcurrent: s.recordConcurrent == null ? !isMobile() : !!s.recordConcurrent,
       patientMode: s.patientMode === true };
   }
@@ -455,6 +458,7 @@
     var heard = toks(text);
     if (!heard.length) return "none";
     if (st.game === "name") return coverage(toks(st.data[lang][0]), heard) >= 1 ? "good" : "retry";
+    if (st.game === "mystery") return [st.data.w].concat(st.data.alts || []).some(function (w) { return coverage(toks(w), heard) >= 1; }) ? "good" : "retry";
     if (st.game === "seq") return grade(coverage(toks(st.data.items.join(" ")), heard, 1), 0.8, 0.5);
     if (st.game === "echo" || st.game === "read") return grade(coverage(toks(st.data), heard), 0.8, 0.5);
     if (st.game === "script") return st.lv === 1 && S.support === 0
@@ -518,6 +522,9 @@
     var fromI = I.length ? Math.min(n - 1, I.length) : 0;
     for (i = 0; i < fromI; i++) out.push(I[(off + 2 + i) % I.length]);
     for (i = 0; out.length < n; i++) out.push(G[(off + 5 + i) % G.length]);
+    /* One month or day to unscramble each time (an anagram, as on paper worksheets). */
+    var A = ANAGRAMS.filter(ok);
+    if (A.length && n >= 2) out[n - 1] = A[off % A.length];
     return out;
   }
   function pickCross(off) {
@@ -548,6 +555,7 @@
       for (i = 0; i < pz.p.length; i++) out.push({ game: g, lv: lv, data: { pz: pz, wi: i } });
     }
     if (g === "name") pickNames(n, off).forEach(function (x) { out.push({ game: g, lv: lv, data: x }); });
+    if (g === "mystery") { var mp = MYSTERY[lang]; for (i = 0; i < n; i++) { var m = mp[(off * n + i) % mp.length]; out.push({ game: g, lv: lv, data: { w: m[0], clues: m[1], alts: m[2] } }); } }
     if (g === "wordbuild") pickBuild(n, off).forEach(function (x) { out.push({ game: g, lv: lv, data: x }); });
     if (g === "script") {
       var sc = getScripts();
@@ -565,8 +573,10 @@
   function todayPlan() {
     var day = Math.floor(Date.now() / 86400000), set = getSettings();
     var letters = day % 2 ? "wordbuild" : "crossword";
-    var list = ["describe", letters, "name", "script", "read", "echo"];
+    var list = ["describe", "mystery", letters, "name", "script", "read", "echo"];
     if (set.maze) list.push("maze");
+    if (set.calc) list.push("calc");
+    if (set.path) list.push("path");
     list.push("seq");
     return { day: day, list: list, set: set };
   }
@@ -574,7 +584,9 @@
     var tp = todayPlan(), L = tp.set.levels, d = tp.day, steps = [];
     tp.list.forEach(function (g) {
       if (g === "maze") { steps.push({ game: "maze", lv: null, data: { n: tp.set.mazeSize } }); return; }
-      var n = { describe: 1, crossword: 10, wordbuild: 3, name: 4, script: 2, read: 4, echo: 2, seq: 1 }[g];
+      if (g === "calc") { makeCalc(tp.set.calcLevel, 5).forEach(function (q) { steps.push({ game: "calc", lv: null, data: q }); }); return; }
+      if (g === "path") { steps.push({ game: "path", lv: null, data: makePath(tp.set.pathSize, d) }); return; }
+      var n = { describe: 1, mystery: 2, crossword: 10, wordbuild: 3, name: 4, script: 2, read: 4, echo: 2, seq: 1 }[g];
       steps = steps.concat(makeSteps(g, L[g], n, d));
     });
     return { mode: "session", id: "s" + Date.now().toString(36), who: who, steps: steps, i: -1, log: [], stopped: false, started: new Date(), levels: L, games: tp.list };
@@ -622,14 +634,27 @@
     if (st.game === "crossword") { S.support = Math.min(st.lv - 1, 2); S.max = 2; setupCross(st); }
     if (st.game === "wordbuild") { S.support = st.lv - 1; S.max = 3; setupBuild(st); }
     if (st.game === "maze") { setupMaze(st.data.n); }
+    if (st.game === "mystery") {
+      if (st.lv <= 2) { S.support = st.lv === 2 ? 2 : 0; S.max = 3; if (S.support >= 3) makeOpts(st); }
+      else makeOpts(st);
+    }
+    if (st.game === "calc") { S.opts = st.data.opts.map(function (v) { return { v: v, ok: v === st.data.ans }; }); }
+    if (st.game === "path") { S.trail = []; S.pathHint = -1; S.wrongs = 0; }
     S.start = S.support;
   }
   function makeOpts(st) {
+    if (st.game === "mystery") {
+      var n = st.lv === 4 ? 1 : 2;
+      var pool = shuffle(MYSTERY[lang].filter(function (m) { return m[0] !== st.data.w; })).slice(0, n);
+      S.opts = shuffle([{ w: st.data.w, ok: true }].concat(pool.map(function (m) { return { w: m[0], ok: false }; })));
+      return;
+    }
     var others = shuffle(ALL_NAMES.filter(function (n) { return n !== st.data && n.pic !== st.data.pic && n[lang][0] !== st.data[lang][0]; })).slice(0, 2);
     S.opts = shuffle([st.data].concat(others)).map(function (n) { return { n: n, ok: n === st.data }; });
   }
   function target(st) {
     if (st.game === "crossword") return st.data.pz.p[st.data.wi].w;
+    if (st.game === "mystery") return st.data.w.toUpperCase();
     return st.data[lang][0].toUpperCase();
   }
   function cells(word) {
@@ -761,6 +786,9 @@
     if (st.game === "read") return st.data;
     if (st.game === "seq") return st.data.label;
     if (st.game === "maze") return st.data.n + "×" + st.data.n;
+    if (st.game === "mystery") return st.data.w;
+    if (st.game === "calc") return st.data.text;
+    if (st.game === "path") return st.data.word.toLowerCase();
     return st.data;
   }
   function score(result, extra) {
@@ -769,7 +797,7 @@
   }
   function record(result) {
     var st = cur(), extra = Math.max(0, (S.support || 0) - (S.start || 0));
-    var hasHints = (st.game === "name" && st.lv <= 2) || ["describe", "script", "crossword", "wordbuild"].indexOf(st.game) >= 0;
+    var hasHints = ((st.game === "name" || st.game === "mystery") && st.lv <= 2) || ["describe", "script", "crossword", "wordbuild"].indexOf(st.game) >= 0;
     S.log.push({ game: st.game, lv: st.lv, label: itemLabel(st), hints: hasHints ? S.support : null, result: result, score: score(result, extra), ms: Date.now() - S.t0, heard: (S.heard || []).join(" / "), meas: S.meas || null, recIds: (S.recIds || []).slice() });
     next();
   }
@@ -962,7 +990,7 @@
       '<p class="tag">' + esc(t.planTitle) + '</p>' +
       '<div class="scale" aria-hidden="true"><span>↑ ' + esc(t.hard) + '</span></div>' +
       '<ol class="plan">' + tp.list.map(function (g) {
-        var detail = g === "maze" ? t.sizes[tp.set.mazeSize] : t.level + ' ' + L[g] + ' · ' + t.lv[g][L[g] - 1];
+        var detail = g === "maze" ? t.sizes[tp.set.mazeSize] : g === "calc" ? t.calcLevels[tp.set.calcLevel] : g === "path" ? t.pathSizes[tp.set.pathSize] : t.level + ' ' + L[g] + ' · ' + t.lv[g][L[g] - 1];
         return '<li><strong>' + esc(t.game[g]) + '</strong><span>' + esc(detail) + '</span></li>';
       }).join("") + '</ol>' +
       '<div class="scale" aria-hidden="true"><span>↓ ' + esc(t.easy) + '</span></div>' +
@@ -1143,6 +1171,12 @@
       '<label class="check"><input type="checkbox" id="set-maze"' + (set.maze ? ' checked' : '') + '>' + esc(t.mazeOn) + '</label>' +
       '<div class="setrow"><label for="set-msize">' + esc(t.mazeSize) + '</label><select id="set-msize">' +
       [4, 6, 8].map(function (n) { return '<option value="' + n + '"' + (set.mazeSize === n ? ' selected' : '') + '>' + esc(t.sizes[n]) + '</option>'; }).join("") + '</select></div>' +
+      '<label class="check"><input type="checkbox" id="set-calc"' + (set.calc ? ' checked' : '') + '>' + esc(t.calcOn) + '</label>' +
+      '<div class="setrow"><label for="set-clevel">' + esc(t.calcLevel) + '</label><select id="set-clevel">' +
+      [1, 2, 3].map(function (n) { return '<option value="' + n + '"' + (set.calcLevel === n ? ' selected' : '') + '>' + esc(t.calcLevels[n]) + '</option>'; }).join("") + '</select></div>' +
+      '<label class="check"><input type="checkbox" id="set-path"' + (set.path ? ' checked' : '') + '>' + esc(t.pathOn) + '</label>' +
+      '<div class="setrow"><label for="set-psize">' + esc(t.pathSize) + '</label><select id="set-psize">' +
+      [4, 5].map(function (n) { return '<option value="' + n + '"' + (set.pathSize === n ? ' selected' : '') + '>' + esc(t.pathSizes[n]) + '</option>'; }).join("") + '</select></div>' +
       '</div>' +
       (flash ? '<p class="nudge">' + esc(flash) + '</p>' : '') +
       '<button class="primary" data-act="save-settings">' + esc(t.saveSet) + '</button>' +
@@ -1169,6 +1203,12 @@
       body += viewBuild(st);
     } else if (st.game === "maze") {
       body += viewMaze();
+    } else if (st.game === "mystery") {
+      body += viewMystery(st);
+    } else if (st.game === "calc") {
+      body += viewCalc(st);
+    } else if (st.game === "path") {
+      body += viewPath(st);
     } else if (st.game === "name" && st.lv <= 2) {
       var w = st.data[lang], h = "";
       if (S.support >= 1) h += '<div class="hint"><b>1</b><span>' + esc(w[1]) + '</span></div>';
@@ -1272,12 +1312,132 @@
       '<div class="cwbox"><div class="maze" style="--n:' + n + '">' + html + '</div></div>' +
       (S.solved ? '' : '<div class="tools"><button class="tool" data-act="maze-skip">' + esc(t.mazeSkip) + '</button></div>');
   }
+  /* Mystery word: five clue words point to one word. Hints: first letter, then some letters, then a choice. */
+  function mysteryPattern(w) {
+    return w.toUpperCase().split("").map(function (ch, i, a) {
+      if (ch === " ") return " ";
+      return (i % 3 === 0 || i === a.length - 1) ? ch : "_";
+    }).join(" ");
+  }
+  function viewMystery(st) {
+    var t = T[lang], d = st.data, h = "";
+    var clues = '<div class="chips clues">' + d.clues.map(function (c) { return '<span class="chip">' + esc(c) + '</span>'; }).join("") + '</div>';
+    if (st.lv >= 3) {
+      return '<p class="instr">' + esc(st.lv === 4 ? t.myListen : t.myPick) + '</p>' + clues +
+        '<div class="tools">' + listenBtn() + '</div>' + noTtsNote() + optsHtml(false);
+    }
+    if (S.support >= 1) h += '<div class="hint"><b>1</b><span>' + esc(fill(t.myStarts, { l: d.w[0].toUpperCase(), n: d.w.replace(/\s/g, "").length })) + '</span></div>';
+    if (S.support >= 2) h += '<div class="hint"><b>2</b><span class="pattern" aria-label="' + esc(t.myLetters) + '">' + esc(mysteryPattern(d.w)) + '</span></div>';
+    return '<p class="instr">' + esc(t.myInstr) + '</p>' + clues +
+      (h ? '<div class="hints">' + h + '</div>' : '') + optsHtml(false) +
+      '<div class="tools">' + listenBtn() + (S.support < S.max ? hintBtn() : '') + '</div>' + rateRow();
+  }
+
+  /* Calculations (optional, outside the language levels): the double or the half of a number, choose from four. */
+  function fmtNum(v) { var x = Math.round(v * 100) / 100; return String(x).replace(".", lang === "it" ? "," : "."); }
+  function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+  function makeCalc(level, n) {
+    var out = [], seen = {};
+    for (var k = 0; out.length < n && k < 200; k++) {
+      var dbl = Math.random() < 0.5, x;
+      if (level === 1) x = dbl ? rnd(2, 20) : rnd(1, 10) * 2;
+      else if (level === 2) x = dbl ? rnd(11, 50) : rnd(10, 50) * 2;
+      else x = dbl ? rnd(11, 60) + 0.5 : (Math.random() < 0.5 ? rnd(50, 499) * 2 + 1 : rnd(20, 99) + 0.5);
+      var key = (dbl ? "d" : "h") + x; if (seen[key]) continue; seen[key] = 1;
+      var ans = dbl ? x * 2 : x / 2;
+      var steps = level === 3 ? [0.25, 0.5, 1, 2, 10] : [1, 2, 10, 4];
+      var opts = [ans], j = 0;
+      while (opts.length < 4 && j < 40) {
+        var dlt = steps[j % steps.length] * (j % 2 ? -1 : 1) * (1 + Math.floor(j / (steps.length * 2))); j++;
+        var v = Math.round((ans + dlt) * 100) / 100;
+        if (v > 0 && opts.indexOf(v) < 0) opts.push(v);
+      }
+      out.push({ dbl: dbl, x: x, ans: ans, opts: shuffle(opts), text: fill(dbl ? T[lang].calcDouble : T[lang].calcHalf, { n: fmtNum(x) }) });
+    }
+    return out;
+  }
+  function viewCalc(st) {
+    var t = T[lang];
+    return '<p class="instr">' + esc(t.calcInstr) + '</p><p class="cue">' + esc(st.data.text) + '</p>' +
+      '<div class="tools">' + listenBtn() + '</div>' + '<div class="calc-opts">' + optsHtml(false) + '</div>';
+  }
+
+  /* Letter path (optional, outside the language levels): a word of a category hidden as a path of
+     neighbouring letters. Start at the arrow and tap the next letter each time. */
+  function makePath(n, seed) {
+    var groups = PATH_WORDS[lang], max = n === 4 ? 7 : 10, tries = 0;
+    while (tries++ < 50) {
+      var g = groups[(seed + tries) % groups.length], words = g[1].filter(function (w) { return w.length >= 3 && w.length <= max; });
+      if (!words.length) continue;
+      var word = words[Math.floor(Math.random() * words.length)], path = pathWalk(n, word.length);
+      if (!path) continue;
+      var alpha = lang === "it" ? "ABCDEFGILMNOPRSTUVZ" : "ABCDEFGHIKLMNOPRSTUWY", grid = [];
+      for (var i = 0; i < n * n; i++) grid.push(alpha[Math.floor(Math.random() * alpha.length)]);
+      path.forEach(function (c, i) { grid[c] = word[i]; });
+      return { cat: g[0], word: word, n: n, grid: grid, path: path };
+    }
+    return { cat: groups[0][0], word: groups[0][1][0], n: n, grid: groups[0][1][0].split(""), path: [0, 1, 2, 3] };
+  }
+  function pathAdj(n, a, b) { var ra = Math.floor(a / n), rb = Math.floor(b / n); return Math.abs(ra - rb) + Math.abs(a % n - b % n) === 1; }
+  function pathWalk(n, len) {
+    for (var attempt = 0; attempt < 200; attempt++) {
+      var path = [rnd(0, n * n - 1)], used = {};
+      used[path[0]] = true;
+      while (path.length < len) {
+        var c = path[path.length - 1], nb = [c - n, c + n, c - 1, c + 1].filter(function (x) { return x >= 0 && x < n * n && pathAdj(n, c, x) && !used[x]; });
+        if (!nb.length) break;
+        var nx = nb[Math.floor(Math.random() * nb.length)]; used[nx] = true; path.push(nx);
+      }
+      if (path.length === len) return path;
+    }
+    return null;
+  }
+  function viewPath(st) {
+    var t = T[lang], d = st.data, n = d.n, html = "", on = {};
+    S.trail.forEach(function (c, i) { on[c] = i + 1; });
+    for (var i = 0; i < n * n; i++) {
+      var cls = "pc" + (on[i] ? " on" : "") + (!S.trail.length && i === d.path[0] ? " start" : "") + (i === S.pathHint ? " phint" : "") + (S.solved && on[i] ? " ok" : "");
+      html += '<button class="' + cls + '" data-act="pcell" data-i="' + i + '" aria-label="' + esc(d.grid[i]) + (on[i] ? " " + on[i] : "") + '">' + esc(d.grid[i]) + '</button>';
+    }
+    var shown = d.word.split("").map(function (ch, i) { return i < S.trail.length ? ch : "_"; }).join(" ");
+    return '<p class="instr">' + esc(S.solved ? t.pathDone : t.pathInstr) + '</p>' +
+      '<p class="cue">' + esc(fill(t.pathCat, { c: d.cat })) + '</p>' +
+      '<p class="model pattern" aria-live="polite">' + esc(shown) + '</p>' + nudge() +
+      '<div class="cwbox"><div class="pgrid" style="--n:' + n + '">' + html + '</div></div>' +
+      (S.solved ? '' : '<div class="tools"><button class="tool" data-act="path-hint">' + esc(t.hintBtn) + '</button>' +
+        '<button class="tool" data-act="path-restart">' + esc(t.pathRestart) + '</button>' +
+        '<button class="tool" data-act="path-skip">' + esc(t.pathSkip) + '</button></div>');
+  }
+  function pathTap(st, i) {
+    var d = st.data, tr = S.trail, t = T[lang];
+    if (S.solved) return;
+    var ok = !tr.length ? i === d.path[0]
+      : (tr.indexOf(i) < 0 && pathAdj(d.n, tr[tr.length - 1], i) && d.grid[i] === d.word[tr.length]);
+    if (!ok) {
+      if (tr.length && tr[tr.length - 1] === i) { tr.pop(); S.pathHint = -1; S.nudge = ""; render(); return; }
+      S.firstTry = false; S.nudge = tr.length ? t.pathWrong : t.pathStart; render(); return;
+    }
+    tr.push(i); S.pathHint = -1; S.nudge = "";
+    if (tr.length === d.word.length) {
+      S.solved = true; render(); speak(d.word.toLowerCase());
+      var res = S.firstTry && S.support === 0 ? "good" : "almost";
+      busy = true;
+      setTimeout(function () { busy = false; if (screen === "item" && cur() === st) record(res); }, 1500);
+      return;
+    }
+    render();
+  }
+  function pathHint(st) {
+    var d = st.data, tr = S.trail, k = tr.length;
+    for (var j = 0; j < k; j++) if (tr[j] !== d.path[j]) { S.trail = d.path.slice(0, j); k = j; break; }
+    S.pathHint = d.path[k]; S.support++; S.nudge = ""; render();
+  }
   /* An item's picture: the album photo when there is one, otherwise its icon. */
   function picHtml(d) { return d && d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : (d && d.pic) || ""; }
   function optsHtml(pictures) {
     if (!S.opts) return "";
     return '<div class="opts">' + S.opts.map(function (o, i) {
-      var label = pictures ? picHtml(o.n) : esc(o.n[lang][0]);
+      var label = o.w != null ? esc(o.w) : o.v != null ? esc(fmtNum(o.v)) : pictures ? picHtml(o.n) : esc(o.n[lang][0]);
       var aria = pictures ? ' aria-label="' + (i + 1) + '"' : '';
       return '<button class="opt' + (pictures ? ' pico' : '') + ' ' + (o.state || "") + '" data-act="opt" data-i="' + i + '"' + aria + (o.state ? ' disabled' : '') + '>' + label + '</button>';
     }).join("") + '</div>';
@@ -1379,6 +1539,8 @@
   function speakCurrent(st) {
     if (st.game === "seq") playSeq(st.data.items);
     else if (st.game === "name") speak(st.data[lang][0]);
+    else if (st.game === "mystery") speak(st.data.clues.join(", "));
+    else if (st.game === "calc") speak(st.data.text);
     else if (st.game === "script") speak(st.data.phrase);
     else if (st.game === "echo" || st.game === "read") speak(st.data);
   }
@@ -1512,6 +1674,10 @@
       set.allowUp = document.getElementById("set-up").checked;
       set.maze = document.getElementById("set-maze").checked;
       set.mazeSize = +document.getElementById("set-msize").value;
+      set.calc = document.getElementById("set-calc").checked;
+      set.calcLevel = +document.getElementById("set-clevel").value;
+      set.path = document.getElementById("set-path").checked;
+      set.pathSize = +document.getElementById("set-psize").value;
       var conc = document.getElementById("set-conc"); if (conc) set.recordConcurrent = conc.checked;
       var pm = document.getElementById("set-patient"), wantPatient = !!(pm && pm.checked);
       if (wantPatient && !load("pin")) {
@@ -1528,7 +1694,7 @@
       var which = confirmAsk; confirmAsk = "";
       if (which === "reset") {
         var s0 = getSettings();
-        save("history", {}); save("settings", { auto: s0.auto, allowUp: s0.allowUp, maze: s0.maze, mazeSize: s0.mazeSize, record: s0.record, consentAt: s0.consentAt, recordConcurrent: s0.recordConcurrent });
+        save("history", {}); save("settings", { auto: s0.auto, allowUp: s0.allowUp, maze: s0.maze, mazeSize: s0.mazeSize, calc: s0.calc, calcLevel: s0.calcLevel, path: s0.path, pathSize: s0.pathSize, record: s0.record, consentAt: s0.consentAt, recordConcurrent: s0.recordConcurrent });
         flash = t.resetDone; render(); return;
       }
       save("placement", { status: "in_progress", levels: {}, flags: [] });
@@ -1565,10 +1731,15 @@
       return;
     }
     if (act === "maze-skip") { record("skip"); return; }
+    if (act === "pcell") { pathTap(st, +b.getAttribute("data-i")); return; }
+    if (act === "path-hint") { pathHint(st); return; }
+    if (act === "path-restart") { S.trail = []; S.pathHint = -1; S.nudge = ""; render(); return; }
+    if (act === "path-skip") { record("skip"); return; }
     if (act === "hint") {
       S.support = Math.min(S.max, S.support + 1); S.nudge = "";
       applySupport(st); render();
       if (st.game === "name" && S.support === 3) speak(st.data[lang][0]);
+      if (st.game === "mystery" && S.support === 3 && !S.opts) { makeOpts(st); render(); }
       if (st.game === "script" && S.support === 2) speak(st.data.phrase);
       return;
     }
@@ -1577,8 +1748,8 @@
       var o = S.opts[+b.getAttribute("data-i")];
       if (o.ok) {
         o.state = "ok"; S.opts.forEach(function (x) { if (!x.ok) x.state = "dim"; });
-        render(); speak(o.n[lang][0]);
-        var res = st.lv <= 2 ? "choice" : (S.firstTry ? "good" : "almost");
+        render(); speak(o.w != null ? o.w : o.v != null ? fmtNum(o.v) : o.n[lang][0]);
+        var res = st.game === "calc" ? (S.firstTry ? "good" : "almost") : st.lv <= 2 ? "choice" : (S.firstTry ? "good" : "almost");
         busy = true;
         setTimeout(function () { busy = false; if (screen === "item" && cur() === st) record(res); }, 1600);
       } else { o.state = "dim"; S.firstTry = false; render(); }
@@ -1619,7 +1790,9 @@
     var st = cur(), t = T[lang];
     if (r === "good" || r === "almost") { record(r); return; }
     if (S.support < S.max) {
-      S.support++; S.nudge = t.hintGiven; render();
+      S.support++; S.nudge = t.hintGiven;
+      if (st.game === "mystery" && S.support === 3 && !S.opts) makeOpts(st);
+      render();
       if (st.game === "name" && S.support === 3) speak(st.data[lang][0]);
       if (st.game === "script" && S.support === 2) speak(st.data.phrase);
       if (st.game === "seq") playSeq(st.data.items);

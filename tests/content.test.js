@@ -84,5 +84,32 @@ for (const lang of ["it", "en"]) {
   }
 }
 
+// Mystery word: five clues, none of which gives the answer away
+const plain = (w) => w.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+for (const lang of ["it", "en"]) {
+  const seen = new Set();
+  if (C.MYSTERY[lang].length < 20) fail(lang + ": mystery needs at least 20 sets");
+  for (const [w, clues, alts] of C.MYSTERY[lang]) {
+    if (seen.has(w)) fail(lang + ": duplicate mystery word " + w);
+    seen.add(w);
+    if (clues.length !== 5) fail(lang + ": mystery " + w + " needs five clues");
+    if (new Set(clues).size !== 5) fail(lang + ": mystery " + w + " repeats a clue");
+    for (const c of clues) for (const t of [w].concat(alts)) {
+      if (plain(c).includes(plain(t)) || plain(t).includes(plain(c))) fail(lang + ": clue «" + c + "» gives away «" + t + "»");
+    }
+  }
+}
+// Month and day anagrams fit Word building (one word, 8 letters at most)
+for (const a of C.ANAGRAMS) for (const lang of ["it", "en"]) {
+  if (!/^[a-z]{3,8}$/.test(a[lang][0])) fail(lang + ": bad anagram word " + a[lang][0]);
+  if (!a[lang][1] || !a[lang][2]) fail(lang + ": anagram " + a[lang][0] + " needs a clue and a first sound");
+}
+// Letter path words: capitals only, short enough for the small grid
+for (const lang of ["it", "en"]) for (const [cat, words] of C.PATH_WORDS[lang]) {
+  if (!cat) fail(lang + ": path category without a name");
+  if (words.filter((w) => w.length <= 7).length < 3) fail(lang + ": path category " + cat + " needs short words for the 4x4 grid");
+  for (const w of words) if (!/^[A-Z]{3,10}$/.test(w)) fail(lang + ": bad path word " + w);
+}
+
 if (failures) { console.error(failures + " problem(s) found."); process.exit(1); }
-console.log("OK: " + generated + " generated 8+ word crosswords and both base answer banks are valid; all interests complete.");
+console.log("OK: " + generated + " generated 8+ word crosswords and both base answer banks are valid; all interests complete; mystery, anagram and letter-path content valid.");

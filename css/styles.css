@@ -587,3 +587,17 @@ html[data-patient-lock="1"] .util-menu { display: none !important; }
 }
 .mc-hit { fill: transparent; stroke: none; }
 .mc-hit:hover { fill: var(--accent); }
+
+/* ---------- mystery word, calculations, letter path ---------- */
+.clues .chip { font-size: 24px; }
+.pattern { font-size: 30px; font-weight: 700; letter-spacing: .15em; color: var(--ink); opacity: 1; }
+.hint .pattern { font-size: 26px; }
+.pgrid { --pc: min(68px, calc((100vw - 110px) / var(--n))); display: grid; grid-template-columns: repeat(var(--n), var(--pc)); gap: 6px; }
+.pc { width: var(--pc); height: var(--pc); border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font-size: calc(var(--pc) * .45); font-weight: 700; position: relative; padding: 0; }
+.pc.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.pc.start { border: 3px solid var(--accent); box-shadow: 0 0 0 3px var(--soft); }
+.pc.start::before { content: "➜"; position: absolute; top: 2px; left: 5px; font-size: 14px; line-height: 1; color: var(--accent); }
+.pc.phint { background: var(--hl); border-color: var(--accent); }
+.calc-opts { width: 100%; max-width: 480px; }
+.calc-opts .opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pc.ok { background: var(--good); border-color: var(--good); color: var(--surface); }

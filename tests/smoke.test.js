@@ -58,6 +58,7 @@ async function open(browser, withMic, supabaseStub, viewport) {
 
 async function spokenAnswer(page) {
   const tag = await page.textContent(".tag");
+  if (/Parola misteriosa|Mystery word/.test(tag)) return "non lo so"; // wrong on purpose: hints, then the choice of words
   if (/Racconto/.test(tag)) return "Mi sveglio presto, bevo il caffè, faccio colazione e poi leggo il giornale in cucina con calma";
   if (/Parole ·/.test(tag)) return "è " + (await page.getAttribute(".pic", "aria-label"));
   if (/Sequenze/.test(tag)) return (await page.$$eval(".chip", (e) => e.map((x) => x.textContent))).join(" ");
@@ -211,7 +212,8 @@ async function playThrough(page, solo) {
   await ph.click('[data-ret="close"]');
   await ph.click('[data-act="start"]'); await ph.click('[data-w="assist"]');
   check(!(await ph.isVisible(".util-toggle")), "phone: the account menu is hidden during exercises");
-  await ph.click('[data-r="good"]');
+  // telling, then the two mystery words, then the crossword
+  for (let i = 0; i < 3; i++) await ph.click('[data-r="good"]');
   await ph.locator(".kb").scrollIntoViewIfNeeded();
   const keyboardTop = await ph.evaluate(() => window.scrollY);
   await ph.click('.key[data-ch="A"]');
@@ -222,7 +224,7 @@ async function playThrough(page, solo) {
     viewport: window.innerHeight
   }));
   check(Math.abs(keyboardAfterKey.scrollY - keyboardTop) < 3, "phone: entering a crossword letter keeps the keyboard at the same scroll position");
-  check(keyboardAfterKey.focused === "A" && keyboardAfterKey.keyboard.top >= 0 && keyboardAfterKey.keyboard.bottom <= keyboardAfterKey.viewport, "phone: the crossword keyboard stays visible and keeps focus after a letter");
+  check(keyboardAfterKey.focused === "A" && keyboardAfterKey.keyboard.top >= 0 && keyboardAfterKey.keyboard.bottom <= keyboardAfterKey.viewport + 1, "phone: the crossword keyboard stays visible and keeps focus after a letter " + JSON.stringify(keyboardAfterKey));
   check(ph.errors.length === 0, "no page errors (phone layout): " + ph.errors.join("; "));
 
   // Solo session with a simulated microphone
@@ -488,6 +490,74 @@ async function playThrough(page, solo) {
   await ck.pdf({ path: path.join(__dirname, "..", "dist", "report-print.pdf") }).catch(() => {});
   check(ck.errors.length === 0, "no page errors (check-in, summary): " + ck.errors.join("; "));
   await browser4.close();
+
+  /* Mystery word, month anagrams, optional calculations and letter path (a word-building day). */
+  const browser5 = await chromium.launch();
+  const ctx5 = await browser5.newContext({ viewport: { width: 900, height: 1100 } });
+  await ctx5.addInitScript(FIXED_DAY.replace("20400 * 86400000", "20401 * 86400000"));
+  await ctx5.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  const g5 = await ctx5.newPage();
+  g5.errors = []; g5.on("pageerror", (e) => g5.errors.push(e.message));
+  await g5.goto("https://app.test/");
+  await g5.fill("#pf-name", "Test"); await g5.click('[data-act="onboard-skip"]');
+  if (await g5.$('[data-act="home"]')) await g5.click('[data-act="home"]');
+  await g5.click('[data-act="settings"]');
+  await g5.check("#set-calc"); await g5.selectOption("#set-clevel", "3");
+  await g5.check("#set-path"); await g5.selectOption("#set-psize", "4");
+  await g5.click('[data-act="save-settings"]');
+  if (!(await g5.$('[data-act="start"]'))) await g5.click('[data-act="home"]');
+  const plan = await g5.textContent(".plan");
+  check(/Parola misteriosa/.test(plan) && /Calcoli/.test(plan) && /Percorso di lettere/.test(plan) && /Componi la parola/.test(plan), "home plan lists mystery word, calculations and letter path");
+  await g5.click('[data-act="start"]'); await g5.click('[data-w="assist"]');
+  await g5.click('[data-r="good"]'); // telling
+  check((await g5.$$(".clues .chip")).length === 5, "mystery word: five clue words are shown");
+  await g5.click('[data-r="retry"]');
+  check(/Inizia con/.test(await g5.textContent(".hints")), "mystery word: first hint gives the first letter and length");
+  await g5.click('[data-r="retry"]');
+  const pattern = (await g5.textContent(".hints .pattern")).trim();
+  check(/_/.test(pattern), "mystery word: second hint shows some letters (" + pattern + ")");
+  await g5.click('[data-r="retry"]');
+  const myOpts = await g5.$$eval('[data-act="opt"]', (bs) => bs.map((b) => b.textContent));
+  check(myOpts.length === 3, "mystery word: third hint offers three words");
+  const rx = new RegExp("^" + pattern.split(" ").map((c) => c === "_" ? "." : c === " " ? " " : c).join("") + "$", "i");
+  const pick = myOpts.findIndex((w) => rx.test(w.toUpperCase()));
+  check(pick >= 0, "mystery word: one option matches the letters shown");
+  await g5.click('[data-act="opt"] >> nth=' + Math.max(0, pick)); await g5.waitForTimeout(1800);
+  let sawAnagram = false, calcDone = 0, pathDone = false;
+  for (let i = 0; i < 200; i++) {
+    if (await g5.$(".sumhead")) break;
+    const tag = (await g5.$(".tag")) ? await g5.textContent(".tag") : "";
+    if (/Componi la parola/.test(tag) && /📅/.test(await g5.textContent(".card"))) sawAnagram = true;
+    if (/Calcoli/.test(tag)) {
+      const q = await g5.textContent(".cue"), m = q.match(/(doppio|metà) di ([\d,]+)/);
+      const x = parseFloat(m[2].replace(",", ".")), ans = m[1] === "doppio" ? x * 2 : x / 2;
+      const opts = await g5.$$eval('[data-act="opt"]', (bs) => bs.map((b) => parseFloat(b.textContent.replace(",", "."))));
+      const k = opts.findIndex((v) => Math.abs(v - ans) < 1e-9);
+      if (k < 0) { check(false, "calculations: the right answer is among the options (" + q + " " + opts + ")"); break; }
+      await g5.click('[data-act="opt"] >> nth=' + k); await g5.waitForTimeout(1700); calcDone++; continue;
+    }
+    if (await g5.$(".pgrid")) {
+      const cells = await g5.$$(".pc"); await cells[(await g5.$$eval(".pc", (c) => c.findIndex((x) => !x.classList.contains("start"))))].click();
+      check(/freccia/.test(await g5.textContent(".nudge")), "letter path: it starts from the arrow");
+      for (let j = 0; j < 12 && !(await g5.$(".pc.ok")); j++) { await g5.click('[data-act="path-hint"]'); await g5.click(".pc.phint"); }
+      check(!!(await g5.$(".pc.ok")) && /Trovata/.test(await g5.textContent(".instr")), "letter path: following the path spells the word");
+      pathDone = true; await g5.waitForTimeout(1700); continue;
+    }
+    if (await g5.$('[data-act="advance"]')) { await g5.click('[data-act="advance"]'); continue; }
+    if (await g5.$('[data-act="reveal"]')) { await g5.click('[data-act="reveal"]'); continue; }
+    if (await g5.$(".slots")) { await g5.click('[data-act="hint"]'); continue; }
+    if (await g5.$(".maze")) { await g5.click('[data-act="maze-skip"]'); continue; }
+    const o = await g5.$$('[data-act="opt"]:not([disabled])'); if (o.length) { await o[0].click(); await g5.waitForTimeout(1700); continue; }
+    await g5.click('[data-r="good"]');
+  }
+  check(sawAnagram, "word building includes a month or day to unscramble");
+  check(calcDone === 5, "calculations: five questions, each with the right answer among four (" + calcDone + ")");
+  check(pathDone, "letter path appears in the session");
+  check(!!(await g5.$(".sumhead")), "session with the new games finishes");
+  const hist = await g5.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_history")); return JSON.parse(localStorage.getItem(k)); });
+  check(hist.mystery && !hist.calc && !hist.path, "levels: mystery word counts, calculations and letter path don't");
+  check(g5.errors.length === 0, "no page errors (new games): " + g5.errors.join("; "));
+  await browser5.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");

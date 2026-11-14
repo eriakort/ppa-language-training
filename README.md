@@ -108,8 +108,14 @@ A bilingual account entry supports email/password sign-in, self-registration,
 email confirmation, password recovery and sign-out. It is disabled until a
 Supabase project is configured in `js/supabase-config.js` with its public URL
 and publishable/anon key. The service-role key is never used in the browser.
-Signing in does not upload learner profiles, exercise history or recordings;
-cloud synchronization is a separate future increment.
+With an account, a learner profile can be backed up to the cloud (with
+consent) and shared with a carer or therapist. A shared therapist sees
+numbers only: session measures, each exercise's level and accuracy, and
+speech check-in scores, including the same "Progress and statistics" view
+as on the learner's device (Account & data → Therapist history → Progress
+and statistics). Recordings, phrases and transcripts never leave the device.
+See docs/IDENTITY-PERSISTENCE.md. Database changes are applied with
+`supabase db push`.
 
 ## Where it runs
 

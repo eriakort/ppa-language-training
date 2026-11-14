@@ -652,10 +652,64 @@ async function playThrough(page, solo) {
   const ps = await pr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_progress_settings")); return JSON.parse(localStorage.getItem(k)); });
   check(ps.k === 3 && ps.run === 4, "progress: thresholds can be changed and are saved");
   check(!(await pr.$(".alerts")), "progress: with a 4-session rule the 3 low sessions no longer raise a notice");
-  await pr.click('[data-act="therapist"]'); await pr.click('[data-act="report"]');
+  await pr.click('[data-act="pr-back"]'); await pr.click('[data-act="report"]');
   check(/Confronto con il periodo precedente/.test(await pr.textContent(".print-area")), "printable summary includes the comparison with the previous period");
   check(pr.errors.length === 0, "no page errors (progress): " + pr.errors.join("; "));
   await browser7.close();
+
+  /* Cloud statistics: per-exercise aggregates are published (numbers only) and a shared learner's
+     statistics open read-only for a therapist on another device. */
+  const CLOUD_STUB = `window.__rpc = [];
+  window.supabase = { createClient: function () {
+    var user = { id: "t1", email: "therapist@example.com", user_metadata: {} }, D = 86400000, now = Date.now();
+    var ses = [], games = [], cks = [];
+    for (var i = 0; i < 40; i++) {
+      var id = "s" + (1000 + i).toString(36), t = new Date(now - (80 - i * 2) * D).toISOString(), late = i >= 37;
+      ses.push({ profile_id: "cloud-1", session_id: id, started_at: t, mode: "session", player_mode: i % 2 ? "solo" : "assisted", item_count: 6, spoken_count: 4, avg_onset_ms: 1500, avg_wpm: 100, avg_pauses: 1, avg_longest_pause_ms: 900 });
+      games.push({ session_id: id, game: "name", level: 1, item_count: 4, accuracy: late ? 0.25 : 0.8 + (i % 3) * 0.02, avg_hints: 1, median_item_ms: 8000, median_onset_ms: 1500, median_wpm: null });
+    }
+    for (var k = 0; k < 4; k++) cks.push({ checkin_id: "k" + k, started_at: new Date(now - (70 - k * 14) * D).toISOString(), player_mode: "solo", naming_correct: 9 - k, naming_total: 10, fluency_count: 14 - k, repetition: 0.9, description_wpm: 100 });
+    var tables = { profile_members: [{ profile_id: "cloud-1", role: "therapist" }], learner_profiles: [{ id: "cloud-1", display_name: "Maria" }],
+      therapist_session_metrics: ses, therapist_game_metrics: games, therapist_checkin_metrics: cks };
+    var q = function (name) { var from = 0, to = 1e9, desc = false, o = {
+        select: function () { return o; }, eq: function () { return o; }, in: function () { return o; }, order: function (c, op) { desc = op && op.ascending === false; return o; },
+        limit: function (n) { to = n - 1; return o; }, range: function (a, b) { from = a; to = b; return o; },
+        maybeSingle: function () { return Promise.resolve({ data: null, error: null }); }, single: function () { return Promise.resolve({ data: null, error: null }); },
+        then: function (r, j) { var d = (tables[name] || []).slice(); if (desc) d.reverse(); return Promise.resolve({ data: d.slice(from, to + 1), error: null }).then(r, j); } }; return o; };
+    return { auth: {
+        getSession: function () { return Promise.resolve({ data: { session: { user: user } } }); },
+        getUser: function () { return Promise.resolve({ data: { user: user } }); },
+        onAuthStateChange: function (cb) { return { data: { subscription: { unsubscribe: function () {} } } }; },
+        signOut: function () { return Promise.resolve({ error: null }); }
+      }, from: q, rpc: function (name, args) { window.__rpc.push({ name: name, args: JSON.parse(JSON.stringify(args)) }); return Promise.resolve({ data: null, error: null }); },
+      functions: { invoke: function () { return Promise.resolve({ data: null, error: null }); } } };
+  } };`;
+  const browser8 = await chromium.launch();
+  const cl = await open(browser8, false, CLOUD_STUB, { width: 1000, height: 1200 });
+  await cl.fill("#pf-name", "Test"); await cl.click('[data-act="onboard-skip"]');
+  if (await cl.$('[data-act="home"]')) await cl.click('[data-act="home"]');
+  // this device's learner is linked to the cloud profile with consent
+  await cl.evaluate(() => { const id = localStorage.getItem("pog_active_profile_id"); localStorage.setItem("pog_cloud_consent_" + id, new Date().toISOString()); localStorage.setItem("pog_cloud_profile_" + id, "cloud-1"); });
+  await startSession(cl); await cl.click('[data-w="assist"]');
+  for (let i = 0; i < 3; i++) await cl.click('[data-r="good"]');
+  await cl.click('[data-act="stop"]'); await cl.waitForTimeout(400);
+  const sent = await cl.evaluate(() => window.__rpc.filter((r) => r.name === "upsert_therapist_progress_metrics").pop());
+  check(sent && sent.args.p_games.some((g) => g.game === "mystery" && g.level === 1 && g.accuracy === 1), "cloud: per-exercise level and accuracy are published after a session");
+  check(sent && !/heard|label|transcript/.test(JSON.stringify(sent.args)), "cloud: the published exercise rows contain numbers only");
+  // a therapist opens the shared learner's statistics
+  await cl.click('[data-act="home"]');
+  await menuClick(cl, ".therapist-cloud-launcher");
+  await cl.waitForSelector('[data-thcloud="progress"]');
+  await cl.click('[data-thcloud="progress"]');
+  await cl.waitForSelector(".pr-controls");
+  const remoteText = await cl.textContent(".card");
+  check(/Dati dal cloud: Maria/.test(remoteText), "cloud: statistics open for the shared learner, marked read-only");
+  check(/Indice di autonomia: Parole/.test(remoteText) && /Controllo: nomi giusti/.test(remoteText), "cloud: exercise ability and check-ins are shown");
+  check(/Indice di autonomia/.test(await cl.textContent(".alerts")), "cloud: a recent drop in the shared learner's sessions raises a notice");
+  await cl.click('[data-act="pr-back"]');
+  check(await cl.isVisible(".therapist-cloud-panel"), "cloud: going back returns to the shared history");
+  check(cl.errors.length === 0, "no page errors (cloud statistics): " + cl.errors.join("; "));
+  await browser8.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");

@@ -1154,7 +1154,7 @@
       '<div class="report"><h2>' + esc(t.thTrends) + '</h2>' + trend + '<p class="note">' + esc(t.thTrendsNote) + '</p>' +
       '<div class="row-actions"><button class="secondary" data-act="chk-results">' + esc(t.thCheckins) + '</button><button class="secondary" data-act="report">' + esc(t.thReport) + '</button>' +
         (window.POG.progress ? '<button class="secondary" data-act="progress">' + esc(window.POG.progress.label()) + '</button>' : '') + '</div>' +
-      (window.POG.progress && window.POG.progress.alerts().length ? '<p class="nudge">⚠ ' + esc(t.thAlert) + '</p>' : '') +
+      (window.POG.progress && window.POG.progress.localAlerts().length ? '<p class="nudge">⚠ ' + esc(t.thAlert) + '</p>' : '') +
       '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
       '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
       '<div class="row-actions">' +

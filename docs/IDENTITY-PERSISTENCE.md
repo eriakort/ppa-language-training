@@ -133,6 +133,28 @@ backup are created only after the user presses the create/backup action.
 The therapist dashboard reads only `therapist_session_metrics`, a dedicated aggregate projection. Authenticated readers can select the session date/mode, item and spoken counts, and aggregate onset, words-per-minute and pause measures. Column grants exclude the client-supplied JSON result-count field. Direct browser writes are revoked; a membership-checked database function accepts only the fixed metric fields. The projection does not contain exercise labels, personal phrases, recognition transcripts, audio, or raw session JSON. The client publishes at most the latest 60 local session aggregates only when the learner profile has explicit cloud consent and is already linked to a cloud profile. The dashboard lists only profiles explicitly shared with the signed-in account and exports the same limited columns as CSV. Therapists have SELECT only on the approved columns; owners/caregivers/learners publish through the same scoped function; no client delete policy is provided.
 
 
+## Remote progress statistics
+
+Migration `202611140001_therapist_progress_metrics.sql` adds two more numeric projections for the
+"Progress and statistics" view on a therapist's own device:
+
+- `therapist_game_metrics`: one row per exercise per session (game name from a fixed list, level,
+  item count, accuracy 0–1, average hints, median time per item, median onset, median words per
+  minute). Rows reference their `therapist_session_metrics` row and are deleted with it, so the
+  retention period and profile deletion apply automatically.
+- `therapist_checkin_metrics`: one row per speech check-in (names correct of 10, animals counted,
+  repetition 0–1, description words per minute, mode). Same per-profile retention, same
+  finite / not-in-the-future timestamp guard, deleted with the profile.
+
+Both are readable column by column by owners, caregivers and therapists of the profile; there are no
+client write policies. The browser publishes through the membership-checked
+`upsert_therapist_progress_metrics` function, only with cloud consent and a linked cloud profile,
+after the session aggregates. No labels, phrases, recognised words, check-in transcripts, word lists
+or audio are sent. `session_id` and `player_mode` of `therapist_session_metrics` are now readable so
+the view can join exercises to sessions and filter by "on my own" / "with help". Deploy with
+`supabase db push`; until then the app keeps working and the remote statistics button reports that
+the server needs the update.
+
 ## Profile export and shared-access lifecycle
 
 The Profile privacy panel exports the active local profile's JSON data allowlist

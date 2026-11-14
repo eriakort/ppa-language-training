@@ -38,7 +38,7 @@
       ckNaming: "Controllo: nomi giusti (su 10)", ckFlu: "Controllo: animali in un minuto", ckRep: "Controllo: ripetizione", ckWpm: "Controllo: parole al minuto",
       settings: "Soglie", kLabel: "Un cambiamento conta se supera", kOpt: "{k} volte la variazione abituale", runLabel: "Avviso dopo", runOpt: "{n} sessioni di fila sotto il solito", save: "Salva le soglie", saved: "Soglie salvate.",
       method: "Come si calcola: si usano le mediane, così un giorno storto pesa poco. «Variazione abituale» è la dispersione robusta del periodo A (MAD × 1,4826). Un cambiamento conta solo se è più grande della soglia; la tendenza usa la pendenza di Theil–Sen e il test di Mann–Kendall (p < 0,05). I controlli del parlato sono la misura più affidabile, perché sono sempre uguali e usano parole che non compaiono negli esercizi. Con meno di 5 sessioni (2 controlli) per periodo il risultato è «dati insufficienti». Valori indicativi, non una valutazione clinica: le soglie vanno decise dal logopedista.",
-      back: "Torna all'area logopedista", none: "–", perMonth: "al mese", unitS: "s", pct: "%"
+      back: "Torna all'area logopedista", backCloud: "Torna allo storico condiviso", remote: "Dati dal cloud: {n} (sola lettura)", none: "–", perMonth: "al mese", unitS: "s", pct: "%"
     },
     en: {
       btn: "Progress and statistics", title: "Progress and statistics",
@@ -60,7 +60,7 @@
       ckNaming: "Check-in: names correct (of 10)", ckFlu: "Check-in: animals in one minute", ckRep: "Check-in: repetition", ckWpm: "Check-in: words per minute",
       settings: "Thresholds", kLabel: "A change counts when it exceeds", kOpt: "{k} times the usual variation", runLabel: "Notice after", runOpt: "{n} sessions in a row below usual", save: "Save thresholds", saved: "Thresholds saved.",
       method: "How it's worked out: medians are used, so one bad day counts for little. \"Usual variation\" is the robust spread of period A (MAD × 1.4826). A change counts only when it is larger than the threshold; the trend uses the Theil–Sen slope and the Mann–Kendall test (p < 0.05). Speech check-ins are the most reliable measure, because they are always the same and use words that don't appear in the exercises. With fewer than 5 sessions (2 check-ins) in a period the result is \"not enough data\". These are indicators, not a clinical assessment: the therapist should decide the thresholds.",
-      back: "Back to the therapist area", none: "–", perMonth: "a month", unitS: "s", pct: "%"
+      back: "Back to the therapist area", backCloud: "Back to the shared history", remote: "Cloud data: {n} (read-only)", none: "–", perMonth: "a month", unitS: "s", pct: "%"
     }
   };
   function T() { return C[api.lang()] || C.it; }
@@ -92,18 +92,21 @@
     return { id: sess.id, t: new Date(sess.date).getTime(), who: sess.who, g: out };
   }
   function round(v, d) { if (v == null || !isFinite(v)) return null; var p = Math.pow(10, d); return Math.round(v * p) / p; }
-  function log() { var l = api.load(KEY); return Array.isArray(l) ? l : []; }
+  /* SRC: null = this device's data; otherwise data loaded from the cloud for a shared learner (read-only). */
+  var SRC = null;
+  function localLog() { var l = api.load(KEY); return Array.isArray(l) ? l : []; }
+  function log() { return SRC ? SRC.log : localLog(); }
   function upsert(list, e) {
     var i = -1; for (var j = 0; j < list.length; j++) if (list[j].id === e.id) { i = j; break; }
     if (i >= 0) list[i] = e; else list.push(e);
   }
   function record(sess) {
     var e = summarise(sess); if (!e) return;
-    var l = log(); upsert(l, e); l.sort(function (a, b) { return a.t - b.t; }); api.save(KEY, l.slice(-KEEP));
+    var l = localLog(); upsert(l, e); l.sort(function (a, b) { return a.t - b.t; }); api.save(KEY, l.slice(-KEEP));
   }
   /* Older sessions saved before this log existed are added once. */
   function backfill() {
-    var l = log(), have = {}, n = l.length;
+    var l = localLog(), have = {}, n = l.length;
     l.forEach(function (e) { have[e.id] = 1; });
     api.sessions().forEach(function (s) { if (!have[s.id]) { var e = summarise(s); if (e) l.push(e); } });
     if (l.length !== n) { l.sort(function (a, b) { return a.t - b.t; }); api.save(KEY, l.slice(-KEEP)); }
@@ -133,7 +136,7 @@
     return list;
   }
   function settingsP() { var s = api.load("progress_settings") || {}; return { k: [1.5, 2, 3].indexOf(+s.k) >= 0 ? +s.k : 2, run: [2, 3, 4, 5].indexOf(+s.run) >= 0 ? +s.run : 3 }; }
-  function checkins() { return window.POG.checkins ? window.POG.checkins.list() : []; }
+  function checkins() { return SRC ? SRC.checkins : window.POG.checkins ? window.POG.checkins.list() : []; }
   function pointsFor(m, who, from, to) {
     var src = m.src === "c" ? checkins().map(function (k) { return { t: new Date(k.date).getTime(), who: k.who, raw: k }; })
       : log().map(function (e) { return { t: e.t, who: e.who, raw: e }; });
@@ -211,7 +214,7 @@
       { key: "on", label: t.colOnset, better: "down", min: 300, f: function (v) { return v == null ? "–" : num(v / 1000, 1); } }
     ];
     var games = [];
-    today.forEach(function (e) { Object.keys(e.g).forEach(function (g) { if (games.indexOf(g) < 0) games.push(g); }); });
+    today.forEach(function (e) { Object.keys(e.g).forEach(function (g) { if (games.indexOf(g) < 0 && api.t().game[g]) games.push(g); }); });
     var rows = games.map(function (g) {
       var cells = cols.map(function (c) {
         var tv = ST.mean(today.map(function (e) { return e.g[g] ? e.g[g][c.key] : null; }));
@@ -281,7 +284,8 @@
       }).join("") + '<button class="secondary" data-act="pr-apply">' + esc(t.apply) + '</button></div>' : '';
     var kOpts = [1.5, 2, 3].map(function (k) { return '<option value="' + k + '"' + (ps.k === k ? ' selected' : '') + '>' + esc(api.fill(t.kOpt, { k: num(k, k % 1 ? 1 : 0) })) + '</option>'; }).join("");
     var rOpts = [2, 3, 4, 5].map(function (n) { return '<option value="' + n + '"' + (ps.run === n ? ' selected' : '') + '>' + esc(api.fill(t.runOpt, { n: n })) + '</option>'; }).join("");
-    return api.header(false) + '<section class="card"><h1 class="instr">' + esc(t.title) + '</h1><p class="sub">' + esc(t.intro) + '</p>' +
+    return api.header(false) + '<section class="card"><h1 class="instr">' + esc(t.title) + '</h1>' +
+      (SRC ? '<p class="tag">' + esc(api.fill(t.remote, { n: SRC.name || "" })) + '</p>' : '') + '<p class="sub">' + esc(t.intro) + '</p>' +
       '<div class="report">' +
       '<h2>' + esc(t.alerts) + '</h2>' + (al.length ? '<ul class="alerts">' + al.map(function (a) { return '<li>⚠ ' + esc(a.text) + '</li>'; }).join("") + '</ul>' : '<p class="note">' + esc(t.noAlerts) + '</p>') +
       '<div class="pr-controls"><div class="setrow"><label for="pr-period">' + esc(t.period) + '</label><select id="pr-period">' + presets + '</select></div>' +
@@ -296,12 +300,17 @@
       (f ? '<p class="nudge">' + esc(f) + '</p>' : '') +
       '<div class="row-actions"><button class="secondary" data-act="pr-save">' + esc(t.save) + '</button></div>' +
       '<p class="note">' + esc(t.method) + '</p></div>' +
-      '<button class="link" data-act="therapist">' + esc(t.back) + '</button></section>';
+      '<button class="link" data-act="pr-back">' + esc(SRC ? t.backCloud : t.back) + '</button></section>';
   }
 
   var ext = window.POG.ext;
-  ext.screens.progress = function () { return api.therapistUnlocked() ? view() : api.therapistView(); };
-  ext.actions.progress = function () { backfill(); api.go("progress"); };
+  /* Local data needs the therapist PIN; cloud data was already checked by the database (shared profiles only). */
+  ext.screens.progress = function () { return SRC || api.therapistUnlocked() ? view() : api.therapistView(); };
+  ext.actions.progress = function () { SRC = null; backfill(); api.go("progress"); };
+  ext.actions["pr-back"] = function () {
+    if (SRC) { SRC = null; api.go("home"); if (window.POG.therapistCloud) window.POG.therapistCloud.show(); return; }
+    api.go("therapist");
+  };
   ext.actions["pr-apply"] = function () {
     var g = function (id) { var el = document.getElementById(id); return el && el.value ? new Date(el.value + "T00:00:00").getTime() : null; };
     var af = g("pr-af"), at = g("pr-at"), bf = g("pr-bf"), bt = g("pr-bt");
@@ -319,8 +328,10 @@
     if (id === "pr-who") { V.who = e.target.value; api.render(); }
     if (id === "pr-measure") { V.measure = e.target.value; api.render(); }
   });
-  window.addEventListener("pog:profile-change", function () { V = { preset: "4w", who: "all", measure: "ability", custom: null }; });
+  window.addEventListener("pog:profile-change", function () { SRC = null; V = { preset: "4w", who: "all", measure: "ability", custom: null }; });
 
-  window.POG.progress = { record: record, backfill: backfill, log: log, alerts: alerts, compareTable: compareTable, activityRow: activityRow, summarise: summarise, label: function () { return T().btn; } };
+  function openRemote(data) { SRC = { name: data.name, log: data.log || [], checkins: data.checkins || [] }; V = { preset: "4w", who: "all", measure: "ability", custom: null }; api.go("progress"); }
+  function localAlerts() { var keep = SRC; SRC = null; try { return alerts("all"); } finally { SRC = keep; } }
+  window.POG.progress = { record: record, backfill: backfill, log: log, alerts: alerts, localAlerts: localAlerts, openRemote: openRemote, compareTable: compareTable, activityRow: activityRow, summarise: summarise, label: function () { return T().btn; } };
   try { backfill(); } catch (e) {}
 })();

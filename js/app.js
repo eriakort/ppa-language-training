@@ -49,6 +49,8 @@
   var MAXLV = { describe: 3, mystery: 4, crossword: 4, name: 4, wordbuild: 4, script: 3, read: 4, echo: 3, seq: 3 };
   var PLACE_N = { describe: 1, mystery: 2, crossword: 2, name: 2, wordbuild: 2, script: 2, read: 1, echo: 2, seq: 1 };
   var EXTRAS = ["maze", "calc", "path"];
+  /* Every game a session can include, in session order (hardest first, sequences always last). */
+  var ORDER = ["describe", "mystery", "crossword", "wordbuild", "name", "script", "read", "echo", "maze", "calc", "path", "seq"];
   var RULE = { down: 0.6, downN: 3, up: 0.9, upN: 5, flag: 0.4, place: 0.6 };
 
   var T = window.POG.strings, C = window.POG.content;
@@ -176,7 +178,7 @@
   var accountSignedOut = localStorage.getItem("pog_account_signed_out") === "1";
   var screen = "home";
   var lastRenderedScreen = null;
-  var S = null, flash = "", confirmAsk = "", busy = false, pending = "start";
+  var S = null, flash = "", confirmAsk = "", busy = false, pending = "start", picked = null, pickDraft = [], pickNudge = "";
 
   function getSettings() {
     var s = load("settings") || {};
@@ -570,8 +572,14 @@
     }
     return out;
   }
-  function todayPlan() {
+  /* The games picked in the checklist (remembered per profile), or null for the usual daily plan. */
+  function savedChoice() {
+    var c = load("game_choice"), g = c && Array.isArray(c.games) ? c.games.filter(function (x) { return ORDER.indexOf(x) >= 0; }) : [];
+    return g.length ? g : null;
+  }
+  function todayPlan(choice) {
     var day = Math.floor(Date.now() / 86400000), set = getSettings();
+    if (choice && choice.length) return { day: day, list: ORDER.filter(function (g) { return choice.indexOf(g) >= 0; }), set: set, chosen: true };
     var letters = day % 2 ? "wordbuild" : "crossword";
     var list = ["describe", "mystery", letters, "name", "script", "read", "echo"];
     if (set.maze) list.push("maze");
@@ -580,8 +588,8 @@
     list.push("seq");
     return { day: day, list: list, set: set };
   }
-  function buildSession(who) {
-    var tp = todayPlan(), L = tp.set.levels, d = tp.day, steps = [];
+  function buildSession(who, choice) {
+    var tp = todayPlan(choice), L = tp.set.levels, d = tp.day, steps = [];
     tp.list.forEach(function (g) {
       if (g === "maze") { steps.push({ game: "maze", lv: null, data: { n: tp.set.mazeSize } }); return; }
       if (g === "calc") { makeCalc(tp.set.calcLevel, 5).forEach(function (q) { steps.push({ game: "calc", lv: null, data: q }); }); return; }
@@ -904,6 +912,39 @@
       '<button class="micbtn" data-act="mic">' + ICON_MIC + esc(t.micBtn) + '</button></div></div>';
   }
   function nudge() { return S.nudge ? '<p class="nudge">' + esc(S.nudge) + '</p>' : ''; }
+  function gameDetail(g, set) {
+    var t = T[lang], L = set.levels;
+    if (g === "maze") return t.sizes[set.mazeSize] + " · " + t.pickExtra;
+    if (g === "calc") return t.calcLevels[set.calcLevel] + " · " + t.pickExtra;
+    if (g === "path") return t.pathSizes[set.pathSize] + " · " + t.pickExtra;
+    return t.level + ' ' + L[g] + ' · ' + t.lv[g][L[g] - 1];
+  }
+  var GAME_ICON = { describe: "💬", mystery: "❓", crossword: "✏️", wordbuild: "🔤", name: "🖼️", script: "🗨️", read: "📖", echo: "🔁", maze: "🧭", calc: "➗", path: "🔠", seq: "🔢" };
+  function gameNames(list) { return list.map(function (g) { return T[lang].game[g]; }).join(" · "); }
+  function viewPickAsk() {
+    var t = T[lang], prev = savedChoice() || [];
+    return header(false) + '<section class="card"><h1 class="instr">' + esc(t.askTitle) + '</h1>' +
+      '<div class="modes">' +
+      '<button class="modecard" data-act="pick-prev"><span class="ico" aria-hidden="true">↩️</span><strong>' + esc(t.askPrev) + '</strong><span>' + esc(gameNames(ORDER.filter(function (g) { return prev.indexOf(g) >= 0; }))) + '</span></button>' +
+      '<button class="modecard" data-act="pick-new"><span class="ico" aria-hidden="true">☑️</span><strong>' + esc(t.askNew) + '</strong><span>' + esc(t.askNewDesc) + '</span></button>' +
+      '</div><button class="link" data-act="home">' + esc(t.back) + '</button></section>';
+  }
+  function viewPick() {
+    var t = T[lang], set = getSettings();
+    var items = ORDER.map(function (g) {
+      var on = pickDraft.indexOf(g) >= 0;
+      return '<button class="pickitem' + (on ? ' on' : '') + '" data-act="pick-toggle" data-g="' + g + '" role="checkbox" aria-checked="' + on + '">' +
+        '<span class="pk-box" aria-hidden="true">' + (on ? '✓' : '') + '</span><span class="pk-ico" aria-hidden="true">' + GAME_ICON[g] + '</span>' +
+        '<span class="pk-txt"><strong>' + esc(t.game[g]) + '</strong><span>' + esc(gameDetail(g, set)) + '</span></span></button>';
+    }).join("");
+    return header(false) + '<section class="card"><h1 class="instr">' + esc(t.pickTitle) + '</h1><p class="sub">' + esc(t.pickHelp) + '</p>' +
+      '<div class="row-actions"><button class="secondary" data-act="pick-all">' + esc(t.pickAll) + '</button><button class="secondary" data-act="pick-none">' + esc(t.pickNone) + '</button></div>' +
+      '<div class="picklist" role="group" aria-label="' + esc(t.pickTitle) + '">' + items + '</div>' +
+      '<p class="sub">' + esc(fill(t.pickCount, { n: pickDraft.length })) + '</p>' +
+      (pickNudge ? '<p class="nudge">' + esc(pickNudge) + '</p>' : '') +
+      '<button class="primary" data-act="pick-next">' + esc(t.pickNext) + '</button>' +
+      '<button class="link" data-act="home">' + esc(t.back) + '</button></section>';
+  }
   function viewMode() {
     var t = T[lang];
     return header(false) + '<section class="card">' +
@@ -980,7 +1021,7 @@
       '<button data-act="lang" data-l="en" aria-pressed="' + (lang === "en") + '">English</button></div>';
   }
   function viewHome() {
-    var t = T[lang], tp = todayPlan(), L = tp.set.levels, prof = getProfile(), pl = getPlacement();
+    var t = T[lang], tp = todayPlan(savedChoice()), L = tp.set.levels, prof = getProfile(), pl = getPlacement();
     var greeting = accountSignedOut ? t.helloGuest : fill(t.hello, { name: prof.name });
     var pending = pl.status === "in_progress", locked = isLocked(), patient = tp.set.patientMode;
     return header(false) +
@@ -990,7 +1031,7 @@
       '<p class="tag">' + esc(t.planTitle) + '</p>' +
       '<div class="scale" aria-hidden="true"><span>↑ ' + esc(t.hard) + '</span></div>' +
       '<ol class="plan">' + tp.list.map(function (g) {
-        var detail = g === "maze" ? t.sizes[tp.set.mazeSize] : g === "calc" ? t.calcLevels[tp.set.calcLevel] : g === "path" ? t.pathSizes[tp.set.pathSize] : t.level + ' ' + L[g] + ' · ' + t.lv[g][L[g] - 1];
+        var detail = gameDetail(g, tp.set);
         return '<li><strong>' + esc(t.game[g]) + '</strong><span>' + esc(detail) + '</span></li>';
       }).join("") + '</ol>' +
       '<div class="scale" aria-hidden="true"><span>↓ ' + esc(t.easy) + '</span></div>' +
@@ -1509,7 +1550,7 @@
     persistActiveSession();
     document.documentElement.setAttribute("data-patient-lock", isLocked() ? "1" : "0");
     var extView = window.POG.ext.screens[screen];
-    var html = extView ? extView() : screen === "unlock" ? viewUnlock() : screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "profiles" ? viewProfiles() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
+    var html = extView ? extView() : screen === "unlock" ? viewUnlock() : screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "pick" ? viewPick() : screen === "pick-ask" ? viewPickAsk() : screen === "profiles" ? viewProfiles() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
     app.innerHTML = html;
     flash = "";
     lastRenderedScreen = screen;
@@ -1609,11 +1650,32 @@
     if (act === "profiles") { screen = "profiles"; render(); return; }
     if (act === "profile-add") { createLocalProfile(""); S = null; screen = "onboard"; render(); return; }
     if (act === "profile-switch") { var targetId = b.getAttribute("data-id"); if (targetId && targetId !== activeProfileId && profileList().some(function (p) { return p.id === targetId; })) { stopVoice(); micCancel(); S = null; setActiveProfile(targetId); screen = getProfile() ? "home" : "onboard"; } else screen = "home"; render(); return; }
-    if (act === "place" || act === "start") { pending = act; screen = "mode"; render(); return; }
+    if (act === "place") { pending = act; screen = "mode"; render(); return; }
+    /* Starting a session: continue with the games picked last time, or tick a new selection. */
+    if (act === "start") {
+      pending = "start"; pickNudge = "";
+      if (savedChoice()) { screen = "pick-ask"; render(); return; }
+      pickDraft = todayPlan().list.slice(); screen = "pick"; render(); return;
+    }
+    if (act === "pick-prev") { picked = savedChoice(); screen = "mode"; render(); return; }
+    if (act === "pick-new" || act === "pick-open") { pickDraft = (savedChoice() || todayPlan().list).slice(); pickNudge = ""; pending = "start"; screen = "pick"; render(); return; }
+    if (act === "pick-toggle") {
+      var pg = b.getAttribute("data-g"), at = pickDraft.indexOf(pg);
+      if (at >= 0) pickDraft.splice(at, 1); else pickDraft.push(pg);
+      pickNudge = ""; render(); return;
+    }
+    if (act === "pick-all") { pickDraft = ORDER.slice(); pickNudge = ""; render(); return; }
+    if (act === "pick-none") { pickDraft = []; pickNudge = ""; render(); return; }
+    if (act === "pick-next") {
+      if (!pickDraft.length) { pickNudge = t.pickNeed; render(); return; }
+      picked = ORDER.filter(function (g) { return pickDraft.indexOf(g) >= 0; });
+      save("game_choice", { games: picked, at: new Date().toISOString() });
+      screen = "mode"; render(); return;
+    }
     if (act === "who") {
       var who = b.getAttribute("data-w") === "assist" ? "assist" : "solo";
       if (pending === "place") { if (buildPlacement(who)) { screen = "item"; next(); } else { finishPlacement(true); } return; }
-      S = buildSession(who); screen = "item"; next(); return;
+      S = buildSession(who, picked); screen = "item"; next(); return;
     }
     if (act === "scripts" || act === "settings") { confirmAsk = ""; screen = act; render(); return; }
     if (act === "home") { stopVoice(); if (S) micCancel(); confirmAsk = ""; thLock(); screen = "home"; render(); return; }

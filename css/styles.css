@@ -601,3 +601,14 @@ html[data-patient-lock="1"] .util-menu { display: none !important; }
 .calc-opts { width: 100%; max-width: 480px; }
 .calc-opts .opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pc.ok { background: var(--good); border-color: var(--good); color: var(--surface); }
+
+/* ---------- choosing the games ---------- */
+.picklist { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; width: 100%; max-width: 720px; }
+.pickitem { display: flex; align-items: center; gap: 12px; text-align: left; background: var(--surface); border: 3px solid var(--line); border-radius: 16px; padding: 12px 14px; min-height: 72px; color: var(--ink); }
+.pickitem.on { border-color: var(--accent); background: var(--soft); }
+.pk-box { flex: none; width: 34px; height: 34px; border-radius: 8px; border: 3px solid var(--line); display: grid; place-items: center; font-size: 22px; font-weight: 700; color: var(--accent-ink); }
+.pickitem.on .pk-box { background: var(--accent); border-color: var(--accent); }
+.pk-ico { font-size: 28px; flex: none; }
+.pk-txt { display: flex; flex-direction: column; gap: 2px; }
+.pk-txt strong { font-size: 20px; }
+.pk-txt span { font-size: 15px; color: var(--muted); }

@@ -37,6 +37,13 @@ const SCRIPT_CUES = { "Al bar": "Vorrei un caffè, per favore.", "Hai bisogno di
 const FIXED_DAY = `(function(){ var real = Date.now, shift = (20400 * 86400000 + 43200000) - real(); Date.now = function(){ return real() + shift; }; })();`;
 
 /* Account, cloud and privacy options live in the "Account and data" menu in the page header. */
+/* Start a session: continue with last time's games if asked, otherwise accept the suggested selection. */
+async function startSession(page) {
+  await page.click('[data-act="start"]');
+  if (await page.$('[data-act="pick-prev"]')) await page.click('[data-act="pick-prev"]');
+  else await page.click('[data-act="pick-next"]');
+}
+
 async function menuClick(page, selector) {
   if ((await page.getAttribute(".util-toggle", "aria-expanded")) !== "true") await page.click(".util-toggle");
   await page.click(".util-sheet " + selector);
@@ -101,7 +108,7 @@ async function playThrough(page, solo) {
   check((await p.getAttribute('[data-k="calcio"]', "aria-pressed")) === "true", "chosen interests survive a validation message");
   await p.fill("#pf-name", "Test"); await p.click('[data-act="onboard-skip"]'); await p.click('[data-act="home"]');
   check(/Calcio/.test(await p.textContent(".mychips")), "home shows the interests");
-  await p.click('[data-act="start"]'); await p.click('[data-w="assist"]');
+  await startSession(p); await p.click('[data-w="assist"]');
   check(/Bologna FC/.test(await p.textContent(".card .instr")), "story topic uses the favourite team");
   const resumePrompt = await p.textContent(".instr");
   const checkpoint = await p.evaluate(() => { const key = Object.keys(localStorage).find((k) => k.startsWith("pog_p_") && k.endsWith("_active_session")); return key ? JSON.parse(localStorage.getItem(key)) : null; });
@@ -156,7 +163,7 @@ async function playThrough(page, solo) {
   await en.evaluate(() => document.querySelector('[data-act="lang"][data-l="en"]').click());
   check((await en.textContent(".cloud-card h2")) === "Cloud backup", "open cloud backup panel refreshes back to English");
   await en.click('[data-cloud="close"]');
-  await en.click('[data-act="start"]');
+  await startSession(en);
   await en.click('[data-w="assist"]');
   check(/Your morning/.test(await en.textContent(".instr")), "English learning session uses English exercise content");
   // The choice must survive a reload in every panel, not only in the main app.
@@ -210,7 +217,7 @@ async function playThrough(page, solo) {
   check(await ph.isVisible(".account-panel"), "phone: an option in the menu opens its dialog");
   check((await ph.getAttribute(".util-toggle", "aria-expanded")) === "false", "phone: the menu closes when an option is chosen");
   await ph.click('[data-ret="close"]');
-  await ph.click('[data-act="start"]'); await ph.click('[data-w="assist"]');
+  await startSession(ph); await ph.click('[data-w="assist"]');
   check(!(await ph.isVisible(".util-toggle")), "phone: the account menu is hidden during exercises");
   // telling, then the two mystery words, then the crossword
   for (let i = 0; i < 3; i++) await ph.click('[data-r="good"]');
@@ -230,7 +237,7 @@ async function playThrough(page, solo) {
   // Solo session with a simulated microphone
   const q = await open(browser, true);
   await q.fill("#pf-name", "Test"); await q.click('[data-act="onboard-skip"]'); await q.click('[data-act="home"]');
-  await q.click('[data-act="start"]'); await q.click('[data-w="solo"]');
+  await startSession(q); await q.click('[data-w="solo"]');
   await playThrough(q, true);
   // Spoken games only: the test reveals crossword and word-building answers on purpose.
   const spoken = await q.$$eval("tbody tr", (rows) => rows
@@ -275,7 +282,7 @@ async function playThrough(page, solo) {
   check(true, "PIN saved and therapist area opens");
   await w.click('[data-act="home"]');
   // solo session with recording
-  await w.click('[data-act="start"]');
+  await startSession(w);
   check(/Google/.test(await w.textContent(".note")), "mode screen explains where the browser sends speech");
   await w.click('[data-w="solo"]');
   let sawRead = false;
@@ -318,7 +325,7 @@ async function playThrough(page, solo) {
   await w.waitForTimeout(400);
   check((await w.$$(".rec")).length === recs.length - 1, "a recording can be deleted after confirming");
   // assisted mode with the helper recording one answer
-  await w.click('[data-act="home"]'); await w.click('[data-act="start"]'); await w.click('[data-w="assist"]');
+  await w.click('[data-act="home"]'); await startSession(w); await w.click('[data-w="assist"]');
   await w.click('[data-act="arec"]'); await w.waitForTimeout(1500);
   check(/Ferma/.test(await w.textContent('[data-act="arec"]')), "assisted mode: the helper can record an answer");
   await w.click('[data-r="good"]'); await w.waitForTimeout(600);
@@ -378,7 +385,7 @@ async function playThrough(page, solo) {
   await pa.click('[data-act="aac-tab"][data-t="people"]');
   check(!!(await pa.$(".aac-tile img")) && /Anna/.test(await pa.textContent(".aac-grid")), "board: people from the album appear with their photo");
   // Album photo in the games
-  await pa.click('[data-act="home"]'); await pa.click('[data-act="start"]'); await pa.click('[data-w="assist"]');
+  await pa.click('[data-act="home"]'); await startSession(pa); await pa.click('[data-w="assist"]');
   let sawAlbumPhoto = false;
   for (let i = 0; i < 120 && !sawAlbumPhoto; i++) {
     if (await pa.$(".pic img")) { sawAlbumPhoto = true; break; }
@@ -508,7 +515,7 @@ async function playThrough(page, solo) {
   if (!(await g5.$('[data-act="start"]'))) await g5.click('[data-act="home"]');
   const plan = await g5.textContent(".plan");
   check(/Parola misteriosa/.test(plan) && /Calcoli/.test(plan) && /Percorso di lettere/.test(plan) && /Componi la parola/.test(plan), "home plan lists mystery word, calculations and letter path");
-  await g5.click('[data-act="start"]'); await g5.click('[data-w="assist"]');
+  await startSession(g5); await g5.click('[data-w="assist"]');
   await g5.click('[data-r="good"]'); // telling
   check((await g5.$$(".clues .chip")).length === 5, "mystery word: five clue words are shown");
   await g5.click('[data-r="retry"]');
@@ -558,6 +565,45 @@ async function playThrough(page, solo) {
   check(hist.mystery && !hist.calc && !hist.path, "levels: mystery word counts, calculations and letter path don't");
   check(g5.errors.length === 0, "no page errors (new games): " + g5.errors.join("; "));
   await browser5.close();
+
+  /* Choosing the games: a checklist, then "continue with last time's games" or a new selection. */
+  const browser6 = await chromium.launch();
+  const ctx6 = await browser6.newContext({ viewport: { width: 900, height: 1100 } });
+  await ctx6.addInitScript(FIXED_DAY);
+  await ctx6.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  const c6 = await ctx6.newPage();
+  c6.errors = []; c6.on("pageerror", (e) => c6.errors.push(e.message));
+  await c6.goto("https://app.test/");
+  await c6.fill("#pf-name", "Test"); await c6.click('[data-act="onboard-skip"]');
+  if (await c6.$('[data-act="home"]')) await c6.click('[data-act="home"]');
+  await c6.click('[data-act="start"]');
+  check((await c6.$$(".pickitem")).length === 12, "game choice: the checklist lists all 12 games and extras");
+  const preset = await c6.$$eval(".pickitem.on", (x) => x.map((b) => b.getAttribute("data-g")));
+  check(preset.includes("describe") && preset.includes("seq") && !preset.includes("calc"), "game choice: today's usual plan is ticked to start with");
+  await c6.click('[data-act="pick-none"]'); await c6.click('[data-act="pick-next"]');
+  check(/almeno un gioco/.test(await c6.textContent(".nudge")), "game choice: at least one game is needed");
+  for (const g of ["seq", "calc", "echo"]) await c6.click('.pickitem[data-g="' + g + '"]');
+  check((await c6.getAttribute('.pickitem[data-g="calc"]', "aria-checked")) === "true", "game choice: ticking marks the game as chosen");
+  await c6.click('[data-act="pick-next"]'); await c6.click('[data-w="assist"]');
+  const steps6 = await c6.$$eval(".steps li", (x) => x.map((li) => li.textContent));
+  check(JSON.stringify(steps6) === JSON.stringify(["Ripetizione", "Calcoli", "Sequenze"]), "game choice: the session has only the chosen games, hardest first (" + steps6 + ")");
+  await c6.click('[data-act="stop"]'); await c6.click('[data-act="home"]');
+  check(/Ripetizione/.test(await c6.textContent(".plan")) && !/Racconto/.test(await c6.textContent(".plan")), "game choice: the home plan shows the chosen games");
+  await c6.click('[data-act="start"]');
+  check(/Ripetizione · Calcoli · Sequenze/.test(await c6.textContent('[data-act="pick-prev"]')), "game choice: next time it offers to continue with last time's games");
+  await c6.click('[data-act="pick-new"]');
+  check((await c6.$$(".pickitem.on")).length === 3, "game choice: a new selection starts from last time's games");
+  await c6.click('[data-act="pick-all"]'); await c6.click('[data-act="pick-next"]'); await c6.click('[data-w="assist"]');
+  check((await c6.$$(".steps li")).length === 12, "game choice: 'All' plays every game");
+  await c6.click('[data-act="stop"]'); await c6.click('[data-act="home"]');
+  // patient mode: the player can still choose
+  await c6.click('[data-act="therapist"]'); await c6.fill("#th-pin1", "1357"); await c6.fill("#th-pin2", "1357"); await c6.click('[data-act="pin-set"]');
+  await c6.click('[data-act="home"]'); await c6.click('[data-act="settings"]'); await c6.check("#set-patient"); await c6.click('[data-act="save-settings"]');
+  await c6.click('[data-act="home"]'); await c6.click('[data-act="relock"]');
+  await c6.click('[data-act="start"]'); await c6.click('[data-act="pick-new"]');
+  check(!!(await c6.$(".picklist")) && !(await c6.$("#un-pin")), "game choice: in patient mode the player can choose games without the PIN");
+  check(c6.errors.length === 0, "no page errors (game choice): " + c6.errors.join("; "));
+  await browser6.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");

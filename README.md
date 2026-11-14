@@ -16,6 +16,11 @@ A prototype tablet app for short daily language practice for people with
   telling (a story on a topic) → mystery word → crossword or word building
   (alternate days) → naming pictures → personal phrases → reading aloud
   → repeating → optional maze, calculations and letter path → sequences.
+- **Choosing the games:** "Start the session" asks whether to continue with
+  last time's games or make a new selection from a checklist of every game and
+  extra (today's usual plan is ticked to start with; "All" and "None" help).
+  The choice is remembered per profile and the order stays hardest to easiest.
+  The patient can choose too, also in patient mode.
 - **Mystery word:** five clue words point to one word ("waves, beach, salt,
   sailing, shells" → sea). Levels: the clues only, with some letters shown, a
   choice of three words, then listen and choose from two. Hints on request

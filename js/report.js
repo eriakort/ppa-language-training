@@ -26,7 +26,8 @@
       chk: "Controlli del parlato", noChk: "Nessun controllo nel periodo.",
       chkCols: ["Data", "Modalità", "Nomi (su 10)", "Ripetizione", "Animali", "Parole/min"], solo: "Da solo", assist: "Con aiuto",
       chName: "Nomi detti giusti (su 10)", chFlu: "Animali in un minuto",
-      notes: "Note", notesHelp: "Spazio per le note a mano."
+      notes: "Note", notesHelp: "Spazio per le note a mano.",
+      cmp: "Confronto con il periodo precedente", cmpHelp: "Mediane del periodo (B) e dei {m} mesi prima (A). «Stabile» se la differenza è entro la variazione abituale; dettagli in «Andamento e statistiche»."
     },
     en: {
       title: "Summary for the therapist", period: "Period", m3: "Last 3 months", m6: "Last 6 months",
@@ -43,7 +44,8 @@
       chk: "Speech check-ins", noChk: "No check-ins in this period.",
       chkCols: ["Date", "Mode", "Names (of 10)", "Repetition", "Animals", "Words/min"], solo: "On my own", assist: "With help",
       chName: "Names said correctly (of 10)", chFlu: "Animals in one minute",
-      notes: "Notes", notesHelp: "Space for handwritten notes."
+      notes: "Notes", notesHelp: "Space for handwritten notes.",
+      cmp: "Compared with the previous period", cmpHelp: "Medians for the period (B) and the {m} months before (A). \"Stable\" when the difference is within the usual variation; details in \"Progress and statistics\"."
     }
   };
   var months = 3;
@@ -126,6 +128,8 @@
       '<h2>' + esc(c.act) + '</h2>' + activity +
       '<h2>' + esc(c.lv) + '</h2><p class="note">' + esc(c.lvHelp) + '</p>' + lv +
       '<h2>' + esc(c.speak) + '</h2><p class="note">' + esc(c.speakHelp) + '</p>' + speak +
+      (window.POG.progress ? '<h2>' + esc(c.cmp) + '</h2><p class="note">' + esc(api.fill(c.cmpHelp, { m: months })) + '</p>' +
+        window.POG.progress.compareTable({ aFrom: d.since.getTime() - (now.getTime() - d.since.getTime()), aTo: d.since.getTime(), bFrom: d.since.getTime(), bTo: now.getTime() + 1 }, "all", ["ability", "onset", "wpm", "ck_naming", "ck_flu", "ck_rep"]) : '') +
       '<h2>' + esc(c.chk) + '</h2>' + chk +
       '<h2 class="print-only">' + esc(c.notes) + '</h2><div class="rp-notes print-only" aria-hidden="true"></div>' +
       '</article>' +

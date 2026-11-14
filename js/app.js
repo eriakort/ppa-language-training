@@ -855,9 +855,11 @@
     var all = load("sessions") || [];
     all = all.filter(function (x) { return x.id !== S.id; });
     all.push({ id: S.id, date: S.started.toISOString(), mode: S.mode, who: S.who, items: S.log.map(function (r) {
-      return { game: r.game, lv: r.lv, label: r.label, result: r.result, hints: r.hints, ms: r.ms, heard: r.heard, meas: r.meas, recIds: r.recIds };
+      return { game: r.game, lv: r.lv, label: r.label, result: r.result, score: r.score, hints: r.hints, ms: r.ms, heard: r.heard, meas: r.meas, recIds: r.recIds };
     }) });
     save("sessions", all.slice(-60));
+    /* A compact copy for long-term progress statistics (kept much longer than full sessions). */
+    if (window.POG.progress && window.POG.progress.record) { try { window.POG.progress.record(all[all.length - 1]); } catch (e) {} }
   }
   function finishPlacement(complete) {
     stopVoice();
@@ -1150,7 +1152,9 @@
     }
     return head +
       '<div class="report"><h2>' + esc(t.thTrends) + '</h2>' + trend + '<p class="note">' + esc(t.thTrendsNote) + '</p>' +
-      '<div class="row-actions"><button class="secondary" data-act="chk-results">' + esc(t.thCheckins) + '</button><button class="secondary" data-act="report">' + esc(t.thReport) + '</button></div>' +
+      '<div class="row-actions"><button class="secondary" data-act="chk-results">' + esc(t.thCheckins) + '</button><button class="secondary" data-act="report">' + esc(t.thReport) + '</button>' +
+        (window.POG.progress ? '<button class="secondary" data-act="progress">' + esc(window.POG.progress.label()) + '</button>' : '') + '</div>' +
+      (window.POG.progress && window.POG.progress.alerts().length ? '<p class="nudge">⚠ ' + esc(t.thAlert) + '</p>' : '') +
       '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
       '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
       '<div class="row-actions">' +
@@ -1879,7 +1883,7 @@
     /* Recording is on and consented; with concurrent, also allowed while speech recognition listens. */
     recordingAllowed: function (concurrent) { return recordingWanted() && (!concurrent || getSettings().recordConcurrent); },
     therapistUnlocked: function () { return !!TH.unlocked; }, therapistView: function () { screen = "therapist"; return viewTherapist(); }, lockTherapist: function () { thLock(); },
-    settings: getSettings, games: function () { return GAMES.slice(); }, inHost: function () { return IN_HOST; },
+    settings: getSettings, games: function () { return GAMES.slice(); }, maxLevels: function () { return Object.assign({}, MAXLV); }, inHost: function () { return IN_HOST; },
     history: function () { return load("history") || {}; }, sessions: function () { var s = load("sessions"); return Array.isArray(s) ? s : []; }
   };
   RECS.purge().catch(function () {});

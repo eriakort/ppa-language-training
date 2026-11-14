@@ -612,3 +612,32 @@ html[data-patient-lock="1"] .util-menu { display: none !important; }
 .pk-txt { display: flex; flex-direction: column; gap: 2px; }
 .pk-txt strong { font-size: 20px; }
 .pk-txt span { font-size: 15px; color: var(--muted); }
+
+/* ---------- progress and statistics ---------- */
+:root { --worse: #9B3434; --worse-soft: #F6E3E3; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --worse: #F09A9A; --worse-soft: #3A2224; } }
+:root[data-theme="dark"] { --worse: #F09A9A; --worse-soft: #3A2224; }
+.pv { display: inline-block; font-size: 15px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.pv.good { background: var(--good-soft); color: var(--good); }
+.pv.worse { background: var(--worse-soft); color: var(--worse); }
+.pv.stable { background: var(--soft); color: var(--ink); }
+.pv.none { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+.dv { font-weight: 700; display: block; }
+.dv.better { color: var(--good); }
+.dv.worse { color: var(--worse); }
+.dv.same { color: var(--ink); }
+.dv.new { color: var(--muted); }
+td small, .report td small { display: block; font-size: 13px; color: var(--muted); font-weight: 400; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; margin: 0; }
+.legend .dv { display: inline; }
+.alerts { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.alerts li { background: var(--worse-soft); color: var(--ink); border-left: 4px solid var(--worse); border-radius: 10px; padding: 10px 14px; font-size: 17px; }
+.pr-controls { display: flex; flex-direction: column; gap: 10px; }
+.pr-dates { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; font-size: 16px; }
+.pr-dates input { min-height: 48px; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; padding: 6px 10px; }
+.chart-row.one { grid-template-columns: 1fr; }
+.mc-mark { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.mc-dot.soft { fill: var(--muted); opacity: .55; stroke: none; }
+.trend-verdict { margin: 0; font-size: 16px; }
+.trend-verdict small { color: var(--muted); }
+@media print { .print-area .pv { border: 1px solid #999; background: #fff; color: #000; } }

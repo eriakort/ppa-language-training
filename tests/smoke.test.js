@@ -605,6 +605,58 @@ async function playThrough(page, solo) {
   check(c6.errors.length === 0, "no page errors (game choice): " + c6.errors.join("; "));
   await browser6.close();
 
+  /* Progress and statistics: ability index, period comparison, trend, daily report, alerts. */
+  const browser7 = await chromium.launch();
+  const ctx7 = await browser7.newContext({ viewport: { width: 1000, height: 1200 } });
+  await ctx7.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  const pr = await ctx7.newPage();
+  pr.errors = []; pr.on("pageerror", (e) => pr.errors.push(e.message));
+  await pr.goto("https://app.test/");
+  await pr.fill("#pf-name", "Test"); await pr.click('[data-act="onboard-skip"]');
+  if (await pr.$('[data-act="home"]')) await pr.click('[data-act="home"]');
+  // one real session, to check that it reaches the long-term log
+  await startSession(pr); await pr.click('[data-w="assist"]');
+  for (let i = 0; i < 3; i++) await pr.click('[data-r="good"]'); // telling and the two mystery words
+  await pr.click('[data-act="stop"]');
+  const logged = await pr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_progress_log")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(logged.length === 1 && logged[0].g.describe && logged[0].g.mystery && logged[0].g.mystery.s === 1, "progress: a finished session is added to the long-term log with its scores");
+  // 50 example sessions over 100 days: steady at level 1, then three clearly worse sessions
+  await pr.evaluate(() => {
+    const pre = Object.keys(localStorage).find((x) => /^pog_p_.+_profile$/.test(x)).replace(/_profile$/, "");
+    const D = 86400000, now = Date.now(), log = [];
+    for (let i = 0; i < 50; i++) {
+      const t = now - (100 - i * 2) * D, bad = i >= 47, s = bad ? 0.3 : 0.8 + (i % 3) * 0.02;
+      log.push({ id: "x" + i, t, who: "assist", g: { name: { lv: bad ? 2 : 1, n: 4, s, hints: 1, ms: 8000, on: bad ? 3500 : 1500 + (i % 3) * 50, wpm: 100, msTot: 60000 }, echo: { lv: 1, n: 2, s, hints: null, ms: 5000, on: 1200, wpm: 110, msTot: 20000 } } });
+    }
+    localStorage.setItem(pre + "_progress_log", JSON.stringify(log));
+  });
+  await pr.click('[data-act="home"]'); await pr.click('[data-act="therapist"]'); await pr.fill("#th-pin1", "2468"); await pr.fill("#th-pin2", "2468"); await pr.click('[data-act="pin-set"]');
+  check(/calo da guardare/.test(await pr.textContent(".card")), "progress: the therapist area points out a drop");
+  await pr.click('[data-act="progress"]');
+  const alertsText = await pr.textContent(".alerts");
+  check(/Indice di autonomia/.test(alertsText) && /ultime 3 sessioni/.test(alertsText), "progress: three sessions well below usual raise a notice");
+  check(/Più difficile del solito/.test(await pr.innerHTML(".report")), "progress: the daily report compares the latest day with the usual");
+  const rows = await pr.$$eval(".report table", (tbls) => tbls[1] ? [...tbls[1].querySelectorAll("tbody tr")].map((r) => r.textContent) : []);
+  // medians are robust: three bad sessions out of 14 don't change the period's median (the notice above catches them)
+  check(rows.some((r) => /Indice di autonomia \(tutti/.test(r) && /Stabile/.test(r)), "progress: the period comparison uses medians, so a few bad days don't flip it");
+  check(rows.some((r) => /Controllo/.test(r) && /Dati insufficienti/.test(r)) || !rows.some((r) => /Controllo/.test(r)), "progress: measures without enough data say so");
+  check(!!(await pr.$(".chart-row.one .mc-line")), "progress: the trend chart draws a line");
+  await pr.selectOption("#pr-measure", "ab_name"); await pr.waitForTimeout(100);
+  check(!!(await pr.$(".mc-mark")), "progress: level changes are marked on the chart");
+  await pr.selectOption("#pr-period", "3m"); await pr.waitForTimeout(100);
+  check(/Tendenza|Nessuna tendenza/.test(await pr.textContent(".trend-verdict")), "progress: the trend has a verdict");
+  await pr.selectOption("#pr-period", "custom"); await pr.waitForTimeout(100);
+  check((await pr.$$('.pr-dates input[type="date"]')).length === 4, "progress: custom dates can be chosen");
+  await pr.click('[data-act="pr-apply"]');
+  await pr.selectOption("#pr-k", "3"); await pr.selectOption("#pr-run", "4"); await pr.click('[data-act="pr-save"]');
+  const ps = await pr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_progress_settings")); return JSON.parse(localStorage.getItem(k)); });
+  check(ps.k === 3 && ps.run === 4, "progress: thresholds can be changed and are saved");
+  check(!(await pr.$(".alerts")), "progress: with a 4-session rule the 3 low sessions no longer raise a notice");
+  await pr.click('[data-act="therapist"]'); await pr.click('[data-act="report"]');
+  check(/Confronto con il periodo precedente/.test(await pr.textContent(".print-area")), "printable summary includes the comparison with the previous period");
+  check(pr.errors.length === 0, "no page errors (progress): " + pr.errors.join("; "));
+  await browser7.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

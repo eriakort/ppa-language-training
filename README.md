@@ -86,6 +86,18 @@ A prototype tablet app for short daily language practice for people with
   rates and counts. The learner sees no score. Results, with one-measure
   trend charts and a table, are in the therapist area. These are indicators
   for following change, not a clinical test.
+- **Progress and statistics** (therapist area, behind the PIN): an ability
+  index per game, (levels − level + accuracy) ÷ levels, so stepping down to an
+  easier level shows as a dip rather than an improvement; the latest day
+  compared with the usual of the previous 30 days; two periods compared (last
+  4 weeks, this month, last 3 months or chosen dates) by median, with a change
+  counted only when it exceeds k × the usual variation (MAD × 1.4826 of the
+  earlier period); a trend chart with a rolling median, level changes marked,
+  Theil–Sen slope and Mann–Kendall test; and a notice when the last N sessions
+  are all clearly below usual. k and N are adjustable. Filters: all sessions,
+  on my own, with help. A compact copy of each session (one line per game) is
+  kept for up to 800 sessions on the device for these statistics. Indicators,
+  not a clinical assessment.
 - **Printable summary.** In the therapist area: the last 3 or 6 months of
   activity, levels, speaking measures by month and check-ins, printed or saved
   as PDF with the browser's print window.
@@ -167,6 +179,8 @@ js/album-store.js     Album storage on the device (IndexedDB)
 js/checkin.js         Speech check-in: the fixed tasks, results and frequency
 js/report.js          Printable summary for the therapist
 js/charts.js          Small one-measure trend charts (inline SVG)
+js/stats.js           Robust statistics: medians, MAD, Theil–Sen, Mann–Kendall, alerts
+js/progress.js        Progress and statistics screen and the long-term session log
 js/offline.js         Registers the offline copy (sw.js) on the website
 sw.js                 Offline copy of the app's files, network first
 js/utility-menu.js    "Account and data" menu in the page header; collects the account,

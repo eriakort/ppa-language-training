@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Draws the app icons (an original design: a speech bubble with "Ae" on the app's teal) and saves
+ * Draws the app icons (an original design: a speech bubble with "AePa" on the app's teal) and saves
  * the PNG sizes the web app manifest and phones need. Run again after changing the design:
  *   node tools/make-icons.js
  */
@@ -8,6 +8,7 @@
 const fs = require("fs"), path = require("path");
 const { chromium } = require("playwright");
 const out = path.join(__dirname, "..", "assets", "icons");
+const LABEL = "AePa";
 /* inset: how much of the canvas the bubble may use. Maskable icons keep content inside the central 80%. */
 function svg(size, inset, rounded) {
   const r = rounded ? size * 0.22 : 0, c = size / 2, w = size * inset, h = w * 0.78, x = c - w / 2, y = c - h / 2 - size * 0.03;
@@ -16,7 +17,7 @@ function svg(size, inset, rounded) {
   <rect width="${size}" height="${size}" rx="${r}" fill="#1D6A73"/>
   <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h * 0.32}" fill="#FFFFFF"/>
   <path d="${tail}" fill="#FFFFFF"/>
-  <text x="${c}" y="${y + h * 0.7}" text-anchor="middle" font-family="Atkinson Hyperlegible, Arial, sans-serif" font-weight="700" font-size="${h * 0.62}" fill="#1D6A73">Ae</text>
+  <text x="${c}" y="${y + h * 0.66}" text-anchor="middle" font-family="Atkinson Hyperlegible, Arial, sans-serif" font-weight="700" font-size="${h * 0.44}" fill="#1D6A73" textLength="${w * 0.8}" lengthAdjust="spacingAndGlyphs">${LABEL}</text>
   <circle cx="${x + w * 0.83}" cy="${y + h * 0.2}" r="${h * 0.07}" fill="#E2B962"/>
 </svg>`;
 }

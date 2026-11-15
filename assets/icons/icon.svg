@@ -2,6 +2,6 @@
   <rect width="512" height="512" rx="112.64" fill="#1D6A73"/>
   <rect x="87.03999999999999" y="108.85119999999999" width="337.92" height="263.5776" rx="84.34483200000001" fill="#FFFFFF"/>
   <path d="M 161.3824 370.4288 L 141.1072 440.0128 L 242.4832 370.4288 Z" fill="#FFFFFF"/>
-  <text x="256" y="293.35552" text-anchor="middle" font-family="Atkinson Hyperlegible, Arial, sans-serif" font-weight="700" font-size="163.418112" fill="#1D6A73">Ae</text>
+  <text x="256" y="282.812416" text-anchor="middle" font-family="Atkinson Hyperlegible, Arial, sans-serif" font-weight="700" font-size="115.97414400000001" fill="#1D6A73" textLength="270.336" lengthAdjust="spacingAndGlyphs">AePa</text>
   <circle cx="367.5136" cy="161.56672" r="18.450432000000003" fill="#E2B962"/>
 </svg>

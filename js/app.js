@@ -266,6 +266,24 @@
   window.addEventListener("scroll", function () { if (scrollTimer) return; scrollTimer = setTimeout(function () { scrollTimer = null; saveUi(); }, 300); }, { passive: true });
   var scrollTimer = null;
   window.addEventListener("pagehide", saveUi);
+  /* ---------- install as an app ----------
+     Chrome and Edge on Android offer "Install" when the page has a manifest and an offline copy.
+     The prompt event is kept so the settings can offer an install button; iPhone and iPad install
+     from the Share menu instead. */
+  var installPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); installPrompt = e; if (screen === "settings") rerenderKeep(); });
+  window.addEventListener("appinstalled", function () { installPrompt = null; if (screen === "settings") rerenderKeep(); });
+  function isInstalled() {
+    try { return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true; } catch (e) { return false; }
+  }
+  function installSection() {
+    if (IN_HOST) return "";
+    var t = T[lang], ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    var body = isInstalled() ? '<p class="note">' + esc(t.installDone) + '</p>'
+      : installPrompt ? '<p class="note">' + esc(t.installHelp) + '</p><div class="row-actions"><button class="secondary" data-act="install-app">' + esc(t.installBtn) + '</button></div>'
+      : '<p class="note">' + esc(ios ? t.installIos : t.installMenu) + '</p>';
+    return '<h2>' + esc(t.secInstall) + '</h2>' + body;
+  }
   function restoreActiveSession() {
     var checkpoint = load("active_session");
     if (!checkpoint || checkpoint.version !== 1 || checkpoint.screen !== "item" || !checkpoint.session) return false;
@@ -1275,6 +1293,7 @@
           : '<p class="note">' + esc(REC.supported ? t.recOff : t.recUnsupported) + '</p>' +
             (REC.supported ? '<div class="row-actions"><button class="secondary" data-act="rec-on">' + esc(t.recTurnOn) + '</button></div>' : ''))) +
       '<div class="row-actions"><button class="secondary" data-act="therapist">' + esc(t.thArea) + '</button></div>' +
+      installSection() +
       '<h2>' + esc(t.secPatient) + '</h2>' +
       '<label class="check"><input type="checkbox" id="set-patient"' + (set.patientMode ? ' checked' : '') + '>' + esc(t.patientMode) + '</label>' +
       '<p class="note">' + esc(t.patientHelp) + '</p>' +
@@ -1708,6 +1727,13 @@
       return;
     }
     if (window.POG.ext.actions[act]) { window.POG.ext.actions[act](b, e); return; }
+    if (act === "install-app") {
+      if (!installPrompt) { rerenderKeep(); return; }
+      var ip = installPrompt; installPrompt = null;
+      ip.prompt();
+      (ip.userChoice || Promise.resolve()).then(function () { rerenderKeep(); }, function () { rerenderKeep(); });
+      return;
+    }
     if (act === "lang") {
       var nl = b.getAttribute("data-l") === "en" ? "en" : "it";
       if (nl === lang) return;

@@ -24,7 +24,10 @@ const inline = (s) => s
 
 const head = html.match(/<head>([\s\S]*?)<\/head>/)[1]
   .replace(/<meta charset[^>]*>\n?/, "")
-  .replace(/<meta name="viewport"[^>]*>\n?/, "");
+  .replace(/<meta name="viewport"[^>]*>\n?/, "")
+  /* The Claude artifact has its own icon and isn't installable: leave out the manifest, icons and app-mode tags. */
+  .replace(/<link rel="(?:manifest|icon|apple-touch-icon)"[^>]*>\n?/g, "")
+  .replace(/<meta name="(?:theme-color|mobile-web-app-capable|apple-mobile-web-app-[a-z-]+)"[^>]*>\n?/g, "");
 const body = html.match(/<body>([\s\S]*?)<\/body>/)[1];
 
 const artifact = inline(head.trim() + "\n\n" + body.trim()) + "\n";

@@ -6,9 +6,10 @@
  *
  * Keep SHELL in step with index.html (tests/offline.test.js checks this). Bump VERSION when the list changes.
  */
-var VERSION = "pog-shell-v3";
+var VERSION = "pog-shell-v4";
 var SHELL = [
-  "./", "index.html", "css/styles.css",
+  "./", "index.html", "css/styles.css", "manifest.webmanifest",
+  "assets/icons/favicon-32.png", "assets/icons/apple-touch-icon.png", "assets/icons/icon-192.png", "assets/icons/icon-512.png", "assets/icons/icon-maskable-512.png",
   "js/strings.js", "content/base.js", "content/interests.js",
   "js/speech.js", "js/recorder.js", "js/recordings.js",
   "js/vendor/supabase-js-2.119.0.js", "js/supabase-config.js",

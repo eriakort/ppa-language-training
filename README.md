@@ -111,6 +111,20 @@ A prototype tablet app for short daily language practice for people with
   activity, levels, speaking measures by month and check-ins, printed or saved
   as PDF with the browser's print window.
 
+## Install as an app
+
+The website is an installable web app (manifest, icons, offline copy). On
+Android, open it in Chrome and choose **Install app** (or use the button in
+Levels and settings → App on this device); on iPhone and iPad, Safari →
+Share → Add to Home Screen. It then opens full screen with its own icon,
+works offline, and updates itself from the website. The icons are drawn by
+`tools/make-icons.js`; run it again after changing the design.
+
+A Play Store version can be built later on top of this as a Trusted Web
+Activity (Bubblewrap or PWABuilder). That needs `/.well-known/assetlinks.json`
+at the root of the domain, so it requires a custom domain or a separate
+`<user>.github.io` repository.
+
 ## Accounts (optional)
 
 A bilingual account entry supports email/password sign-in, self-registration,
@@ -196,6 +210,8 @@ js/report.js          Printable summary for the therapist
 js/charts.js          Small one-measure trend charts (inline SVG)
 js/stats.js           Robust statistics: medians, MAD, Theil–Sen, Mann–Kendall, alerts
 js/progress.js        Progress and statistics screen and the long-term session log
+manifest.webmanifest  App name, colours and icons for installing
+assets/icons/         App icons (made by tools/make-icons.js)
 js/offline.js         Registers the offline copy (sw.js) on the website
 sw.js                 Offline copy of the app's files, network first
 js/utility-menu.js    "Account and data" menu in the page header; collects the account,

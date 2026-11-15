@@ -27,7 +27,7 @@ used.concat(fonts).forEach((u) => check(shell.includes(u), "offline copy include
 shell.filter((u) => u !== "./").forEach((u) => check(fs.existsSync(path.join(root, u)), "listed offline file exists: " + u));
 
 /* 2. Works offline after one online visit. */
-const TYPES = { ".js": "application/javascript", ".css": "text/css", ".html": "text/html", ".woff2": "font/woff2" };
+const TYPES = { ".js": "application/javascript", ".css": "text/css", ".html": "text/html", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json", ".png": "image/png" };
 const server = http.createServer((req, res) => {
   let p = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
   if (p === "/") p = "/index.html";
@@ -53,6 +53,18 @@ const server = http.createServer((req, res) => {
   check(await page.evaluate(() => !!navigator.serviceWorker.controller), "the offline copy is active after the first visit");
   await page.fill("#pf-name", "Offline"); await page.click('[data-act="onboard-skip"]'); await page.click('[data-act="home"]');
   await page.waitForTimeout(500);
+
+  /* 3. Installable as an app: Chrome's own installability check finds nothing missing. */
+  const cdp = await ctx.newCDPSession(page);
+  const inst = await cdp.send("Page.getInstallabilityErrors");
+  check(inst.installabilityErrors.length === 0, "Chrome finds the app installable" + (inst.installabilityErrors.length ? " (" + inst.installabilityErrors.map((e) => e.errorId).join(", ") + ")" : ""));
+  const man = await page.evaluate(() => fetch("manifest.webmanifest").then((r) => r.json()));
+  check(man.display === "standalone" && man.icons.some((i) => i.purpose === "maskable") && man.icons.some((i) => i.sizes === "512x512"), "the manifest asks for full screen and has 512 px and maskable icons");
+  const sizes = await page.evaluate(() => Promise.all(["assets/icons/icon-192.png", "assets/icons/icon-512.png", "assets/icons/icon-maskable-512.png"].map((u) => new Promise((res) => { const im = new Image(); im.onload = () => res(im.naturalWidth); im.onerror = () => res(0); im.src = u; }))));
+  check(sizes.join() === "192,512,512", "the icons load at their stated sizes");
+  await page.click('[data-act="settings"]');
+  check(/App sul dispositivo/.test(await page.textContent(".card")), "settings explain how to install the app");
+  await page.click('[data-act="home"]');
 
   await ctx.setOffline(true);
   server.close();

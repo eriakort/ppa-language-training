@@ -785,6 +785,43 @@ async function playThrough(page, solo) {
   check(rf.errors.length === 0, "no page errors (refresh): " + rf.errors.join("; "));
   await browser10.close();
 
+  /* Colour themes: light/dark/automatic and palettes, per person, from any screen. */
+  const browser11 = await chromium.launch();
+  const th = await open(browser11, false, null, { width: 900, height: 1000 });
+  await th.fill("#pf-name", "Anna"); await th.click('[data-act="onboard-skip"]'); await th.click('[data-act="home"]');
+  const attrs = () => th.evaluate(() => ({ t: document.documentElement.getAttribute("data-theme"), p: document.documentElement.getAttribute("data-palette"), bg: getComputedStyle(document.body).backgroundColor, meta: document.querySelector('meta[name="theme-color"]') && document.querySelector('meta[name="theme-color"]').content }));
+  check((await attrs()).t === null && (await attrs()).p === null, "themes: by default the app follows the device, in the Sea colours");
+  await th.click('[data-act="theme-open"]');
+  check(!!(await th.$(".theme-panel")), "themes: the palette button opens the appearance panel");
+  await th.click('[data-act="theme-pal"][data-v="forest"]'); await th.click('[data-act="theme-mode"][data-v="dark"]');
+  let a1 = await attrs();
+  check(a1.t === "dark" && a1.p === "forest" && a1.bg === "rgb(15, 26, 18)", "themes: choosing Forest and Dark recolours the app (" + a1.bg + ")");
+  await th.click('[data-act="theme-close"]');
+  await th.reload(); await th.waitForTimeout(200);
+  a1 = await attrs();
+  check(a1.t === "dark" && a1.p === "forest", "themes: the choice is kept after a refresh");
+  // during an exercise
+  await startSession(th); await th.click('[data-w="assist"]');
+  await th.click('[data-act="theme-open"]'); await th.click('[data-act="theme-pal"][data-v="sunset"]'); await th.click('[data-act="theme-mode"][data-v="light"]'); await th.click('[data-act="theme-close"]');
+  a1 = await attrs();
+  check(a1.p === "sunset" && a1.t === "light" && !!(await th.$('[data-r="good"]')), "themes: can be changed in the middle of an exercise without leaving it");
+  await th.click('[data-act="stop"]'); await th.click('[data-act="home"]');
+  // each person keeps their own
+  await th.click('[data-act="profiles"]'); await th.click('[data-act="profile-add"]');
+  await th.fill("#pf-name", "Bruno"); await th.click('[data-act="onboard-skip"]');
+  a1 = await attrs();
+  check(a1.p === null && a1.t === null, "themes: another person starts with the default look");
+  // settings has the same controls
+  check(!!(await th.$('.settings-theme [data-act="theme-pal"]')), "themes: the settings screen has the appearance choices too");
+  // patient mode: still allowed
+  await th.click('[data-act="home"]'); await th.click('[data-act="therapist"]'); await th.fill("#th-pin1", "1111"); await th.fill("#th-pin2", "1111"); await th.click('[data-act="pin-set"]');
+  await th.click('[data-act="home"]'); await th.click('[data-act="settings"]'); await th.check("#set-patient"); await th.click('[data-act="save-settings"]');
+  await th.click('[data-act="home"]'); await th.click('[data-act="relock"]');
+  await th.click('[data-act="theme-open"]'); await th.click('[data-act="theme-pal"][data-v="lavender"]');
+  check((await attrs()).p === "lavender" && !(await th.$("#un-pin")), "themes: in patient mode the person can change colours without the PIN");
+  check(th.errors.length === 0, "no page errors (themes): " + th.errors.join("; "));
+  await browser11.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

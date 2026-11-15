@@ -933,9 +933,43 @@
   /* ---------- views ---------- */
   function header(stopBtn) {
     var t = T[lang];
-    return '<header class="bar"><div class="brand">' + esc(t.appName) + '</div>' + langToggle() +
+    return '<header class="bar"><div class="brand">' + esc(t.appName) + '</div>' + topTools() +
       (stopBtn ? '<button class="stop" data-act="stop">' + esc(t.stop) + '</button>' : '') + '</header>';
   }
+  /* ---------- appearance: light / dark / automatic and colour palettes ----------
+     Kept per person (profile). Everyone can change it, also in patient mode: it only changes the look. */
+  var PALETTES = { sea: ["#1D6A73", "#5DB7C0"], forest: ["#2F6B3A", "#7CC48A"], sunset: ["#A4471E", "#F0A070"], lavender: ["#5B4A9B", "#B3A6EC"] };
+  var themeOpen = false;
+  function getTheme() {
+    var th = load("theme") || {};
+    return { mode: ["auto", "light", "dark"].indexOf(th.mode) >= 0 ? th.mode : "auto", palette: PALETTES[th.palette] ? th.palette : "sea" };
+  }
+  function applyTheme() {
+    var th = getTheme(), root = document.documentElement;
+    if (th.mode === "auto") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", th.mode);
+    if (th.palette === "sea") root.removeAttribute("data-palette"); else root.setAttribute("data-palette", th.palette);
+    var dark = th.mode === "dark" || (th.mode === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", PALETTES[th.palette][dark ? 1 : 0]);
+  }
+  function themeControls() {
+    var t = T[lang], th = getTheme();
+    return '<h3>' + esc(t.themeMode) + '</h3><div class="theme-modes" role="group" aria-label="' + esc(t.themeMode) + '">' +
+      ["auto", "light", "dark"].map(function (m) { return '<button data-act="theme-mode" data-v="' + m + '" aria-pressed="' + (th.mode === m) + '">' + esc(t["theme_" + m]) + '</button>'; }).join("") + '</div>' +
+      '<h3>' + esc(t.themePalette) + '</h3><div class="theme-pals" role="group" aria-label="' + esc(t.themePalette) + '">' +
+      Object.keys(PALETTES).map(function (p) {
+        return '<button data-act="theme-pal" data-v="' + p + '" aria-pressed="' + (th.palette === p) + '"><span class="swatch" style="background:linear-gradient(135deg,' + PALETTES[p][0] + ' 50%,' + PALETTES[p][1] + ' 50%)" aria-hidden="true"></span>' + esc(t["pal_" + p]) + '</button>';
+      }).join("") + '</div>';
+  }
+  function themeButton() {
+    var t = T[lang];
+    return '<button class="themebtn" data-act="theme-open" aria-label="' + esc(t.themeTitle) + '" title="' + esc(t.themeTitle) + '" aria-expanded="' + themeOpen + '">🎨</button>' +
+      (themeOpen ? '<div class="theme-panel" role="dialog" aria-label="' + esc(t.themeTitle) + '"><h2>' + esc(t.themeTitle) + '</h2>' + themeControls() +
+        '<button class="primary" data-act="theme-close">' + esc(t.themeDone) + '</button></div>' : '');
+  }
+  function topTools() { return langToggle() + themeButton(); }
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && themeOpen) { themeOpen = false; rerenderKeep(); } });
+  try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch (e) {}
   /* A small IT | EN switch in the top bar of every screen (hidden while patient mode is locked). */
   function langToggle() {
     if (isLocked()) return '';
@@ -1293,6 +1327,7 @@
           : '<p class="note">' + esc(REC.supported ? t.recOff : t.recUnsupported) + '</p>' +
             (REC.supported ? '<div class="row-actions"><button class="secondary" data-act="rec-on">' + esc(t.recTurnOn) + '</button></div>' : ''))) +
       '<div class="row-actions"><button class="secondary" data-act="therapist">' + esc(t.thArea) + '</button></div>' +
+      '<h2>' + esc(t.themeTitle) + '</h2><div class="settings-theme">' + themeControls() + '</div>' +
       installSection() +
       '<h2>' + esc(t.secPatient) + '</h2>' +
       '<label class="check"><input type="checkbox" id="set-patient"' + (set.patientMode ? ' checked' : '') + '>' + esc(t.patientMode) + '</label>' +
@@ -1632,11 +1667,13 @@
 
   function render() {
     var resetScroll = lastRenderedScreen !== screen;
+    if (resetScroll) themeOpen = false;
     var savedScrollY = window.scrollY || document.documentElement.scrollTop || 0;
     var focused = app.contains(document.activeElement) ? document.activeElement : null;
     var focusAct = focused && focused.getAttribute("data-act");
     var focusCh = focusAct === "key" ? focused.getAttribute("data-ch") : "";
     persistActiveSession();
+    applyTheme();
     document.documentElement.setAttribute("data-patient-lock", isLocked() ? "1" : "0");
     var extView = window.POG.ext.screens[screen];
     var html = extView ? extView() : screen === "unlock" ? viewUnlock() : screen === "therapist" ? viewTherapist() : screen === "consent" ? viewConsent() : screen === "mode" ? viewMode() : screen === "pick" ? viewPick() : screen === "pick-ask" ? viewPickAsk() : screen === "profiles" ? viewProfiles() : screen === "onboard" ? viewOnboard() : screen === "home" ? viewHome() : screen === "scripts" ? viewScripts() : screen === "settings" ? viewSettings() : screen === "item" ? viewItem() : viewSummary();
@@ -1727,6 +1764,13 @@
       return;
     }
     if (window.POG.ext.actions[act]) { window.POG.ext.actions[act](b, e); return; }
+    if (act === "theme-open") { themeOpen = !themeOpen; rerenderKeep(); if (themeOpen) { var tp = app.querySelector(".theme-panel button"); if (tp) tp.focus(); } return; }
+    if (act === "theme-close") { themeOpen = false; rerenderKeep(); var tb = app.querySelector(".themebtn"); if (tb) tb.focus(); return; }
+    if (act === "theme-mode" || act === "theme-pal") {
+      var th0 = getTheme(), v = b.getAttribute("data-v");
+      if (act === "theme-mode") th0.mode = v; else th0.palette = v;
+      save("theme", th0); applyTheme(); rerenderKeep(); return;
+    }
     if (act === "install-app") {
       if (!installPrompt) { rerenderKeep(); return; }
       var ip = installPrompt; installPrompt = null;
@@ -1980,7 +2024,7 @@
     flash: function (m) { flash = m; }, flashText: function () { return flash; },
     speak: speak, stopVoice: stopVoice, isLocked: isLocked,
     profileId: function () { return activeProfileId; }, getScripts: getScripts, getProfile: getProfile,
-    canRecord: function () { return REC.supported && !IN_HOST; }, langToggle: function () { return langToggle(); },
+    canRecord: function () { return REC.supported && !IN_HOST; }, langToggle: function () { return topTools(); },
     /* Recording is on and consented; with concurrent, also allowed while speech recognition listens. */
     recordingAllowed: function (concurrent) { return recordingWanted() && (!concurrent || getSettings().recordConcurrent); },
     therapistUnlocked: function () { return !!TH.unlocked; }, therapistView: function () { screen = "therapist"; return viewTherapist(); }, lockTherapist: function () { thLock(); },

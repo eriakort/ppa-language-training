@@ -21,6 +21,11 @@ A prototype tablet app for short daily language practice for people with
   was. After a session has ended, after signing out or in a new tab, the app
   opens on the home screen. In patient mode locked screens are not reopened,
   and screens behind the therapist PIN ask for it again first.
+- **Appearance and colours:** the 🎨 button in the top bar (and a section in
+  Levels and settings) chooses Automatic (follow the device), Light or Dark,
+  and a palette: Sea (default), Forest, Sunset or Lavender. Kept per person;
+  allowed in patient mode. Every palette keeps text contrast at WCAG AA
+  (4.5:1) or better in light and dark.
 - **Language anywhere:** a small IT | EN switch sits in the top bar of every
   screen. In the middle of a session the current and remaining exercises are
   made again in the new language at the same levels; answers already given

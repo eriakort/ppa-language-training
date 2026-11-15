@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Draws the app icons (an original design: a speech bubble with "Aa" on the app's teal) and saves
+ * Draws the app icons (an original design: a speech bubble with "Ae" on the app's teal) and saves
  * the PNG sizes the web app manifest and phones need. Run again after changing the design:
  *   node tools/make-icons.js
  */
@@ -16,7 +16,7 @@ function svg(size, inset, rounded) {
   <rect width="${size}" height="${size}" rx="${r}" fill="#1D6A73"/>
   <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h * 0.32}" fill="#FFFFFF"/>
   <path d="${tail}" fill="#FFFFFF"/>
-  <text x="${c}" y="${y + h * 0.7}" text-anchor="middle" font-family="Atkinson Hyperlegible, Arial, sans-serif" font-weight="700" font-size="${h * 0.62}" fill="#1D6A73">Aa</text>
+  <text x="${c}" y="${y + h * 0.7}" text-anchor="middle" font-family="Atkinson Hyperlegible, Arial, sans-serif" font-weight="700" font-size="${h * 0.62}" fill="#1D6A73">Ae</text>
   <circle cx="${x + w * 0.83}" cy="${y + h * 0.2}" r="${h * 0.07}" fill="#E2B962"/>
 </svg>`;
 }

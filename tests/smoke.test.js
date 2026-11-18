@@ -836,6 +836,100 @@ async function playThrough(page, solo) {
   check(th.errors.length === 0, "no page errors (themes): " + th.errors.join("; "));
   await browser11.close();
 
+  /* Variant-targeted PPA exercises: nfvPPA sentence building, svPPA semantic links, lvPPA sounds/syllables/span. */
+  const browser12 = await chromium.launch();
+  const vr = await open(browser12, false, null, { width: 900, height: 1000 });
+  await vr.fill("#pf-name", "Giulia"); await vr.click('[data-act="onboard-skip"]'); await vr.click('[data-act="home"]');
+  check(!!(await vr.$('[data-act="var-home"]')), "variants: launcher appears on home screen");
+  await vr.click('[data-act="var-home"]');
+  check(!!(await vr.$('[data-act="var-focus"][data-f="nfv"]')), "variants: hub shows PPA profile focus choices and 3 domain drills");
+  await vr.click('[data-act="var-focus"][data-f="nfv"]');
+  check((await vr.getAttribute('[data-act="var-focus"][data-f="nfv"]', "aria-pressed")) === "true", "variants: focus selection persists");
+
+  // Play all 3 items of sentence building (nfvPPA) using Hint + Check + Next
+  await vr.click('[data-act="var-start"][data-m="sentence"]');
+  for (let item = 0; item < 3; item++) {
+    // First item tests placing wrong/one tile then using hints to place remaining tokens cleanly
+    if (item === 0) {
+      await vr.click('[data-act="var-stile"][data-i="0"]');
+      await vr.click('[data-act="var-sslot"][data-i="0"]'); // tap slot returns tile to pool
+      check((await vr.$$(".var-slot.has")).length === 0, "variants sentence: tapping placed slot removes token cleanly");
+    }
+    for (let h = 0; h < 10 && !(await vr.$('[data-act="var-next"]')); h++) {
+      const targetBtn = await vr.$('[data-act="var-scheck"]:not([disabled])');
+      await vr.click('[data-act="var-hint"]');
+      const nextNow = await vr.$('[data-act="var-next"]');
+      if (nextNow) break;
+      if (h >= 2 && targetBtn) {
+        await vr.click('[data-act="var-scheck"]');
+        if (await vr.$('[data-act="var-next"]')) break;
+      }
+    }
+    if (!(await vr.$('[data-act="var-next"]'))) await vr.click('[data-act="var-scheck"]');
+    check(!!(await vr.$('[data-act="var-next"]')), "variants sentence: item " + (item + 1) + " solved cleanly");
+    await vr.click('[data-act="var-next"]');
+  }
+  check(!!(await vr.$(".sumhead")) && /sentence|Frasi/i.test(await vr.textContent(".card")), "variants sentence: summary screen records completed drill");
+  await vr.click('[data-act="var-hub"]');
+
+  // Play all 3 items of semantic links (svPPA: odd, assoc, feat)
+  await vr.click('[data-act="var-start"][data-m="semantic"]');
+  for (let item = 0; item < 3; item++) {
+    await vr.click('[data-act="var-hint"]');
+    if (await vr.$('[data-act="var-feat"]')) {
+      for (const ans of ["true", "false"]) {
+        if (await vr.$('[data-act="var-next"]')) break;
+        await vr.click('[data-act="var-feat"][data-ans="' + ans + '"]');
+      }
+    } else {
+      const opts = await vr.$$('[data-act="var-sopt"]');
+      for (let i = 0; i < opts.length; i++) {
+        if (await vr.$('[data-act="var-next"]')) break;
+        const sel = '[data-act="var-sopt"][data-i="' + i + '"]:not([disabled])';
+        if (await vr.$(sel)) await vr.click(sel);
+      }
+    }
+    check(!!(await vr.$(".var-feedback.good")) && !!(await vr.$('[data-act="var-next"]')), "variants semantic: item " + (item + 1) + " displays explanation feedback");
+    await vr.click('[data-act="var-next"]');
+  }
+  await vr.click('[data-act="var-hub"]');
+
+  // Switch to English mid-hub and play 3 items of sound & span (lvPPA/AOS: pair, syll, span)
+  await vr.click('[data-act="lang"][data-l="en"]');
+  check(/Targeted PPA exercises/.test(await vr.textContent(".card")), "variants: switching to EN updates hub immediately");
+  await vr.click('[data-act="var-start"][data-m="soundspan"]');
+  for (let item = 0; item < 3; item++) {
+    if (await vr.$('[data-act="var-span-ready"]')) {
+      await vr.click('[data-act="var-span-play"]');
+      await vr.click('[data-act="var-span-ready"]');
+      for (let h = 0; h < 6 && !(await vr.$('[data-act="var-next"]')); h++) await vr.click('[data-act="var-hint"]');
+    } else if (await vr.$('[data-act="var-popt"]')) {
+      const opts = await vr.$$('[data-act="var-popt"]');
+      for (let i = 0; i < opts.length; i++) {
+        if (await vr.$('[data-act="var-next"]')) break;
+        const sel = '[data-act="var-popt"][data-i="' + i + '"]:not([disabled])';
+        if (await vr.$(sel)) await vr.click(sel);
+      }
+    } else {
+      for (let h = 0; h < 6 && !(await vr.$('[data-act="var-next"]')); h++) await vr.click('[data-act="var-hint"]');
+    }
+    check(!!(await vr.$('[data-act="var-next"]')), "variants soundspan: item " + (item + 1) + " solved cleanly");
+    await vr.click('[data-act="var-next"]');
+  }
+  await vr.click('[data-act="var-hub"]');
+
+  // Check local persistence + therapist report display of targeted PPA practice
+  const vSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_variant_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(vSaved.length === 3 && vSaved.map((s) => s.mode).join(",") === "sentence,semantic,soundspan", "variants: all three targeted domain sessions persisted locally");
+  await vr.click('[data-act="var-back"]');
+  await vr.click('[data-act="therapist"]');
+  await vr.fill("#th-pin1", "1234"); await vr.fill("#th-pin2", "1234"); await vr.click('[data-act="pin-set"]');
+  await vr.click('[data-act="report"]');
+  const rpVar = await vr.textContent(".print-area");
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Semantic links/.test(rpVar), "variants: printable therapist summary lists targeted domain rows");
+  check(vr.errors.length === 0, "no page errors (variants): " + vr.errors.join("; "));
+  await browser12.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

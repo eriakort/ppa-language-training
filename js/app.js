@@ -230,7 +230,7 @@
      Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
      therapist PIN ask for it again, then continue to where you were. */
   var UI_KEY = "pog_ui";
-  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, pick: 1, "pick-ask": 1 };
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, pick: 1, "pick-ask": 1 };
   var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
   var UI_PIN = { "chk-results": 1, report: 1, progress: 1 };
   function saveUi() {
@@ -1177,9 +1177,20 @@
     if (!list.length) return "";
     list = list.filter(function (h) { try { return !h.show || h.show(); } catch (e) { return false; } });
     if (!list.length) return "";
-    return '<div class="homebtns">' + list.map(function (h) {
-      return '<button class="homebtn" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + h.icon + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
-    }).join("") + '</div>';
+    var tiles = list.filter(function (h) { return !h.standalone; });
+    var solo = list.filter(function (h) { return !!h.standalone; });
+    var html = "";
+    if (tiles.length) {
+      html += '<div class="homebtns">' + tiles.map(function (h) {
+        return '<button class="homebtn" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + h.icon + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
+      }).join("") + '</div>';
+    }
+    if (solo.length) {
+      html += solo.map(function (h) {
+        return '<button class="var-launch" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + h.icon + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
+      }).join("");
+    }
+    return html;
   }
   function langSeg() {
     return '<div class="seg" role="group" aria-label="Lingua / Language">' +
@@ -1344,6 +1355,12 @@
           m.pauses == null ? "" : m.pauses, m.shortPauses == null ? "" : m.shortPauses, m.longPauses == null ? "" : m.longPauses,
           m.longestPauseMs == null ? "" : (m.longestPauseMs / 1000).toFixed(2), m.phonationRatio == null ? "" : m.phonationRatio, m.syllRate == null ? "" : m.syllRate,
           m.words == null ? "" : m.words, m.wpm == null ? "" : m.wpm, m.src || ""].map(csvCell).join(","));
+      });
+    });
+    (load("variant_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "variant", s.who || "solo", i.game, i.lv, i.label, "", i.result, i.hints, i.kind || "", "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
       });
     });
     var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });

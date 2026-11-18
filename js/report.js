@@ -27,7 +27,8 @@
       chkCols: ["Data", "Modalità", "Nomi (su 10)", "Ripetizione", "Animali", "Lettera", "Concetti (su 12)", "Parole/min"], solo: "Da solo", assist: "Con aiuto",
       chName: "Nomi detti giusti (su 10)", chFlu: "Animali in un minuto",
       notes: "Note", notesHelp: "Spazio per le note a mano.",
-      cmp: "Confronto con il periodo precedente", cmpHelp: "Mediane del periodo (B) e dei {m} mesi prima (A). «Stabile» se la differenza è entro la variazione abituale; dettagli in «Andamento e statistiche»."
+      cmp: "Confronto con il periodo precedente", cmpHelp: "Mediane del periodo (B) e dei {m} mesi prima (A). «Stabile» se la differenza è entro la variazione abituale; dettagli in «Andamento e statistiche».",
+      varTitle: "Esercizi mirati PPA", varCols: ["Dominio", "Prove", "Precisione", "Livello attuale"]
     },
     en: {
       title: "Summary for the therapist", period: "Period", m3: "Last 3 months", m6: "Last 6 months",
@@ -45,7 +46,8 @@
       chkCols: ["Date", "Mode", "Names (of 10)", "Repetition", "Animals", "Letter", "Concepts (of 12)", "Words/min"], solo: "On my own", assist: "With help",
       chName: "Names said correctly (of 10)", chFlu: "Animals in one minute",
       notes: "Notes", notesHelp: "Space for handwritten notes.",
-      cmp: "Compared with the previous period", cmpHelp: "Medians for the period (B) and the {m} months before (A). \"Stable\" when the difference is within the usual variation; details in \"Progress and statistics\"."
+      cmp: "Compared with the previous period", cmpHelp: "Medians for the period (B) and the {m} months before (A). \"Stable\" when the difference is within the usual variation; details in \"Progress and statistics\".",
+      varTitle: "Targeted PPA practice", varCols: ["Domain", "Items", "Accuracy", "Current level"]
     }
   };
   var months = 3;
@@ -93,7 +95,22 @@
       };
     });
     var checks = (window.POG.checkins ? window.POG.checkins.list() : []).filter(function (k) { return new Date(k.date) >= since; });
-    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks };
+    var vApi = window.POG.variants;
+    var vSessions = (vApi && vApi.listSessions ? vApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    var vRows = [];
+    if (vApi && vSessions.length) {
+      var vLvs = vApi.levels();
+      vApi.DOMAINS.forEach(function (dom) {
+        var matched = [];
+        vSessions.forEach(function (s) {
+          (s.items || []).forEach(function (it) { if (it.game === dom) matched.push(it); });
+        });
+        if (!matched.length) return;
+        var sc = avg(matched.map(function (it) { return it.score; }));
+        vRows.push({ dom: dom, name: vApi.label(dom), n: matched.length, pct: sc != null ? Math.round(sc * 100) + "%" : "–", lv: String(vLvs[dom] || 2) });
+      });
+    }
+    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks, variants: vRows };
   }
 
   function view() {
@@ -146,6 +163,7 @@
       (window.POG.progress ? '<h2>' + esc(c.cmp) + '</h2><p class="note">' + esc(api.fill(c.cmpHelp, { m: months })) + '</p>' +
         window.POG.progress.compareTable({ aFrom: d.since.getTime() - (now.getTime() - d.since.getTime()), aTo: d.since.getTime(), bFrom: d.since.getTime(), bTo: now.getTime() + 1 }, "all", ["ability", "onset", "wpm", "phonation", "syllRate", "longPauses", "ck_naming", "ck_icu", "ck_flu", "ck_letter_flu", "ck_rep"]) : '') +
       '<h2>' + esc(c.chk) + '</h2>' + chk +
+      (d.variants && d.variants.length ? '<h2>' + esc(c.varTitle) + '</h2>' + table(c.varCols, d.variants.map(function (v) { return [v.name, String(v.n), v.pct, v.lv]; })) : '') +
       '<h2 class="print-only">' + esc(c.notes) + '</h2><div class="rp-notes print-only" aria-hidden="true"></div>' +
       '</article>' +
       '<button class="link no-print" data-act="therapist">' + esc(c.back) + '</button></section>';

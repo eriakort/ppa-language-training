@@ -683,3 +683,40 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .swatch { width: 28px; height: 28px; border-radius: 50%; flex: none; border: 2px solid rgba(0,0,0,.15); }
 .theme-panel .primary { min-height: 52px; }
 .settings-theme { width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: left; }
+
+/* ---------- targeted PPA variant exercises ---------- */
+.var-launch { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; max-width: 520px; min-height: 64px; padding: 12px 20px; border-radius: 18px; background: var(--soft); color: var(--ink); border: 2px solid var(--line); font-size: 21px; font-weight: 700; }
+.var-launch:hover { border-color: var(--accent); }
+.var-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; width: 100%; }
+.var-dcard { min-height: 150px; }
+.var-badge { display: inline-block; align-self: flex-start; font-size: 14px; font-weight: 700; color: var(--accent) !important; background: var(--surface); border-radius: 999px; padding: 3px 10px; }
+.var-panel { width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: left; border-top: 2px solid var(--soft); padding-top: 14px; }
+.var-panel h2, .var-recent h2 { margin: 4px 0 0; font-size: 16px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.var-focus { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.var-fbtn { background: var(--soft); border: 2px solid var(--line); border-radius: 14px; padding: 12px 14px; min-height: 56px; font-weight: 700; font-size: 17px; text-align: left; color: var(--ink); }
+.var-fbtn[aria-pressed="true"] { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 2px var(--accent); }
+.var-recent { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+.var-slots { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; max-width: 680px; }
+.var-slot { min-width: 78px; min-height: 56px; padding: 8px 16px; border-radius: 14px; border: 2px dashed var(--line); background: var(--bg); color: var(--muted); font-size: 22px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.var-slot.has { border-style: solid; border-color: var(--accent); background: var(--surface); color: var(--ink); }
+.var-slot.ok { border-color: var(--good); background: var(--good-soft); color: var(--good); }
+.var-tiles { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; max-width: 680px; }
+.var-tile { min-height: 58px; padding: 10px 20px; border-radius: 14px; background: var(--soft); border: 2px solid var(--line); color: var(--ink); font-size: 22px; font-weight: 700; }
+.var-tile:hover:not(:disabled) { border-color: var(--accent); }
+.var-tile.used { opacity: .28; }
+.var-anchor { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.var-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; width: 100%; max-width: 640px; }
+.var-opts.two { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 440px; }
+.var-opt { min-height: 84px; padding: 14px; border-radius: 16px; background: var(--soft); border: 3px solid var(--line); color: var(--ink); font-size: 22px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.var-opt:hover:not(:disabled) { border-color: var(--accent); }
+.var-opt.ok { border-color: var(--good); background: var(--good-soft); color: var(--good); }
+.var-opt.dim { opacity: .35; }
+.var-opt-pic { font-size: 40px; line-height: 1; }
+.var-feedback { width: 100%; max-width: 600px; border-radius: 14px; padding: 14px 18px; font-size: 20px; text-align: left; }
+.var-feedback.good { background: var(--good-soft); color: var(--good); }
+.var-feedback p { margin: 0; }
+@media (max-width: 520px) {
+  .var-slot, .var-tile { font-size: 19px; min-height: 50px; padding: 8px 14px; }
+  .var-opts.two { grid-template-columns: 1fr; }
+}
+

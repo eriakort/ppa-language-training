@@ -918,16 +918,49 @@ async function playThrough(page, solo) {
   }
   await vr.click('[data-act="var-hub"]');
 
-  // Check local persistence + therapist report display of targeted PPA practice
+  // Check local persistence + functional reading drill + caregiver log + therapist report display
   const vSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_variant_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(vSaved.length === 3 && vSaved.map((s) => s.mode).join(",") === "sentence,semantic,soundspan", "variants: all three targeted domain sessions persisted locally");
-  await vr.click('[data-act="var-back"]');
+
+  // Launch Everyday functional reading from the hub
+  check(!!(await vr.$('[data-act="func-home"]')), "functional reading: card is offered in targeted practice hub");
+  await vr.click('[data-act="func-home"]');
+  for (let item = 0; item < 3; item++) {
+    await vr.click('[data-act="fn-hint"]');
+    if (item === 0) check(!!(await vr.$(".fn-mark")), "functional reading: hint highlights the exact key clue inline");
+    const opts = await vr.$$('[data-act="fn-opt"]');
+    for (let i = 0; i < opts.length; i++) {
+      if (await vr.$('[data-act="fn-next"]')) break;
+      const sel = '[data-act="fn-opt"][data-i="' + i + '"]:not([disabled])';
+      if (await vr.$(sel)) await vr.click(sel);
+    }
+    check(!!(await vr.$('[data-act="fn-next"]')), "functional reading: item " + (item + 1) + " solved cleanly");
+    await vr.click('[data-act="fn-next"]');
+  }
+  const fnSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_functional_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(fnSaved.length === 1 && fnSaved[0].items.length === 3, "functional reading: completed 3-item session saved locally");
+
+  await vr.click('[data-act="fn-home"]');
   await vr.click('[data-act="therapist"]');
   await vr.fill("#th-pin1", "1234"); await vr.fill("#th-pin2", "1234"); await vr.click('[data-act="pin-set"]');
+
+  // Open Caregiver communication log behind PIN
+  await vr.click('[data-act="carelog"]');
+  await vr.click('[data-act="cg-rate"][data-k="wordFind"][data-v="4"]');
+  await vr.click('[data-act="cg-tag"][data-k="strategy_helped"]');
+  await vr.fill("#cg-note", "Ordered tea calmly using two-choice question.");
+  await vr.click('[data-act="cg-save"]');
+  const cgSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_caregiver_logs")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(cgSaved.length === 1 && cgSaved[0].ratings.wordFind === 4 && cgSaved[0].tags.includes("strategy_helped"), "carelog: structured ratings, context tag, and local note saved");
+  await vr.click('[data-act="cg-tab"][data-t="tips"]');
+  check((await vr.$$(".cg-tip")).length === 4, "carelog: partner strategy tips render all 4 clinical cards");
+  await vr.click('[data-act="therapist"]');
+
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Semantic links/.test(rpVar), "variants: printable therapist summary lists targeted domain rows");
-  check(vr.errors.length === 0, "no page errors (variants): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog: printable therapist summary lists targeted domains, everyday reading, and caregiver observations");
+  check(vr.errors.length === 0, "no page errors (variants, functional, carelog): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

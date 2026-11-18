@@ -720,3 +720,24 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
   .var-opts.two { grid-template-columns: 1fr; }
 }
 
+/* ---------- everyday functional reading & caregiver log ---------- */
+.fn-card { width: 100%; max-width: 640px; background: var(--soft); border: 2px solid var(--line); border-radius: 18px; padding: 18px 22px; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+.fn-meta { display: flex; align-items: center; gap: 10px; font-size: 16px; color: var(--muted); }
+.fn-meta span { font-size: 24px; line-height: 1; }
+.fn-passage { margin: 0; font-size: clamp(22px, 3.6vw, 27px); line-height: 1.5; color: var(--ink); font-weight: 700; }
+.fn-mark { background: var(--hl); color: var(--ink); border-radius: 6px; padding: 1px 4px; }
+.cg-domains { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.cg-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--soft); border-radius: 14px; padding: 12px 14px; }
+.cg-lbl { font-weight: 700; font-size: 18px; flex: 1 1 240px; }
+.cg-scale { display: inline-flex; gap: 6px; }
+.cg-num { width: 48px; height: 48px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font-weight: 700; font-size: 20px; }
+.cg-num[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.cg-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.cg-tag { background: var(--soft); border: 2px solid var(--line); border-radius: 999px; padding: 8px 14px; min-height: 44px; font-size: 16px; font-weight: 700; color: var(--ink); }
+.cg-tag[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.cg-tips { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; width: 100%; }
+.cg-tip { background: var(--soft); border-radius: 16px; padding: 16px 18px; text-align: left; }
+.cg-tip h2 { margin: 0 0 8px; font-size: 18px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+.cg-tip ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
+
+

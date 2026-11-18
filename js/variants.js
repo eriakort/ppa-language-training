@@ -476,7 +476,13 @@
         '<strong>' + esc(t.domains[d]) + '</strong>' +
         '<span class="var-badge">' + esc(api.fill(t.lvTag, { n: lv, name: t.lvNames[lv - 1] })) + '</span>' +
         '<span>' + esc(t.domainDesc[d]) + '</span></button>';
-    }).join("") + '</div>';
+    }).join("") +
+      (window.POG.functional ? '<button class="modecard var-dcard" data-act="func-home">' +
+        '<span class="ico" aria-hidden="true">📖</span>' +
+        '<strong>' + esc(window.POG.functional.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.functional.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.functional.desc()) + '</span></button>' : '') +
+      '</div>';
 
     var recentHtml = hist.length
       ? '<div class="var-recent"><h2>' + esc(t.recentHead) + '</h2><div class="tbl"><table><thead><tr><th>' + esc(t.colDomain) + '</th><th>' + esc(t.colRes) + '</th><th>' + esc(t.colTime) + '</th></tr></thead><tbody>' +

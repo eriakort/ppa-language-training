@@ -28,7 +28,8 @@
       chName: "Nomi detti giusti (su 10)", chFlu: "Animali in un minuto",
       notes: "Note", notesHelp: "Spazio per le note a mano.",
       cmp: "Confronto con il periodo precedente", cmpHelp: "Mediane del periodo (B) e dei {m} mesi prima (A). «Stabile» se la differenza è entro la variazione abituale; dettagli in «Andamento e statistiche».",
-      varTitle: "Esercizi mirati PPA", varCols: ["Dominio", "Prove", "Precisione", "Livello attuale"]
+      varTitle: "Esercizi mirati PPA", varCols: ["Dominio", "Prove", "Precisione", "Livello attuale"],
+      careTitle: "Osservazioni del familiare", careCols: ["Data", "Indice globale", "Contesto / Note"]
     },
     en: {
       title: "Summary for the therapist", period: "Period", m3: "Last 3 months", m6: "Last 6 months",
@@ -47,7 +48,8 @@
       chName: "Names said correctly (of 10)", chFlu: "Animals in one minute",
       notes: "Notes", notesHelp: "Space for handwritten notes.",
       cmp: "Compared with the previous period", cmpHelp: "Medians for the period (B) and the {m} months before (A). \"Stable\" when the difference is within the usual variation; details in \"Progress and statistics\".",
-      varTitle: "Targeted PPA practice", varCols: ["Domain", "Items", "Accuracy", "Current level"]
+      varTitle: "Targeted PPA practice", varCols: ["Domain", "Items", "Accuracy", "Current level"],
+      careTitle: "Caregiver observations", careCols: ["Date", "Overall index", "Context / Note"]
     }
   };
   var months = 3;
@@ -110,7 +112,19 @@
         vRows.push({ dom: dom, name: vApi.label(dom), n: matched.length, pct: sc != null ? Math.round(sc * 100) + "%" : "–", lv: String(vLvs[dom] || 2) });
       });
     }
-    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks, variants: vRows };
+    var fnApi = window.POG.functional;
+    var fnSessions = (fnApi && fnApi.listSessions ? fnApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (fnApi && fnSessions.length) {
+      var fnMatched = [];
+      fnSessions.forEach(function (s) { fnMatched.push.apply(fnMatched, s.items || []); });
+      if (fnMatched.length) {
+        var fsc = avg(fnMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "functional", name: fnApi.label(), n: fnMatched.length, pct: fsc != null ? Math.round(fsc * 100) + "%" : "–", lv: String(fnApi.level()) });
+      }
+    }
+    var cgApi = window.POG.carelog;
+    var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
+    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks, variants: vRows, carelog: cgEntries };
   }
 
   function view() {
@@ -164,6 +178,13 @@
         window.POG.progress.compareTable({ aFrom: d.since.getTime() - (now.getTime() - d.since.getTime()), aTo: d.since.getTime(), bFrom: d.since.getTime(), bTo: now.getTime() + 1 }, "all", ["ability", "onset", "wpm", "phonation", "syllRate", "longPauses", "ck_naming", "ck_icu", "ck_flu", "ck_letter_flu", "ck_rep"]) : '') +
       '<h2>' + esc(c.chk) + '</h2>' + chk +
       (d.variants && d.variants.length ? '<h2>' + esc(c.varTitle) + '</h2>' + table(c.varCols, d.variants.map(function (v) { return [v.name, String(v.n), v.pct, v.lv]; })) : '') +
+      (d.carelog && d.carelog.length && window.POG.carelog ? '<h2>' + esc(c.careTitle) + '</h2>' + table(c.careCols, d.carelog.slice(-8).map(function (e) {
+        var cg = window.POG.carelog;
+        var tags = (e.tags || []).map(function (k) { return cg.tagLabel(k); }).join(" · ");
+        var detail = [tags, e.note].filter(Boolean).join(" — ") || "–";
+        var idxTxt = e.fcIndex != null ? Math.round(e.fcIndex * 100) + "% (" + num(e.avgRating, 1) + "/5)" : "–";
+        return [day(e.date, { day: "numeric", month: "short", year: "numeric" }), idxTxt, detail];
+      })) : '') +
       '<h2 class="print-only">' + esc(c.notes) + '</h2><div class="rp-notes print-only" aria-hidden="true"></div>' +
       '</article>' +
       '<button class="link no-print" data-act="therapist">' + esc(c.back) + '</button></section>';

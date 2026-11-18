@@ -21,10 +21,10 @@
       lv: "Livelli degli esercizi", lvHelp: "Livello 1 = il più impegnativo. Un numero più alto vuol dire più aiuti.",
       colGame: "Esercizio", colStart: "Inizio periodo", colNow: "Oggi", colChanges: "Cambi di livello", noHist: "–",
       speak: "Misure del parlato", speakHelp: "Medie delle risposte a voce misurate. Inizio = tempo prima della prima parola.",
-      colMonth: "Mese", colN: "Risposte misurate", colOnset: "Inizio (s)", colWpm: "Parole/min", colPauses: "Pause", noSpeak: "Nessuna risposta a voce misurata nel periodo.",
+      colMonth: "Mese", colN: "Risposte misurate", colOnset: "Inizio (s)", colWpm: "Parole/min", colPhonation: "Fonazione", colSyllRate: "Sil/s", colPauses: "Pause", colLongPauses: "Pause lunghe", noSpeak: "Nessuna risposta a voce misurata nel periodo.",
       chOnset: "Tempo prima della prima parola", chWpm: "Parole al minuto",
       chk: "Controlli del parlato", noChk: "Nessun controllo nel periodo.",
-      chkCols: ["Data", "Modalità", "Nomi (su 10)", "Ripetizione", "Animali", "Parole/min"], solo: "Da solo", assist: "Con aiuto",
+      chkCols: ["Data", "Modalità", "Nomi (su 10)", "Ripetizione", "Animali", "Lettera", "Concetti (su 12)", "Parole/min"], solo: "Da solo", assist: "Con aiuto",
       chName: "Nomi detti giusti (su 10)", chFlu: "Animali in un minuto",
       notes: "Note", notesHelp: "Spazio per le note a mano.",
       cmp: "Confronto con il periodo precedente", cmpHelp: "Mediane del periodo (B) e dei {m} mesi prima (A). «Stabile» se la differenza è entro la variazione abituale; dettagli in «Andamento e statistiche»."
@@ -39,10 +39,10 @@
       lv: "Exercise levels", lvHelp: "Level 1 = the most demanding. A higher number means more support.",
       colGame: "Exercise", colStart: "Start of period", colNow: "Today", colChanges: "Level changes", noHist: "–",
       speak: "Speaking measures", speakHelp: "Averages of the measured spoken answers. Onset = time before the first word.",
-      colMonth: "Month", colN: "Measured answers", colOnset: "Onset (s)", colWpm: "Words/min", colPauses: "Pauses", noSpeak: "No measured spoken answers in this period.",
+      colMonth: "Month", colN: "Measured answers", colOnset: "Onset (s)", colWpm: "Words/min", colPhonation: "Phonation", colSyllRate: "Syl/s", colPauses: "Pauses", colLongPauses: "Long pauses", noSpeak: "No measured spoken answers in this period.",
       chOnset: "Time before the first word", chWpm: "Words per minute",
       chk: "Speech check-ins", noChk: "No check-ins in this period.",
-      chkCols: ["Date", "Mode", "Names (of 10)", "Repetition", "Animals", "Words/min"], solo: "On my own", assist: "With help",
+      chkCols: ["Date", "Mode", "Names (of 10)", "Repetition", "Animals", "Letter", "Concepts (of 12)", "Words/min"], solo: "On my own", assist: "With help",
       chName: "Names said correctly (of 10)", chFlu: "Animals in one minute",
       notes: "Notes", notesHelp: "Space for handwritten notes.",
       cmp: "Compared with the previous period", cmpHelp: "Medians for the period (B) and the {m} months before (A). \"Stable\" when the difference is within the usual variation; details in \"Progress and statistics\"."
@@ -82,7 +82,15 @@
     });
     var monthRows = Object.keys(byMonth).sort().map(function (k) {
       var m = byMonth[k];
-      return { k: k, n: m.length, onset: avg(m.map(function (x) { return x.onsetMs; })), wpm: avg(m.map(function (x) { return x.wpm; })), pauses: avg(m.map(function (x) { return x.pauses; })) };
+      return {
+        k: k, n: m.length,
+        onset: avg(m.map(function (x) { return x.onsetMs; })),
+        wpm: avg(m.map(function (x) { return x.wpm; })),
+        phonation: avg(m.map(function (x) { return x.phonationRatio; })),
+        syllRate: avg(m.map(function (x) { return x.syllRate; })),
+        pauses: avg(m.map(function (x) { return x.pauses; })),
+        longPauses: avg(m.map(function (x) { return x.longPauses; }))
+      };
     });
     var checks = (window.POG.checkins ? window.POG.checkins.list() : []).filter(function (k) { return new Date(k.date) >= since; });
     return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks };
@@ -99,8 +107,13 @@
       return [l.name, l.start == null ? c.noHist : String(l.start), l.now == null ? "–" : String(l.now), l.changes == null ? c.noHist : String(l.changes)];
     }));
     var speak = d.months.length
-      ? table([c.colMonth, c.colN, c.colOnset, c.colWpm, c.colPauses], d.months.map(function (m) {
-          return [new Date(m.k + "-15").toLocaleDateString(loc(), { month: "long", year: "numeric" }), String(m.n), num(m.onset != null ? m.onset / 1000 : null, 1), num(m.wpm), num(m.pauses, 1)];
+      ? table([c.colMonth, c.colN, c.colOnset, c.colWpm, c.colPhonation, c.colSyllRate, c.colPauses, c.colLongPauses], d.months.map(function (m) {
+          return [
+            new Date(m.k + "-15").toLocaleDateString(loc(), { month: "long", year: "numeric" }),
+            String(m.n), num(m.onset != null ? m.onset / 1000 : null, 1), num(m.wpm),
+            m.phonation != null ? Math.round(m.phonation * 100) + "%" : "–",
+            num(m.syllRate, 1), num(m.pauses, 1), num(m.longPauses, 1)
+          ];
         })) +
         '<div class="chart-row">' +
         window.POG.charts.line(d.perSession.map(function (p) { return { t: p.t, y: p.onset != null ? p.onset / 1000 : null }; }), { title: c.chOnset, unit: "s", locale: loc(), decimals: 1 }) +
@@ -108,8 +121,10 @@
       : '<p class="sub">' + esc(c.noSpeak) + '</p>';
     var chk = d.checks.length
       ? table(c.chkCols, d.checks.map(function (k) {
+          var letTxt = k.letterFlu ? k.letterFlu.letter + ": " + k.letterFlu.count : "–";
+          var icuTxt = k.desc && k.desc.icu != null ? k.desc.icu + "/" + (k.desc.icuTotal || 12) : "–";
           return [day(k.date, { day: "numeric", month: "short", year: "numeric" }), k.who === "solo" ? c.solo : c.assist, k.naming ? String(k.naming.correct) : "–",
-            k.rep && k.rep.avg != null ? Math.round(k.rep.avg * 100) + "%" : "–", k.flu ? String(k.flu.count) : "–", num(k.desc ? k.desc.wpm : null)];
+            k.rep && k.rep.avg != null ? Math.round(k.rep.avg * 100) + "%" : "–", k.flu ? String(k.flu.count) : "–", letTxt, icuTxt, num(k.desc ? k.desc.wpm : null)];
         })) +
         '<div class="chart-row">' +
         window.POG.charts.line(d.checks.map(function (k) { return { t: new Date(k.date).getTime(), y: k.naming ? k.naming.correct : null }; }), { title: c.chName, max: 10, locale: loc() }) +
@@ -129,7 +144,7 @@
       '<h2>' + esc(c.lv) + '</h2><p class="note">' + esc(c.lvHelp) + '</p>' + lv +
       '<h2>' + esc(c.speak) + '</h2><p class="note">' + esc(c.speakHelp) + '</p>' + speak +
       (window.POG.progress ? '<h2>' + esc(c.cmp) + '</h2><p class="note">' + esc(api.fill(c.cmpHelp, { m: months })) + '</p>' +
-        window.POG.progress.compareTable({ aFrom: d.since.getTime() - (now.getTime() - d.since.getTime()), aTo: d.since.getTime(), bFrom: d.since.getTime(), bTo: now.getTime() + 1 }, "all", ["ability", "onset", "wpm", "ck_naming", "ck_flu", "ck_rep"]) : '') +
+        window.POG.progress.compareTable({ aFrom: d.since.getTime() - (now.getTime() - d.since.getTime()), aTo: d.since.getTime(), bFrom: d.since.getTime(), bTo: now.getTime() + 1 }, "all", ["ability", "onset", "wpm", "phonation", "syllRate", "longPauses", "ck_naming", "ck_icu", "ck_flu", "ck_letter_flu", "ck_rep"]) : '') +
       '<h2>' + esc(c.chk) + '</h2>' + chk +
       '<h2 class="print-only">' + esc(c.notes) + '</h2><div class="rp-notes print-only" aria-hidden="true"></div>' +
       '</article>' +

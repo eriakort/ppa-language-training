@@ -6,14 +6,14 @@
  *
  * Keep SHELL in step with index.html (tests/offline.test.js checks this). Bump VERSION when the list changes.
  */
-var VERSION = "pog-shell-v6";
+var VERSION = "pog-shell-v7";
 var SHELL = [
   "./", "index.html", "css/styles.css", "manifest.webmanifest",
   "assets/icons/favicon-32.png", "assets/icons/apple-touch-icon.png", "assets/icons/icon-192.png", "assets/icons/icon-512.png", "assets/icons/icon-maskable-512.png",
   "js/strings.js", "content/base.js", "content/interests.js",
   "js/speech.js", "js/recorder.js", "js/recordings.js",
   "js/vendor/supabase-js-2.119.0.js", "js/supabase-config.js",
-  "js/app.js", "js/album-store.js", "js/aac.js", "js/album.js", "js/charts.js", "js/checkin.js", "js/report.js", "js/stats.js", "js/progress.js",
+  "js/app.js", "js/album-store.js", "js/aac.js", "js/album.js", "js/charts.js", "js/checkin-lexicon.js", "js/checkin.js", "js/report.js", "js/stats.js", "js/progress.js",
   "js/account.js", "js/cloud-sync.js", "js/therapist-cloud.js", "js/profile-lifecycle.js",
   "js/deletion-retention.js", "js/ownership-transfer.js", "js/account-deletion-review.js",
   "js/utility-menu.js", "js/offline.js",

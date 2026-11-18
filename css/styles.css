@@ -538,6 +538,11 @@ html[data-patient-lock="1"] .util-menu { display: none !important; }
 .chk-scene { width: 100%; max-width: 560px; height: auto; border-radius: 16px; border: 2px solid var(--line); }
 .chk-left { font-size: 34px; font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
 .chk-count { font-size: 24px; font-weight: 700; margin: 0; }
+.chk-icu-box { width: 100%; max-width: 580px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.chk-icu-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chk-icu-chip { background: var(--soft); color: var(--ink); border: 2px solid var(--line); border-radius: 999px; padding: 8px 14px; font-size: 16px; font-weight: 700; min-height: 44px; }
+.chk-icu-chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chk-letter { width: 96px; height: 96px; border-radius: 22px; background: var(--soft); border: 3px solid var(--accent); color: var(--ink); display: grid; place-items: center; font-size: 54px; font-weight: 700; line-height: 1; }
 
 /* ---------- small trend charts (one measure each) ---------- */
 .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }

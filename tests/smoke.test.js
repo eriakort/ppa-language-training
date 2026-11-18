@@ -457,9 +457,9 @@ async function playThrough(page, solo) {
   const saved = await ck.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_checkins")); return JSON.parse(localStorage.getItem(k)); });
   const k1 = saved[0];
   check(k1.naming.correct === 9 && k1.naming.total === 10, "check-in: 9 of 10 names recognised (alternatives accepted, skip counted) - got " + k1.naming.correct);
-  check(k1.rep.items.length === 3 && k1.rep.items[0].score === 1 && k1.rep.items[2].score < 1, "check-in: repetition scored by coverage");
-  check(k1.flu.count === 4, "check-in: animals count distinct words without fillers - got " + k1.flu.count);
-  check(k1.desc.words === 14, "check-in: description words counted - got " + k1.desc.words);
+  check(k1.rep.items.length === 3 && k1.rep.items[0].score === 1 && k1.rep.items[0].order === 1 && k1.rep.orderAvg != null && k1.rep.items[2].score < 1, "check-in: repetition scored by coverage and sequence order");
+  check(k1.flu.count === 4 && k1.flu.repeats === 1 && k1.flu.intrusions === 0, "check-in: animals count distinct lexicon words, repeats and intrusions - got " + JSON.stringify(k1.flu));
+  check(k1.desc.words === 14 && k1.desc.icu === 5, "check-in: description words and kitchen ICU concepts counted - got words=" + k1.desc.words + ", icu=" + k1.desc.icu);
   await ck.click('[data-act="chk-home"]');
   check(!(await ck.$('.homebtn[data-act="chk-start"]')), "check-in: not offered again until the next one is due");
   // With a helper
@@ -495,6 +495,20 @@ async function playThrough(page, solo) {
   await ck.screenshot({ path: path.join(__dirname, "..", "dist", "report-screen.png"), fullPage: true });
   await ck.emulateMedia({ media: "print" });
   await ck.pdf({ path: path.join(__dirname, "..", "dist", "report-print.pdf") }).catch(() => {});
+  await ck.emulateMedia({ media: "screen" });
+  // Standalone 1-minute letter fluency from check-in picker
+  await ck.click('[data-act="therapist"]');
+  await ck.click('[data-act="chk-results"]');
+  await ck.click('[data-act="chk-start"]');
+  await ck.click('[data-act="chk-letter-only"]');
+  await ck.click('[data-act="chk-let-who"][data-w="solo"]');
+  check(!!(await ck.$(".chk-letter")) && (await ck.textContent(".chk-letter")).trim() === "F", "check-in: standalone letter fluency starts on letter F");
+  await ck.click('[data-act="chk-let-start"]'); await ck.waitForTimeout(60);
+  await ck.evaluate(() => window.__say("fiore finestra fuoco fiore casa"));
+  await ck.click('[data-act="chk-done"]'); await ck.waitForTimeout(120);
+  await ck.click('[data-act="chk-let-end"]'); await ck.waitForTimeout(150);
+  const k3 = (await ck.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_checkins")); return JSON.parse(localStorage.getItem(k)); }))[2];
+  check(k3 && k3.kind === "letter" && k3.letterFlu && k3.letterFlu.letter === "F" && k3.letterFlu.count === 3 && k3.letterFlu.repeats === 1 && k3.letterFlu.intrusions === 1, "check-in: standalone letter fluency saves F count, repeats, and intrusions - got " + JSON.stringify(k3 && k3.letterFlu));
   check(ck.errors.length === 0, "no page errors (check-in, summary): " + ck.errors.join("; "));
   await browser4.close();
 

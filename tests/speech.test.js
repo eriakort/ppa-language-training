@@ -34,7 +34,24 @@ check(Math.abs(m.longestPauseMs - 1000) <= 50, "longest pause is about 1 s (got 
 check(Math.abs(m.speechMs - 2200) <= 100, "speaking time about 2.2 s, short gap bridged (got " + m.speechMs + ")");
 const silent = measure(frames([[2000, 0]]), 2000);
 check(silent.onsetMs === null && silent.speechMs === 0, "silence gives no onset and no speech");
+check(silent.phonationRatio === 0 && silent.syllRate === null, "silence gives 0 phonation ratio and null syllable rate");
 check(measure([], 0) === null, "too little audio gives no measures");
+
+// Extended acoustic measures: short hesitation (400 ms), long retrieval pause (1800 ms), and oscillating syllable nuclei
+const fExt = frames([[500, 0], [500, 1], [400, 0], [500, 1], [1800, 0], [500, 1], [300, 0]]);
+const mExt = measure(fExt, 4500);
+check(mExt.shortPauses === 1, "400 ms gap counts as 1 short pause (got " + mExt.shortPauses + ")");
+check(mExt.longPauses === 1 && mExt.pauses === 1, "1800 ms gap counts as 1 long pause and 1 pause (got " + mExt.longPauses + "/" + mExt.pauses + ")");
+check(mExt.phonationRatio > 0.25 && mExt.phonationRatio < 0.45, "phonation ratio reflects active speaking fraction (got " + mExt.phonationRatio + ")");
+
+// Oscillating RMS envelope over 2 seconds (~4 syllables/sec)
+const osc = [];
+for (let i = 0; i < 40; i++) {
+  const peak = i % 5 === 1 || i % 5 === 2;
+  osc.push({ t: i * 50, rms: peak ? 0.28 : 0.04 });
+}
+const mOsc = measure(osc, 2000);
+check(mOsc.syllRate !== null && mOsc.syllRate >= 2.5 && mOsc.syllRate <= 5.5, "oscillating RMS estimates realistic syllable rate (got " + mOsc.syllRate + ")");
 
 /* ---- speech engine with a fake recogniser ---- */
 function engine() {

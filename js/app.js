@@ -427,7 +427,7 @@
   /* Speaking measures for the answer just given: from the audio when recording, otherwise from recogniser timing. */
   function finishRecording() {
     var tm = SP.timing(), words = toks(L.text + " " + L.partial).length;
-    var base = { totalMs: Date.now() - L.t0, onsetMs: tm.firstSpeech ? tm.firstSpeech - tm.startedAt : null, speechMs: null, pauses: null, longestPauseMs: null, words: words, src: "timing" };
+    var base = { totalMs: Date.now() - L.t0, onsetMs: tm.firstSpeech ? tm.firstSpeech - tm.startedAt : null, speechMs: null, pauses: null, shortPauses: null, longPauses: null, longestPauseMs: null, phonationRatio: null, syllRate: null, words: words, src: "timing" };
     if (!recOn) return Promise.resolve(withRate(base));
     recOn = false;
     return REC.stop().then(function (r) {
@@ -452,6 +452,50 @@
     SP.candidates().concat([text]).forEach(function (c) { var v = judge(st, c); if (order[v] > order[best]) best = v; });
     return best;
   }
+  function targetWordsForError(st) {
+    if (st.game === "name") return toks(st.data[lang][0]);
+    if (st.game === "mystery") return toks(st.data.w);
+    if (st.game === "echo" || st.game === "read") return toks(st.data);
+    if (st.game === "script") return toks(st.data.phrase);
+    if (st.game === "seq") return toks(st.data.items.join(" "));
+    return [];
+  }
+  function consonantSkel(w) { return String(w || "").replace(/[aeiou]/g, ""); }
+  function classifySpokenError(st, text) {
+    var spoken = toks(text);
+    if (!spoken.length || st.game === "describe") return null;
+    var targetW = targetWordsForError(st).filter(function (w) { return w.length >= 3; });
+    var isPhonemic = targetW.some(function (tw) {
+      var ts = consonantSkel(tw);
+      return spoken.some(function (hw) {
+        if (hw.length < 2) return false;
+        if (lev(tw, hw) <= Math.max(2, Math.ceil(tw.length * 0.45))) return true;
+        if (tw.length >= 3 && tw.slice(0, 2) === hw.slice(0, 2)) return true;
+        var hs = consonantSkel(hw);
+        return ts.length >= 2 && hs.length >= 2 && lev(ts, hs) <= 1;
+      });
+    });
+    if (isPhonemic) return "phonemic";
+    if (st.game === "name" || st.game === "mystery") {
+      var knownName = ALL_NAMES.some(function (n) {
+        if (st.game === "name" && n === st.data) return false;
+        return toks(n[lang][0]).some(function (nw) { return nw.length >= 3 && spoken.indexOf(nw) >= 0; });
+      });
+      if (knownName) return "semantic";
+    }
+    return "other";
+  }
+  function cueUsed(st, result) {
+    if (result === "skip") return null;
+    if (result === "choice" || S.usedChoice) return "choice";
+    if (result === "model" || S.revealed) return "model";
+    if (st.game === "name") return S.support === 0 ? "none" : S.support === 1 ? "semantic" : S.support === 2 ? "phonemic" : "model";
+    if (st.game === "mystery") return S.support === 0 ? "none" : S.support === 1 ? "phonemic" : S.support === 2 ? "pattern" : "choice";
+    if (st.game === "describe") return S.support === 0 ? "none" : S.support === 1 ? "questions" : "keywords";
+    if (st.game === "script") return S.support === 0 ? "none" : S.support === 1 ? "semantic" : "model";
+    if (st.game === "crossword" || st.game === "wordbuild") return S.support > 0 ? "phonemic" : "none";
+    return S.support > 0 ? "hints" : "none";
+  }
   function evaluateSpoken(meas) {
     var st = L.step;
     if (!S || screen !== "item" || cur() !== st) return;
@@ -462,6 +506,8 @@
     var v = bestVerdict(st, text);
     saveRecording(st, text, v === "good" || v === "almost" ? v : "retry");
     if (v === "good" || v === "almost") { record(v); return; }
+    var et = classifySpokenError(st, text);
+    if (et) S.errType = et;
     rateAction("retry");
     if (S && cur() === st) { S.nudge = T[lang].tryHelp; render(); }
   }
@@ -694,7 +740,7 @@
     var st = cur();
     S.support = 0; S.max = 0; S.start = 0; S.replayed = false; S.opts = null; S.nudge = ""; S.firstTry = true;
     S.slots = null; S.pool = null; S.wrongs = 0; S.solved = false; S.revealed = false; S.t0 = Date.now(); S.heard = [];
-    S.meas = null; S.recIds = []; S.pendingRec = null; S.paceIdx = -1;
+    S.meas = null; S.recIds = []; S.pendingRec = null; S.paceIdx = -1; S.errType = null; S.usedChoice = false;
     if (st.game === "describe") { S.support = st.lv - 1; S.max = 2; }
     if (st.game === "name") { if (st.lv <= 2) { S.support = st.lv - 1; S.max = 3; } else makeOpts(st); }
     if (st.game === "script") { S.support = st.lv - 1; S.max = 2; }
@@ -866,7 +912,7 @@
   function record(result) {
     var st = cur(), extra = Math.max(0, (S.support || 0) - (S.start || 0));
     var hasHints = ((st.game === "name" || st.game === "mystery") && st.lv <= 2) || ["describe", "script", "crossword", "wordbuild"].indexOf(st.game) >= 0;
-    S.log.push({ game: st.game, lv: st.lv, label: itemLabel(st), hints: hasHints ? S.support : null, result: result, score: score(result, extra), ms: Date.now() - S.t0, heard: (S.heard || []).join(" / "), meas: S.meas || null, recIds: (S.recIds || []).slice() });
+    S.log.push({ game: st.game, lv: st.lv, label: itemLabel(st), hints: hasHints ? S.support : null, cue: cueUsed(st, result), errType: S.errType || null, result: result, score: score(result, extra), ms: Date.now() - S.t0, heard: (S.heard || []).join(" / "), meas: S.meas || null, recIds: (S.recIds || []).slice() });
     next();
   }
   function next() {
@@ -915,7 +961,7 @@
     var all = load("sessions") || [];
     all = all.filter(function (x) { return x.id !== S.id; });
     all.push({ id: S.id, date: S.started.toISOString(), mode: S.mode, who: S.who, items: S.log.map(function (r) {
-      return { game: r.game, lv: r.lv, label: r.label, result: r.result, score: r.score, hints: r.hints, ms: r.ms, heard: r.heard, meas: r.meas, recIds: r.recIds };
+      return { game: r.game, lv: r.lv, label: r.label, result: r.result, score: r.score, hints: r.hints, cue: r.cue || null, errType: r.errType || null, ms: r.ms, heard: r.heard, meas: r.meas, recIds: r.recIds };
     }) });
     save("sessions", all.slice(-60));
     /* A compact copy for long-term progress statistics (kept much longer than full sessions). */
@@ -1214,7 +1260,11 @@
     var t = T[lang]; if (!m) return "";
     var parts = [t.mOnset + " " + fmtS(m.onsetMs) + " s"];
     if (m.wpm != null) parts.push(m.wpm + " " + t.mWpm);
+    if (m.syllRate != null) parts.push(String(m.syllRate).replace(".", lang === "it" ? "," : ".") + " " + t.mSyllRate);
+    if (m.phonationRatio != null) parts.push(t.mPhonation + " " + Math.round(m.phonationRatio * 100) + "%");
     if (m.pauses != null) parts.push(t.mPauses + " " + m.pauses + (m.pauses ? " (" + t.mLongest + " " + fmtS(m.longestPauseMs) + " s)" : ""));
+    if (m.shortPauses) parts.push(t.mShortPauses + " " + m.shortPauses);
+    if (m.longPauses) parts.push(t.mLongPauses + " " + m.longPauses);
     return parts.join(" · ");
   }
   function viewTherapist() {
@@ -1285,13 +1335,15 @@
   }
   function exportCsv() {
     var t = T[lang], sessions = load("sessions") || [];
-    var lines = [["date", "session", "mode", "player", "game", "level", "item", "heard", "result", "hints", "time_s", "onset_s", "speech_s", "pauses", "longest_pause_s", "words", "words_per_min", "measure_source"].join(",")];
+    var lines = [["date", "session", "mode", "player", "game", "level", "item", "heard", "result", "hints", "cue", "error_type", "time_s", "onset_s", "speech_s", "pauses", "short_pauses", "long_pauses", "longest_pause_s", "phonation_ratio", "syllables_per_sec", "words", "words_per_min", "measure_source"].join(",")];
     sessions.forEach(function (s) {
       s.items.forEach(function (i) {
         var m = i.meas || {};
-        lines.push([s.date, s.id, s.mode, s.who, i.game, i.lv, i.label, i.heard, i.result, i.hints, i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+        lines.push([s.date, s.id, s.mode, s.who, i.game, i.lv, i.label, i.heard, i.result, i.hints, i.cue || "", i.errType || "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
           m.onsetMs == null ? "" : (m.onsetMs / 1000).toFixed(2), m.speechMs == null ? "" : (m.speechMs / 1000).toFixed(2),
-          m.pauses == null ? "" : m.pauses, m.longestPauseMs == null ? "" : (m.longestPauseMs / 1000).toFixed(2), m.words == null ? "" : m.words, m.wpm == null ? "" : m.wpm, m.src || ""].map(csvCell).join(","));
+          m.pauses == null ? "" : m.pauses, m.shortPauses == null ? "" : m.shortPauses, m.longPauses == null ? "" : m.longPauses,
+          m.longestPauseMs == null ? "" : (m.longestPauseMs / 1000).toFixed(2), m.phonationRatio == null ? "" : m.phonationRatio, m.syllRate == null ? "" : m.syllRate,
+          m.words == null ? "" : m.words, m.wpm == null ? "" : m.wpm, m.src || ""].map(csvCell).join(","));
       });
     });
     var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -1612,13 +1664,18 @@
     var t = T[lang];
     if (!S.log.length) return "";
     var anyHeard = S.log.some(function (r) { return r.heard; });
+    var anyCue = S.log.some(function (r) { return r.cue && r.cue !== "none"; });
+    var anyErr = S.log.some(function (r) { return r.errType; });
     var rows = S.log.map(function (r) {
+      var cueLabel = r.cue && t.cues && t.cues[r.cue] ? t.cues[r.cue] : (r.cue || "–");
+      var errLabel = r.errType && t.errTypes && t.errTypes[r.errType] ? t.errTypes[r.errType] : (r.errType || "–");
       return '<tr><td>' + esc(t.game[r.game]) + '</td><td class="n">' + (r.lv || "–") + '</td><td>' + esc(r.label) + '</td>' +
         (anyHeard ? '<td>' + esc(r.heard || "–") + '</td>' : '') + '<td class="n">' + (r.hints === null ? "–" : r.hints) + '</td>' +
+        (anyCue ? '<td>' + esc(cueLabel) + '</td>' : '') + (anyErr ? '<td>' + esc(errLabel) + '</td>' : '') +
         '<td><span class="pill ' + r.result + '">' + esc(t.res[r.result]) + '</span></td><td class="n">' + Math.round(r.ms / 1000) + '</td></tr>';
     }).join("");
     return '<p class="note">' + esc(S.who === "solo" ? t.modeSolo : t.modeAssist) + '</p>' +
-      '<div class="tbl"><table><thead><tr><th>' + esc(t.colGame) + '</th><th>' + esc(t.colLv) + '</th><th>' + esc(t.colItem) + '</th>' + (anyHeard ? '<th>' + esc(t.colHeard) + '</th>' : '') + '<th>' + esc(t.colHints) + '</th><th>' + esc(t.colRes) + '</th><th>' + esc(t.colTime) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+      '<div class="tbl"><table><thead><tr><th>' + esc(t.colGame) + '</th><th>' + esc(t.colLv) + '</th><th>' + esc(t.colItem) + '</th>' + (anyHeard ? '<th>' + esc(t.colHeard) + '</th>' : '') + '<th>' + esc(t.colHints) + '</th>' + (anyCue ? '<th>' + esc(t.colCue) + '</th>' : '') + (anyErr ? '<th>' + esc(t.colErr) + '</th>' : '') + '<th>' + esc(t.colRes) + '</th><th>' + esc(t.colTime) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
       '<p class="note">' + esc(t.timeNote) + '</p>';
   }
   function summaryLines() {
@@ -1659,7 +1716,9 @@
     if (prof.name) lines.push(prof.name + (prof.year ? " · " + t.birth + " " + prof.year : ""));
     lines.push(S.who === "solo" ? t.modeSolo : t.modeAssist);
     S.log.forEach(function (r) {
-      lines.push(t.game[r.game] + (r.lv ? " (" + t.level + " " + r.lv + ")" : "") + " | " + r.label + (r.heard ? " | " + t.colHeard + ": " + r.heard : "") + " | " + t.colHints + ": " + (r.hints === null ? "–" : r.hints) + " | " + t.res[r.result] + " | " + Math.round(r.ms / 1000) + " s");
+      var cueTxt = r.cue && r.cue !== "none" ? " | " + t.colCue + ": " + ((t.cues && t.cues[r.cue]) || r.cue) : "";
+      var errTxt = r.errType ? " | " + t.colErr + ": " + ((t.errTypes && t.errTypes[r.errType]) || r.errType) : "";
+      lines.push(t.game[r.game] + (r.lv ? " (" + t.level + " " + r.lv + ")" : "") + " | " + r.label + (r.heard ? " | " + t.colHeard + ": " + r.heard : "") + " | " + t.colHints + ": " + (r.hints === null ? "–" : r.hints) + cueTxt + errTxt + " | " + t.res[r.result] + " | " + Math.round(r.ms / 1000) + " s");
     });
     summaryLines().forEach(function (c) { lines.push(c.text); });
     return lines.join("\n");
@@ -1954,7 +2013,7 @@
       if (st.game === "script" && S.support === 2) speak(st.data.phrase);
       return;
     }
-    if (act === "choice") { makeOpts(st); render(); return; }
+    if (act === "choice") { S.usedChoice = true; makeOpts(st); render(); return; }
     if (act === "opt") {
       var o = S.opts[+b.getAttribute("data-i")];
       if (o.ok) {

@@ -7,7 +7,11 @@
  *   speechMs       total time with voice
  *   totalMs        length of the recording
  *   pauses         number of silences of at least 700 ms between stretches of speech
- *   longestPauseMs longest such silence
+ *   shortPauses    number of short hesitations (250–699 ms) between stretches of speech
+ *   longPauses     number of long word-finding silences (>= 1500 ms) between stretches of speech
+ *   longestPauseMs longest silence >= 700 ms
+ *   phonationRatio fraction of total recording time with active voice (0..1)
+ *   syllRate       estimated acoustic syllable-nucleus rate (syllables/s during speech)
  * These are rough indicators for trends, not clinical measurements.
  */
 window.POG = window.POG || {};
@@ -15,6 +19,7 @@ window.POG.measureVoice = function (frames, totalMs, opts) {
   "use strict";
   opts = opts || {};
   var minPause = opts.minPause || 700, bridge = opts.bridge || 250, minSeg = opts.minSeg || 100;
+  var longPause = opts.longPause || 1500;
   if (!frames || frames.length < 6) return null;
   var levels = frames.map(function (f) { return f.rms; }).sort(function (a, b) { return a - b; });
   var floor = levels[Math.floor(levels.length * 0.2)];
@@ -27,13 +32,57 @@ window.POG.measureVoice = function (frames, totalMs, opts) {
     }
   });
   segs = segs.filter(function (s) { return s.end - s.start >= minSeg; });
-  if (!segs.length) return { onsetMs: null, speechMs: 0, totalMs: Math.round(totalMs), pauses: 0, longestPauseMs: 0 };
-  var speech = 0, pauses = 0, longest = 0;
+  if (!segs.length) {
+    return {
+      onsetMs: null, speechMs: 0, totalMs: Math.round(totalMs),
+      pauses: 0, shortPauses: 0, longPauses: 0, longestPauseMs: 0,
+      phonationRatio: 0, syllRate: null
+    };
+  }
+  var speech = 0, pauses = 0, shortPauses = 0, longPauses = 0, longest = 0;
   segs.forEach(function (s, i) {
     speech += s.end - s.start;
-    if (i) { var gap = s.start - segs[i - 1].end; if (gap >= minPause) { pauses++; longest = Math.max(longest, gap); } }
+    if (i) {
+      var gap = s.start - segs[i - 1].end;
+      if (gap >= bridge && gap < minPause) shortPauses++;
+      if (gap >= minPause) {
+        pauses++;
+        longest = Math.max(longest, gap);
+        if (gap >= longPause) longPauses++;
+      }
+    }
   });
-  return { onsetMs: Math.round(segs[0].start), speechMs: Math.round(speech), totalMs: Math.round(totalMs), pauses: pauses, longestPauseMs: Math.round(longest) };
+  var sm = frames.map(function (_f, idx) {
+    var a = idx > 0 ? frames[idx - 1].rms : frames[idx].rms;
+    var b = frames[idx].rms;
+    var c = idx + 1 < frames.length ? frames[idx + 1].rms : frames[idx].rms;
+    return (a + b + c) / 3;
+  });
+  var peaks = 0, lastPeakT = -1e9, minSince = sm[0];
+  for (var i = 1; i < sm.length - 1; i++) {
+    minSince = Math.min(minSince, sm[i]);
+    if (frames[i].rms > thr && sm[i] >= sm[i - 1] && sm[i] > sm[i + 1] && (frames[i].t - lastPeakT >= 140)) {
+      if (lastPeakT < 0 || sm[i] >= minSince * 1.25 || minSince <= thr) {
+        peaks++;
+        lastPeakT = frames[i].t;
+        minSince = sm[i];
+      }
+    }
+  }
+  var syllRate = speech >= 300 && peaks > 0 ? Math.round((peaks / (speech / 1000)) * 10) / 10 : null;
+  if (syllRate != null && (syllRate < 0.5 || syllRate > 10)) syllRate = null;
+  var phonationRatio = totalMs > 0 ? Math.min(1, Math.round((speech / totalMs) * 1000) / 1000) : 0;
+  return {
+    onsetMs: Math.round(segs[0].start),
+    speechMs: Math.round(speech),
+    totalMs: Math.round(totalMs),
+    pauses: pauses,
+    shortPauses: shortPauses,
+    longPauses: longPauses,
+    longestPauseMs: Math.round(longest),
+    phonationRatio: phonationRatio,
+    syllRate: syllRate
+  };
 };
 
 window.POG.createRecorder = function () {

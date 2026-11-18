@@ -35,7 +35,8 @@
       alerts: "Da guardare", alertText: "{m}: le ultime {n} sessioni sono sotto il solito (di solito {u}, ultime {l}).", noAlerts: "Nessun calo improvviso nelle ultime sessioni.",
       activity: "Attività", sessions: "Sessioni", days: "Giorni di esercizio", minutes: "Minuti",
       ability: "Indice di autonomia (tutti gli esercizi)", abilityOf: "Indice di autonomia: {g}", onset: "Tempo prima della prima parola", wpm: "Parole al minuto",
-      ckNaming: "Controllo: nomi giusti (su 10)", ckFlu: "Controllo: animali in un minuto", ckRep: "Controllo: ripetizione", ckWpm: "Controllo: parole al minuto",
+      phonation: "Tempo di fonazione (%)", syllRate: "Sillabe al secondo", longPauses: "Pause lunghe (≥ 1,5 s)",
+      ckNaming: "Controllo: nomi giusti (su 10)", ckFlu: "Controllo: animali in un minuto", ckFluRep: "Controllo: ripetizioni animali", ckLetterFlu: "Controllo: fluenza per lettera", ckFluRatio: "Controllo: rapporto animali / lettera", ckIcu: "Controllo: concetti cucina (su 12)", ckIcuRate: "Controllo: concetti al minuto", ckRep: "Controllo: ripetizione", ckWpm: "Controllo: parole al minuto",
       settings: "Soglie", kLabel: "Un cambiamento conta se supera", kOpt: "{k} volte la variazione abituale", runLabel: "Avviso dopo", runOpt: "{n} sessioni di fila sotto il solito", save: "Salva le soglie", saved: "Soglie salvate.",
       method: "Come si calcola: si usano le mediane, così un giorno storto pesa poco. «Variazione abituale» è la dispersione robusta del periodo A (MAD × 1,4826). Un cambiamento conta solo se è più grande della soglia; la tendenza usa la pendenza di Theil–Sen e il test di Mann–Kendall (p < 0,05). I controlli del parlato sono la misura più affidabile, perché sono sempre uguali e usano parole che non compaiono negli esercizi. Con meno di 5 sessioni (2 controlli) per periodo il risultato è «dati insufficienti». Valori indicativi, non una valutazione clinica: le soglie vanno decise dal logopedista.",
       back: "Torna all'area logopedista", backCloud: "Torna allo storico condiviso", remote: "Dati dal cloud: {n} (sola lettura)", none: "–", perMonth: "al mese", unitS: "s", pct: "%"
@@ -57,7 +58,8 @@
       alerts: "Worth a look", alertText: "{m}: the last {n} sessions are below usual (usually {u}, latest {l}).", noAlerts: "No sudden drop in recent sessions.",
       activity: "Activity", sessions: "Sessions", days: "Days practised", minutes: "Minutes",
       ability: "Ability index (all exercises)", abilityOf: "Ability index: {g}", onset: "Time before the first word", wpm: "Words per minute",
-      ckNaming: "Check-in: names correct (of 10)", ckFlu: "Check-in: animals in one minute", ckRep: "Check-in: repetition", ckWpm: "Check-in: words per minute",
+      phonation: "Phonation time (%)", syllRate: "Syllables per second", longPauses: "Long pauses (≥ 1.5 s)",
+      ckNaming: "Check-in: names correct (of 10)", ckFlu: "Check-in: animals in one minute", ckFluRep: "Check-in: repeated animals", ckLetterFlu: "Check-in: letter fluency", ckFluRatio: "Check-in: animal / letter fluency ratio", ckIcu: "Check-in: kitchen concepts (of 12)", ckIcuRate: "Check-in: concepts per minute", ckRep: "Check-in: repetition", ckWpm: "Check-in: words per minute",
       settings: "Thresholds", kLabel: "A change counts when it exceeds", kOpt: "{k} times the usual variation", runLabel: "Notice after", runOpt: "{n} sessions in a row below usual", save: "Save thresholds", saved: "Thresholds saved.",
       method: "How it's worked out: medians are used, so one bad day counts for little. \"Usual variation\" is the robust spread of period A (MAD × 1.4826). A change counts only when it is larger than the threshold; the trend uses the Theil–Sen slope and the Mann–Kendall test (p < 0.05). Speech check-ins are the most reliable measure, because they are always the same and use words that don't appear in the exercises. With fewer than 5 sessions (2 check-ins) in a period the result is \"not enough data\". These are indicators, not a clinical assessment: the therapist should decide the thresholds.",
       back: "Back to the therapist area", backCloud: "Back to the shared history", remote: "Cloud data: {n} (read-only)", none: "–", perMonth: "a month", unitS: "s", pct: "%"
@@ -76,18 +78,24 @@
     if (!sess || sess.mode !== "session" || !Array.isArray(sess.items)) return null;
     var g = {};
     sess.items.forEach(function (it) {
-      var x = g[it.game] = g[it.game] || { lv: it.lv, sc: [], hints: [], ms: [], on: [], wpm: [] };
+      var x = g[it.game] = g[it.game] || { lv: it.lv, sc: [], hints: [], ms: [], on: [], wpm: [], phon: [], syl: [], lp: [] };
       x.lv = it.lv;
       x.sc.push(it.score != null ? it.score : (BASE[it.result] != null ? BASE[it.result] : null));
       if (it.hints != null) x.hints.push(it.hints);
       if (it.ms != null) x.ms.push(it.ms);
-      if (it.meas) { x.on.push(it.meas.onsetMs); x.wpm.push(it.meas.wpm); }
+      if (it.meas) {
+        x.on.push(it.meas.onsetMs); x.wpm.push(it.meas.wpm);
+        if (it.meas.phonationRatio != null) x.phon.push(it.meas.phonationRatio);
+        if (it.meas.syllRate != null) x.syl.push(it.meas.syllRate);
+        if (it.meas.longPauses != null) x.lp.push(it.meas.longPauses);
+      }
     });
     var out = {};
     Object.keys(g).forEach(function (k) {
       var x = g[k];
       out[k] = { lv: x.lv, n: x.sc.length, s: round(ST.mean(x.sc), 3), hints: round(ST.mean(x.hints), 2), ms: round(ST.median(x.ms), 0),
-        on: round(ST.median(x.on), 0), wpm: round(ST.median(x.wpm), 0), msTot: x.ms.reduce(function (a, b) { return a + Math.min(+b || 0, 600000); }, 0) };
+        on: round(ST.median(x.on), 0), wpm: round(ST.median(x.wpm), 0), phon: round(ST.median(x.phon), 3), syl: round(ST.median(x.syl), 1), lp: round(ST.median(x.lp), 1),
+        msTot: x.ms.reduce(function (a, b) { return a + Math.min(+b || 0, 600000); }, 0) };
     });
     return { id: sess.id, t: new Date(sess.date).getTime(), who: sess.who, g: out };
   }
@@ -123,14 +131,22 @@
     var t = T(), list = [
       { key: "ability", label: t.ability, better: "up", min: 0.05, dec: 2, src: "s", get: function (e) { return ST.mean(langGames().map(function (g) { return abilityOf(g, e.g[g]); })); } },
       { key: "onset", label: t.onset, unit: t.unitS, better: "down", min: 0.3, dec: 1, src: "s", get: function (e) { var v = ST.median(Object.keys(e.g).map(function (g) { return e.g[g].on; })); return v == null ? null : v / 1000; } },
-      { key: "wpm", label: t.wpm, better: "up", min: 8, dec: 0, src: "s", get: function (e) { return ST.median(Object.keys(e.g).map(function (g) { return e.g[g].wpm; })); } }
+      { key: "wpm", label: t.wpm, better: "up", min: 8, dec: 0, src: "s", get: function (e) { return ST.median(Object.keys(e.g).map(function (g) { return e.g[g].wpm; })); } },
+      { key: "phonation", label: t.phonation, better: "up", min: 0.08, dec: 0, pct: true, src: "s", get: function (e) { return ST.median(Object.keys(e.g).map(function (g) { return e.g[g].phon; })); } },
+      { key: "syllRate", label: t.syllRate, better: "up", min: 0.5, dec: 1, src: "s", get: function (e) { return ST.median(Object.keys(e.g).map(function (g) { return e.g[g].syl; })); } },
+      { key: "longPauses", label: t.longPauses, better: "down", min: 0.5, dec: 1, src: "s", get: function (e) { return ST.median(Object.keys(e.g).map(function (g) { return e.g[g].lp; })); } }
     ];
     langGames().forEach(function (g) {
       list.push({ key: "ab_" + g, game: g, label: api.fill(t.abilityOf, { g: api.t().game[g] }), better: "up", min: 0.05, dec: 2, src: "s", get: function (e) { return abilityOf(g, e.g[g]); } });
     });
     list.push(
       { key: "ck_naming", label: t.ckNaming, better: "up", min: 2, dec: 0, src: "c", get: function (k) { return k.naming ? k.naming.correct : null; } },
+      { key: "ck_icu", label: t.ckIcu, better: "up", min: 2, dec: 0, src: "c", get: function (k) { return k.desc && k.desc.icu != null ? k.desc.icu : null; } },
+      { key: "ck_icu_rate", label: t.ckIcuRate, better: "up", min: 3, dec: 1, src: "c", get: function (k) { return k.desc && k.desc.icuPerMin != null ? k.desc.icuPerMin : null; } },
       { key: "ck_flu", label: t.ckFlu, better: "up", min: 3, dec: 0, src: "c", get: function (k) { return k.flu ? k.flu.count : null; } },
+      { key: "ck_flu_rep", label: t.ckFluRep, better: "down", min: 1, dec: 0, src: "c", get: function (k) { return k.flu && k.flu.repeats != null ? k.flu.repeats : null; } },
+      { key: "ck_letter_flu", label: t.ckLetterFlu, better: "up", min: 2, dec: 0, src: "c", get: function (k) { return k.letterFlu && k.letterFlu.count != null ? k.letterFlu.count : null; } },
+      { key: "ck_flu_ratio", label: t.ckFluRatio, better: "up", min: 0.3, dec: 2, src: "c", get: function (k) { return k.flu && k.flu.count != null && k.letterFlu && k.letterFlu.count > 0 ? round(k.flu.count / k.letterFlu.count, 2) : null; } },
       { key: "ck_rep", label: t.ckRep, better: "up", min: 0.15, dec: 0, pct: true, src: "c", get: function (k) { return k.rep ? k.rep.avg : null; } },
       { key: "ck_wpm", label: t.ckWpm, better: "up", min: 15, dec: 0, src: "c", get: function (k) { return k.desc ? k.desc.wpm : null; } });
     return list;
@@ -257,7 +273,7 @@
     var smooth = pts.length >= 8 && m.src === "s" ? ST.rollingMedian(pts, 7) : null;
     /* The axis is fitted to the data (with some room), so a real change is visible; its range is printed on the axis. */
     var ys = pts.map(function (p) { return m.pct ? p.y * 100 : p.y; }), lo = Math.min.apply(null, ys.length ? ys : [0]), hi = Math.max.apply(null, ys.length ? ys : [1]);
-    var top = m.key.indexOf("ab") === 0 || m.key === "ability" ? 1 : m.key === "ck_naming" ? 10 : m.pct ? 100 : null;
+    var top = m.key.indexOf("ab") === 0 || m.key === "ability" ? 1 : m.key === "ck_naming" ? 10 : m.key === "ck_icu" ? 12 : m.pct ? 100 : null;
     var pad = Math.max((hi - lo) * 0.25, top === 1 ? 0.05 : 1), axisMin = Math.max(0, lo - pad), axisMax = top != null ? Math.min(top, hi + pad) : null;
     if (top === 1) { axisMin = Math.floor(axisMin * 10) / 10; axisMax = Math.ceil(axisMax * 10) / 10; }
     var chart = window.POG.charts.line(pts.map(function (p) { return { t: p.t, y: m.pct ? p.y * 100 : p.y }; }),

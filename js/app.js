@@ -230,9 +230,9 @@
      Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
      therapist PIN ask for it again, then continue to where you were. */
   var UI_KEY = "pog_ui";
-  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, pick: 1, "pick-ask": 1 };
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, pick: 1, "pick-ask": 1 };
   var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
-  var UI_PIN = { "chk-results": 1, report: 1, progress: 1, carelog: 1 };
+  var UI_PIN = { "chk-results": 1, report: 1, progress: 1, carelog: 1, "wb-manage": 1 };
   function saveUi() {
     try {
       var remote = !!(window.POG.progress && window.POG.progress.isRemote && window.POG.progress.isRemote());
@@ -1333,7 +1333,8 @@
       '<div class="report"><h2>' + esc(t.thTrends) + '</h2>' + trend + '<p class="note">' + esc(t.thTrendsNote) + '</p>' +
       '<div class="row-actions"><button class="secondary" data-act="chk-results">' + esc(t.thCheckins) + '</button><button class="secondary" data-act="report">' + esc(t.thReport) + '</button>' +
         (window.POG.progress ? '<button class="secondary" data-act="progress">' + esc(window.POG.progress.label()) + '</button>' : '') +
-        (window.POG.carelog ? '<button class="secondary" data-act="carelog">' + esc(window.POG.carelog.label()) + '</button>' : '') + '</div>' +
+        (window.POG.carelog ? '<button class="secondary" data-act="carelog">' + esc(window.POG.carelog.label()) + '</button>' : '') +
+        (window.POG.wordbank ? '<button class="secondary" data-act="wb-manage">' + esc(window.POG.wordbank.manageLabel()) + '</button>' : '') + '</div>' +
       (window.POG.progress && window.POG.progress.localAlerts().length ? '<p class="nudge">⚠ ' + esc(t.thAlert) + '</p>' : '') +
       '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
       '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
@@ -1374,6 +1375,12 @@
       var tags = (c.tags || []).join(";");
       lines.push([c.date, c.id, "carelog", "assist", "carelog", c.avgRating, tags, c.note || "", c.fcIndex != null ? Math.round(c.fcIndex * 100) + "%" : "", "", "", "", "",
         "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+    });
+    (load("wordbank_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "wordbank", s.who || "solo", i.game, i.boxAfter || 1, i.label, "", i.result, "", i.cue || "", "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+      });
     });
     var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
     var a = document.createElement("a");

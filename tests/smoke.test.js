@@ -941,6 +941,36 @@ async function playThrough(page, solo) {
   check(fnSaved.length === 1 && fnSaved[0].items.length === 3, "functional reading: completed 3-item session saved locally");
 
   await vr.click('[data-act="fn-home"]');
+  await vr.click('[data-act="var-home"]');
+
+  // Launch Spaced-Retrieval Word Preservation ("Words to keep alive") from the targeted practice hub
+  check(!!(await vr.$('[data-act="wb-home"]')), "wordbank: card is offered in targeted practice hub");
+  await vr.click('[data-act="wb-home"]');
+  for (let item = 0; item < 5; item++) {
+    if (item === 0) {
+      await vr.click('[data-act="wb-sfa"]');
+      check(!!(await vr.$(".wb-cuebox")), "wordbank: semantic feature analysis (SFA) cue opens cleanly");
+      await vr.click('[data-act="wb-got"]');
+    } else if (item === 1) {
+      await vr.click('[data-act="wb-pca"]');
+      check(!!(await vr.$(".wb-cuebox")), "wordbank: phonemic component analysis (PCA) cue opens cleanly");
+      await vr.click('[data-act="wb-choices"]');
+      const opts = await vr.$$('[data-act="wb-opt"]');
+      for (let oi = 0; oi < opts.length; oi++) {
+        if (await vr.$('[data-act="wb-next"]')) break;
+        const sel = '[data-act="wb-opt"][data-i="' + oi + '"]:not([disabled])';
+        if (await vr.$(sel)) await vr.click(sel);
+      }
+    } else {
+      await vr.click('[data-act="wb-got"]');
+    }
+    check(!!(await vr.$('[data-act="wb-next"]')), "wordbank: item " + (item + 1) + " retrieved and saved cleanly");
+    await vr.click('[data-act="wb-next"]');
+  }
+  const wbSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_wordbank_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(wbSaved.length === 1 && wbSaved[0].items.length === 5, "wordbank: completed 5-word spaced-retrieval session saved locally");
+
+  await vr.click('[data-act="wb-home-exit"]');
   await vr.click('[data-act="therapist"]');
   await vr.fill("#th-pin1", "1234"); await vr.fill("#th-pin2", "1234"); await vr.click('[data-act="pin-set"]');
 
@@ -956,11 +986,19 @@ async function playThrough(page, solo) {
   check((await vr.$$(".cg-tip")).length === 4, "carelog: partner strategy tips render all 4 clinical cards");
   await vr.click('[data-act="therapist"]');
 
+  // Open Word Preservation Curator & Cue Profile behind PIN and add a custom word
+  await vr.click('[data-act="wb-manage"]');
+  await vr.fill("#wb-new-word", "pharmacy");
+  await vr.fill("#wb-new-sfa", "Where you pick up prescriptions");
+  await vr.click('[data-act="wb-add"]');
+  check(/pharmacy/i.test(await vr.textContent(".card")), "wordbank curator: custom everyday word added to personal deck");
+  await vr.click('[data-act="therapist"]');
+
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog: printable therapist summary lists targeted domains, everyday reading, and caregiver observations");
-  check(vr.errors.length === 0, "no page errors (variants, functional, carelog): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank: printable therapist summary lists targeted domains, everyday reading, word preservation, and caregiver observations");
+  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

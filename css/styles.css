@@ -740,4 +740,15 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .cg-tip h2 { margin: 0 0 8px; font-size: 18px; color: var(--ink); text-transform: none; letter-spacing: 0; }
 .cg-tip ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
 
+/* ---------- word preservation & cueing ---------- */
+.wb-cuebox { width: 100%; max-width: 580px; background: var(--soft); border-left: 4px solid var(--accent); border-radius: 14px; padding: 14px 18px; text-align: left; font-size: 19px; display: flex; flex-direction: column; gap: 6px; }
+.wb-cuebox ul, .wb-cuebox p { margin: 0; }
+.wb-cuebox ul { padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+.wb-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.wb-pill.strong { background: var(--good-soft); color: var(--good); }
+.wb-pill.fragile { background: var(--worse-soft); color: var(--worse); }
+.wb-pill.maintaining { background: var(--almost-soft); color: var(--almost); }
+.wb-pill.untested { background: var(--soft); color: var(--muted); }
+.wb-add { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+
 

@@ -29,6 +29,7 @@
       notes: "Note", notesHelp: "Spazio per le note a mano.",
       cmp: "Confronto con il periodo precedente", cmpHelp: "Mediane del periodo (B) e dei {m} mesi prima (A). «Stabile» se la differenza è entro la variazione abituale; dettagli in «Andamento e statistiche».",
       varTitle: "Esercizi mirati PPA", varCols: ["Dominio", "Prove", "Precisione", "Livello attuale"],
+      wbTitle: "Parole da conservare e profilo degli indizi", wbCols: ["Voce", "Valore"], wbWords: "Parole mantenute (riquadro ≥ 3)", wbFragile: "Parole fragili / da ripassare", wbIndep: "Risposte autonome (senza indizi)", wbSemCue: "Aiuti semantici (SFA)", wbPhonCue: "Aiuti fonemici (PCA)", wbErrs: "Errori vocali (fonemici / semantici)",
       careTitle: "Osservazioni del familiare", careCols: ["Data", "Indice globale", "Contesto / Note"]
     },
     en: {
@@ -49,6 +50,7 @@
       notes: "Notes", notesHelp: "Space for handwritten notes.",
       cmp: "Compared with the previous period", cmpHelp: "Medians for the period (B) and the {m} months before (A). \"Stable\" when the difference is within the usual variation; details in \"Progress and statistics\".",
       varTitle: "Targeted PPA practice", varCols: ["Domain", "Items", "Accuracy", "Current level"],
+      wbTitle: "Word preservation & cue profile", wbCols: ["Measure", "Value"], wbWords: "Core words maintained (Box ≥ 3)", wbFragile: "Fragile / due words", wbIndep: "Independent responses (uncued)", wbSemCue: "Semantic cues helped", wbPhonCue: "Phonemic cues helped", wbErrs: "Spoken errors (phonemic / semantic)",
       careTitle: "Caregiver observations", careCols: ["Date", "Overall index", "Context / Note"]
     }
   };
@@ -124,7 +126,17 @@
     }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
-    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks, variants: vRows, carelog: cgEntries };
+    var wbApi = window.POG.wordbank;
+    var wbSessions = (wbApi && wbApi.listSessions ? wbApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    var wbSummary = null;
+    if (wbApi && wbSessions.length) {
+      var deck = wbApi.listDeck ? wbApi.listDeck() : [];
+      var maintained = deck.filter(function (c) { return (c.box || 1) >= 3; }).length;
+      var fragile = deck.filter(function (c) { return wbApi.classifyCard(c) === "fragile"; }).length;
+      var profCue = wbApi.computeCueErrorProfile ? wbApi.computeCueErrorProfile(sessions, wbSessions) : null;
+      wbSummary = { deckTotal: deck.length, maintained: maintained, fragile: fragile, profile: profCue };
+    }
+    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks, variants: vRows, carelog: cgEntries, wordbank: wbSummary };
   }
 
   function view() {
@@ -178,6 +190,17 @@
         window.POG.progress.compareTable({ aFrom: d.since.getTime() - (now.getTime() - d.since.getTime()), aTo: d.since.getTime(), bFrom: d.since.getTime(), bTo: now.getTime() + 1 }, "all", ["ability", "onset", "wpm", "phonation", "syllRate", "longPauses", "ck_naming", "ck_icu", "ck_flu", "ck_letter_flu", "ck_rep"]) : '') +
       '<h2>' + esc(c.chk) + '</h2>' + chk +
       (d.variants && d.variants.length ? '<h2>' + esc(c.varTitle) + '</h2>' + table(c.varCols, d.variants.map(function (v) { return [v.name, String(v.n), v.pct, v.lv]; })) : '') +
+      (d.wordbank ? '<h2>' + esc(c.wbTitle) + '</h2>' + table(c.wbCols, (function () {
+        var wb = d.wordbank, p = wb.profile;
+        var out = [[c.wbWords, wb.maintained + " / " + wb.deckTotal], [c.wbFragile, String(wb.fragile)]];
+        if (p && p.totalCued > 0) {
+          out.push([c.wbIndep, Math.round((p.cues.independent / p.totalCued) * 100) + "% (" + p.cues.independent + "/" + p.totalCued + ")"]);
+          out.push([c.wbSemCue, String(p.cues.semantic)]);
+          out.push([c.wbPhonCue, String(p.cues.phonemic)]);
+        }
+        if (p && p.totalErrors > 0) out.push([c.wbErrs, p.errs.phonemic + " / " + p.errs.semantic]);
+        return out;
+      })()) : '') +
       (d.carelog && d.carelog.length && window.POG.carelog ? '<h2>' + esc(c.careTitle) + '</h2>' + table(c.careCols, d.carelog.slice(-8).map(function (e) {
         var cg = window.POG.carelog;
         var tags = (e.tags || []).map(function (k) { return cg.tagLabel(k); }).join(" · ");

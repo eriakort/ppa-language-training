@@ -517,6 +517,11 @@
         '<strong>' + esc(window.POG.grammar.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.grammar.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.grammar.desc()) + '</span></button>' : '') +
+      (window.POG.surface ? '<button class="modecard var-dcard" data-act="surf-home">' +
+        '<span class="ico" aria-hidden="true">🔍</span>' +
+        '<strong>' + esc(window.POG.surface.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.surface.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.surface.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

@@ -41,6 +41,7 @@
       briefTitle: "Scheda per visita medica / logopedica",
       briefHelp: "Testo neutro pronto da incollare in cartella clinica o inviare prima della visita.",
       copyBtn: "📋 Copia scheda visita",
+      printBtn: "🖨️ Stampa o salva PDF",
       copied: "Scheda visita copiata negli appunti.",
       copyFail: "Copia dal riquadro qui sotto.",
       back: "Torna all'area logopedista",
@@ -79,6 +80,9 @@
       obsVerbs: "Reti dei verbi (VNeST): {tr} su {tot} triadi Chi-Verbo-Cosa autonome; plausibilità semantica {pl} su {tot}.",
       obsNarrative: "Racconto connesso: {sq} su {tot} sequenze giuste al primo tentativo; copertura concetti chiave {mc}%.",
       obsGrammar: "Morfologia e parole ponte: {ft} su {tot} scelte al primo tentativo (tempi {tn}, preposizioni {pr}, accordi {ag}).",
+      obsSurface: "Parole irregolari e omofoni: {ft} su {tot} scelte al primo tentativo (regolarizzazioni fonetiche: {rg}, omofoni: {hm}).",
+      obsLatency: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (su {n} prove).",
+      obsLatencySlow: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (+{diff} s rispetto al periodo precedente).",
       obsAlert: "Avviso andamento ({m}): ultime {n} sessioni sotto il valore abituale.",
       obsCareTags: "Contesto segnalato dal familiare negli ultimi ingressi: {tags}.",
       briefHead: "SCHEDA DI RIEPILOGO CLINICO (USO INTERNO VISITA) · {date}",
@@ -107,6 +111,7 @@
       briefTitle: "Physician / SLP visit brief",
       briefHelp: "Clean plain-text summary ready to paste into clinical notes ahead of an appointment.",
       copyBtn: "📋 Copy visit brief",
+      printBtn: "🖨️ Print or save PDF",
       copied: "Visit brief copied to clipboard.",
       copyFail: "Copy from the box below.",
       back: "Back to the therapist area",
@@ -145,6 +150,9 @@
       obsVerbs: "Verb networks (VNeST): {tr} of {tot} clean Agent-Verb-Object triads; semantic plausibility {pl} of {tot}.",
       obsNarrative: "Connected story retell: {sq} of {tot} sequenced cleanly on first pass; {mc}% main-concept coverage.",
       obsGrammar: "Morphosyntax & cloze: {ft} of {tot} clean first-try inflections/relators (tense {tn}, prep {pr}, agreement {ag}).",
+      obsSurface: "Surface & irregular reading: {ft} of {tot} clean first-try matches (phonetic regularizations: {rg}, homophone foils: {hm}).",
+      obsLatency: "Targeted response speed: median {cur} s per item (across {n} items).",
+      obsLatencySlow: "Targeted response speed: median {cur} s per item (+{diff} s slower vs prior window).",
       obsAlert: "Stability alert ({m}): last {n} sessions fell below usual range.",
       obsCareTags: "Recent caregiver context tags: {tags}.",
       briefHead: "CLINICAL VISIT BRIEF (LOCAL PRACTICE SUMMARY) · {date}",
@@ -181,6 +189,26 @@
     return null;
   }
 
+  function median(arr) {
+    var v = (arr || []).filter(function (x) { return x != null && isFinite(x); }).sort(function (a, b) { return a - b; });
+    if (!v.length) return null;
+    var m = Math.floor(v.length / 2);
+    return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
+  }
+
+  function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
+    var out = [];
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing].forEach(function (list) {
+      (list || []).forEach(function (s) {
+        if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+        (s.items || []).forEach(function (it) {
+          if (it.ms != null && isFinite(+it.ms) && +it.ms > 0 && +it.ms < 120000) out.push(+it.ms / 1000);
+        });
+      });
+    });
+    return out;
+  }
+
   function collectStreams() {
     var sessions = api.sessions ? api.sessions() : [];
     var checkins = window.POG.checkins && window.POG.checkins.list ? window.POG.checkins.list() : [];
@@ -193,6 +221,7 @@
     var verbs = window.POG.verbs && window.POG.verbs.listSessions ? window.POG.verbs.listSessions() : [];
     var narrative = window.POG.narrative && window.POG.narrative.listSessions ? window.POG.narrative.listSessions() : [];
     var grammar = window.POG.grammar && window.POG.grammar.listSessions ? window.POG.grammar.listSessions() : [];
+    var surface = window.POG.surface && window.POG.surface.listSessions ? window.POG.surface.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -206,6 +235,7 @@
       verbs: verbs,
       narrative: narrative,
       grammar: grammar,
+      surface: surface,
       carelog: carelog
     };
   }
@@ -284,6 +314,11 @@
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.syntax.push(clamp01(+s.accuracy));
     });
 
+    streams.surface.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.literacy.push(clamp01(+s.accuracy));
+    });
+
     streams.checkins.forEach(function (k) {
       if (!inRange(k.date, fromMs, toMs, inclusiveEnd)) return;
       if (k.naming && k.naming.correct != null) buckets.lexical.push(clamp01(k.naming.correct / 10));
@@ -307,7 +342,7 @@
     return out;
   }
 
-  function deriveObservations(streams, curFrom, curTo, t) {
+  function deriveObservations(streams, curFrom, curTo, t, prevFrom) {
     var obs = [];
     /* 1. Fluency divergence (animal vs phonemic letter) from latest check-ins */
     var recentChecks = streams.checkins.filter(function (k) { return inRange(k.date, curFrom, curTo, true); });
@@ -435,12 +470,42 @@
       }
     }
 
+    /* 3g. Surface dyslexia / homophone reading profile */
+    var sr = window.POG.surface;
+    if (sr && sr.computeSurfaceProfile) {
+      var srSlice = streams.surface.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (srSlice.length) {
+        var sp = sr.computeSurfaceProfile(srSlice);
+        if (sp.total > 0) {
+          obs.push(api.fill(t.obsSurface, {
+            ft: sp.firstTry,
+            tot: sp.total,
+            rg: sp.errors.regularized,
+            hm: sp.errors.homophone
+          }));
+        }
+      }
+    }
+
     /* 4. Stability alerts from progress engine */
     if (window.POG.progress && window.POG.progress.localAlerts) {
       var als = window.POG.progress.localAlerts();
       als.slice(0, 2).forEach(function (al) {
         obs.push(api.fill(t.obsAlert, { m: al.m.label, n: (al.a && al.a.last ? al.a.last.length : 3) }));
       });
+    }
+
+    /* 4b. Targeted response-latency comparison across Current vs Prior windows */
+    var curLat = collectTargetedLatencies(streams, curFrom, curTo, true);
+    if (curLat.length >= 3) {
+      var curMed = Math.round(median(curLat) * 10) / 10;
+      var prevLat = prevFrom != null ? collectTargetedLatencies(streams, prevFrom, curFrom, false) : [];
+      var prevMed = prevLat.length >= 3 ? median(prevLat) : null;
+      if (prevMed != null && curMed - prevMed >= 1.5) {
+        obs.push(api.fill(t.obsLatencySlow, { cur: String(curMed), diff: String(Math.round((curMed - prevMed) * 10) / 10) }));
+      } else {
+        obs.push(api.fill(t.obsLatency, { cur: String(curMed), n: curLat.length }));
+      }
     }
 
     /* 5. Recent caregiver context tags */
@@ -492,7 +557,7 @@
       };
     });
 
-    var observations = deriveObservations(streams, curFrom, end, t);
+    var observations = deriveObservations(streams, curFrom, end, t, prevFrom);
     var notesCare = streams.carelog.filter(function (c) { return c.note; });
     var latestNote = notesCare.length ? notesCare[notesCare.length - 1] : null;
 
@@ -607,22 +672,26 @@
       ? '<ul class="br-obs">' + b.observations.map(function (o) { return '<li>' + esc(o) + '</li>'; }).join("") + '</ul>'
       : '<p class="sub">' + esc(t.obsNone) + '</p>';
 
+    var inHost = api.inHost && api.inHost();
     return api.header(false) + '<section class="card">' +
+      '<article class="print-area br-printarea">' +
       '<h1 class="instr">' + esc(t.title) + '</h1>' +
       '<p class="sub">' + esc(t.intro) + '</p>' +
-      seg +
+      '<div class="no-print">' + seg + '</div>' +
       cards +
       renderDomainSvg(b.domains, t) +
       '<div class="report">' +
       '<h2>' + esc(t.obsTitle) + '</h2>' + obsHtml +
-      '<h2>' + esc(t.briefTitle) + '</h2>' +
-      '<p class="note">' + esc(t.briefHelp) + '</p>' +
-      '<div class="row-actions"><button type="button" class="secondary" data-act="brief-copy">' + esc(t.copyBtn) + '</button></div>' +
-      (f ? '<p class="nudge" role="status">' + esc(f) + '</p>' : '') +
-      '<textarea readonly id="brief-text" class="br-pre" rows="8">' + esc(briefTxt) + '</textarea>' +
+      '<h2 class="no-print">' + esc(t.briefTitle) + '</h2>' +
+      '<p class="note no-print">' + esc(t.briefHelp) + '</p>' +
+      '<div class="row-actions no-print"><button type="button" class="secondary" data-act="brief-copy">' + esc(t.copyBtn) + '</button>' +
+      (!inHost ? '<button type="button" class="secondary" data-act="brief-print">' + esc(t.printBtn) + '</button>' : '') + '</div>' +
+      (f ? '<p class="nudge no-print" role="status">' + esc(f) + '</p>' : '') +
+      '<textarea readonly id="brief-text" class="br-pre no-print" rows="8">' + esc(briefTxt) + '</textarea>' +
       '<p class="note">' + esc(t.disclaimer) + '</p>' +
       '</div>' +
-      '<button type="button" class="link" data-act="br-back">' + esc(t.back) + '</button>' +
+      '</article>' +
+      '<button type="button" class="link no-print" data-act="br-back">' + esc(t.back) + '</button>' +
       '</section>';
   }
 
@@ -635,6 +704,7 @@
     V.windowDays = d === 7 || d === 90 ? d : 30;
     api.render();
   };
+  A["brief-print"] = function () { try { window.print(); } catch (e) {} };
   A["brief-copy"] = function () {
     var t = T(), el = document.getElementById("brief-text");
     var txt = el ? el.value : buildPlainTextBrief(buildBrief(V.windowDays), api.getProfile ? api.getProfile() : {});

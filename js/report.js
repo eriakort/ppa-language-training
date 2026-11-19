@@ -176,6 +176,16 @@
         vRows.push({ dom: "grammar", name: grApi.label(), n: grMatched.length, pct: gsc != null ? Math.round(gsc * 100) + "%" : "–", lv: String(grApi.level()) });
       }
     }
+    var srApi = window.POG.surface;
+    var srSessions = (srApi && srApi.listSessions ? srApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (srApi && srSessions.length) {
+      var srMatched = [];
+      srSessions.forEach(function (s) { srMatched.push.apply(srMatched, s.items || []); });
+      if (srMatched.length) {
+        var ssc = avg(srMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "surface", name: srApi.label(), n: srMatched.length, pct: ssc != null ? Math.round(ssc * 100) + "%" : "–", lv: String(srApi.level()) });
+      }
+    }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
     var wbApi = window.POG.wordbank;

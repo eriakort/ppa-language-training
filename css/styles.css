@@ -840,3 +840,13 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .pp-list { margin: 0; padding-left: 1.25em; display: flex; flex-direction: column; gap: 6px; font-size: 19px; }
 .pp-checks { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
 
+/* ---------- live keyword slate & printable clinical brief ---------- */
+.aac-slate { width: 100%; display: flex; flex-direction: column; gap: 10px; background: var(--soft); border: 2px solid var(--accent); border-radius: 16px; padding: 12px 14px; }
+.aac-slate input { width: 100%; min-height: 54px; font: inherit; font-size: 22px; font-weight: 700; padding: 8px 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); }
+@media print {
+  .no-print { display: none !important; }
+  .print-area.br-printarea .br-grid { grid-template-columns: 1fr 1fr; }
+  .print-area.br-printarea .br-card, .print-area.br-printarea .br-chartwrap { background: #fff; border: 1px solid #999; break-inside: avoid; }
+}
+
+

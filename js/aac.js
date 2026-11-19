@@ -15,8 +15,9 @@
   var C = {
     it: {
       home: "Comunica", title: "Comunica",
-      tabs: { need: "Essenziali", mine: "Le mie frasi", people: "Persone", things: "Cose e luoghi" },
+      tabs: { need: "Essenziali", clinic: "Medico", shop: "Spesa e bar", mine: "Le mie frasi", people: "Persone", things: "Cose e luoghi" },
       placeholder: "Tocca un'immagine per parlare.", repeat: "🔊 Ripeti", big: "⛶ Mostra grande", clear: "Cancella", closeBig: "Tocca per chiudere",
+      slateBtn: "✏️ Scrivi parola", slatePh: "Scrivi qui una parola, cifra o orario...", slateSay: "🔊 Leggi", slateBig: "⛶ Mostra grande",
       edit: "Modifica la tabella", editTitle: "Modifica la tabella",
       editHelp: "Una frase per riga, nel formato «simbolo | frase». Per esempio: 💧 | Ho sete",
       save: "Salva", reset: "Ripristina le frasi predefinite", saved: "Tabella salvata.", restored: "Frasi predefinite ripristinate.",
@@ -25,8 +26,9 @@
     },
     en: {
       home: "Talk", title: "Talk",
-      tabs: { need: "Essentials", mine: "My phrases", people: "People", things: "Things and places" },
+      tabs: { need: "Essentials", clinic: "At clinic", shop: "Shops & café", mine: "My phrases", people: "People", things: "Things and places" },
       placeholder: "Tap a picture to speak.", repeat: "🔊 Repeat", big: "⛶ Show large", clear: "Clear", closeBig: "Tap to close",
+      slateBtn: "✏️ Type keyword", slatePh: "Type a word, name, or time...", slateSay: "🔊 Speak", slateBig: "⛶ Show large",
       edit: "Edit the board", editTitle: "Edit the board",
       editHelp: "One phrase per line, as “symbol | phrase”. For example: 💧 | I'm thirsty",
       save: "Save", reset: "Restore the default phrases", saved: "Board saved.", restored: "Default phrases restored.",
@@ -43,6 +45,16 @@
          ["💧", "I'm thirsty"], ["🍽️", "I'm hungry"], ["😴", "I'm sleepy"], ["🚻", "I need the toilet"], ["🥶", "I'm cold"], ["🥵", "I'm hot"],
          ["🤕", "It hurts"], ["🔁", "Can you say that again, please?"], ["🐢", "Please speak more slowly"], ["🙂", "I'm fine"]]
   };
+  var CONTEXT_PACKS = {
+    clinic: {
+      it: [["🪪", "Ho l'afasia: mi serve tempo"], ["📝", "Può scriverlo su un foglio?"], ["💊", "Ecco la lista delle medicine"], ["📅", "Qual è la data e l'ora?"], ["📞", "Chiami il mio familiare"], ["🙂", "Ho capito, grazie"]],
+      en: [["🪪", "I have aphasia: please give me time"], ["📝", "Could you write that down?"], ["💊", "Here is my medication list"], ["📅", "What day and time is it?"], ["📞", "Please call my family contact"], ["🙂", "I understand, thank you"]]
+    },
+    shop: {
+      it: [["☕", "Un caffè, per favore"], ["💧", "Una bottiglia d'acqua"], ["🛍️", "Un sacchetto, per favore"], ["💳", "Pago con la carta"], ["🧾", "Posso avere lo scontrino?"], ["🐢", "Può parlare più piano?"]],
+      en: [["☕", "A coffee, please"], ["💧", "A bottle of water"], ["🛍️", "A bag, please"], ["💳", "I'll pay by card"], ["🧾", "May I have a receipt?"], ["🐢", "Could you speak more slowly?"]]
+    }
+  };
   function T() { return C[api.lang()] || C.it; }
   function flashHtml() { var f = api.flashText(); return f ? '<p class="nudge">' + esc(f) + '</p>' : ''; }
 
@@ -54,15 +66,16 @@
   }
   function tilesFor(tab) {
     if (tab === "need") return essentials();
+    if (CONTEXT_PACKS[tab]) return CONTEXT_PACKS[tab][api.lang()].map(function (x) { return { icon: x[0], text: x[1] }; });
     if (tab === "mine") return (api.getScripts() || []).map(function (p) { return { icon: "💬", text: p.phrase, sub: p.cue || "" }; });
     return window.POG.album && window.POG.album.tiles ? window.POG.album.tiles(tab) : [];
   }
 
-  var tab = "need", msg = "", big = false, shown = [];
+  var tab = "need", msg = "", big = false, slateOpen = false, slateVal = "", shown = [];
   function viewBoard() {
     var t = T();
     shown = tilesFor(tab);
-    var tabs = ["need", "mine", "people", "things"].map(function (k) {
+    var tabs = ["need", "clinic", "shop", "mine", "people", "things"].map(function (k) {
       return '<button class="aac-tab" role="tab" data-act="aac-tab" data-t="' + k + '" aria-selected="' + (k === tab) + '">' + esc(t.tabs[k]) + '</button>';
     }).join("");
     var grid = shown.length
@@ -72,11 +85,21 @@
             '<span class="aac-label">' + esc(x.text) + '</span>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '</button>';
         }).join("") + '</div>'
       : '<p class="sub">' + esc(tab === "mine" ? t.noneMine : t.noneHere) + '</p>';
+    var slateBox = slateOpen
+      ? '<div class="aac-slate">' +
+        '<input id="aac-slate-in" type="text" placeholder="' + esc(t.slatePh) + '" aria-label="' + esc(t.slatePh) + '" value="' + esc(slateVal) + '">' +
+        '<div class="tools">' +
+        '<button type="button" class="tool" data-act="aac-slate-say">' + esc(t.slateSay) + '</button>' +
+        '<button type="button" class="tool" data-act="aac-slate-big">' + esc(t.slateBig) + '</button>' +
+        '</div></div>'
+      : '';
     return api.header(false) + '<section class="card aac">' +
       '<div class="aac-bar"><p class="aac-msg' + (msg ? '' : ' empty') + '" aria-live="polite">' + esc(msg || t.placeholder) + '</p>' +
       '<div class="aac-tools"><button class="tool" data-act="aac-say"' + (msg ? '' : ' disabled') + '>' + esc(t.repeat) + '</button>' +
       '<button class="tool" data-act="aac-big"' + (msg ? '' : ' disabled') + '>' + esc(t.big) + '</button>' +
-      '<button class="tool" data-act="aac-clear"' + (msg ? '' : ' disabled') + '>' + esc(t.clear) + '</button></div></div>' +
+      '<button class="tool" data-act="aac-clear"' + (msg ? '' : ' disabled') + '>' + esc(t.clear) + '</button>' +
+      '<button class="tool" data-act="aac-slate-toggle" aria-pressed="' + slateOpen + '">' + esc(t.slateBtn) + '</button></div>' +
+      slateBox + '</div>' +
       '<div class="aac-tabs" role="tablist">' + tabs + '</div>' + grid + flashHtml() +
       '<div class="row-actions">' +
       (window.POG.passport ? '<button class="secondary" data-act="passport">' + esc(window.POG.passport.shortLabel()) + '</button>' : '') +
@@ -96,7 +119,8 @@
 
   window.POG.board = {
     /* Every phrase on the board, for recording family voices. */
-    phrases: function () { return essentials().map(function (x) { return x.text; }); }
+    phrases: function () { return essentials().map(function (x) { return x.text; }); },
+    contextTabs: function () { return Object.keys(CONTEXT_PACKS); }
   };
 
   var ext = window.POG.ext;
@@ -113,9 +137,32 @@
     msg = x.text; api.speak(x.text); api.render();
   };
   A["aac-say"] = function () { if (msg) api.speak(msg); };
-  A["aac-clear"] = function () { msg = ""; big = false; api.stopVoice(); api.render(); };
+  A["aac-clear"] = function () { msg = ""; slateVal = ""; big = false; api.stopVoice(); api.render(); };
   A["aac-big"] = function () { if (msg) { big = true; api.render(); } };
   A["aac-big-close"] = function () { big = false; api.render(); };
+  A["aac-slate-toggle"] = function () {
+    slateOpen = !slateOpen;
+    api.render();
+    if (slateOpen) {
+      var el = document.getElementById("aac-slate-in");
+      if (el) el.focus();
+    }
+  };
+  A["aac-slate-say"] = function () {
+    var el = document.getElementById("aac-slate-in");
+    var txt = (el ? el.value : slateVal).trim();
+    if (!txt) return;
+    slateVal = txt; msg = txt; api.speak(txt); api.render();
+  };
+  A["aac-slate-big"] = function () {
+    var el = document.getElementById("aac-slate-in");
+    var txt = (el ? el.value : slateVal).trim();
+    if (!txt) return;
+    slateVal = txt; msg = txt; big = true; api.render();
+  };
+  document.addEventListener("input", function (e) {
+    if (e.target && e.target.id === "aac-slate-in") slateVal = e.target.value;
+  });
   A["aac-edit"] = function () { api.go("aac-edit"); };
   A["aac-save"] = function () {
     var t = T(), el = document.getElementById("aac-text");

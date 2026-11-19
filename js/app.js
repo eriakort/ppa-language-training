@@ -230,7 +230,7 @@
      Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
      therapist PIN ask for it again, then continue to where you were. */
   var UI_KEY = "pog_ui";
-  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, pick: 1, "pick-ask": 1 };
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, pick: 1, "pick-ask": 1 };
   var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
   var UI_PIN = { "chk-results": 1, report: 1, progress: 1, carelog: 1, "wb-manage": 1, brief: 1 };
   function saveUi() {
@@ -1399,6 +1399,18 @@
       (s.items || []).forEach(function (i) {
         lines.push([s.date, s.id, "pacing", s.who || "solo", i.game, i.lv, i.label, i.heard || "", i.result, i.hints, i.tempo || "", i.kind || "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
           "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+      });
+    });
+    (load("verbs_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "verbs", s.who || "solo", "verbs", i.lv, i.verb, "", i.result, i.hintUsed ? 1 : 0, i.triadClean ? "triad_ok" : "triad_help", i.plausClean ? "plaus_ok" : "plaus_help", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+      });
+    });
+    (load("narrative_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "narrative", s.who || "solo", "narrative", i.lv, i.title, "", i.result, i.anchorsUsed ? 1 : 0, i.seqFirstTry ? "seq_clean" : "seq_guided", "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", i.conceptCoverage != null ? Math.round(i.conceptCoverage * 100) + "%" : "", "", ""].map(csvCell).join(","));
       });
     });
     var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });

@@ -1057,7 +1057,64 @@ async function playThrough(page, solo) {
   const pcSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_pacing_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(pcSaved.length === 1 && pcSaved[0].items.length === 4, "pacing: completed 4-item speech pacing session saved locally");
 
-  await vr.click('[data-act="pace-home-exit"]');
+  await vr.click('[data-act="pace-back-var"]');
+
+  // Launch Actions & verbs (VNeST: verbs-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="verbs-home"]')), "verbs: VNeST Actions & verbs card is offered in targeted practice hub");
+  await vr.click('[data-act="verbs-home"]');
+  for (let item = 0; item < 3; item++) {
+    // Use hint twice on first verb item (Agent + Patient) or click right tiles directly
+    if (item === 0) {
+      await vr.click('[data-act="vb-hint"]');
+      check((await vr.$$(".vb-slot.ok")).length >= 1, "verbs: VNeST progressive hint reveals Agent/Patient cleanly");
+    }
+    while (await vr.$('[data-act="vb-agent"]:not([disabled]), [data-act="vb-patient"]:not([disabled])')) {
+      if (await vr.$('[data-act="vb-plaus"]')) break;
+      const agents = await vr.$$('[data-act="vb-agent"]:not([disabled])');
+      if (agents.length) await agents[0].click();
+      if (await vr.$('[data-act="vb-plaus"]')) break;
+      const patients = await vr.$$('[data-act="vb-patient"]:not([disabled])');
+      if (patients.length) await patients[0].click();
+    }
+    check(!!(await vr.$('[data-act="vb-plaus"]')), "verbs: item " + (item + 1) + " builds Agent-Verb-Patient frame");
+    for (const ans of ["true", "false"]) {
+      if (await vr.$('[data-act="vb-next"]')) break;
+      const pSel = '[data-act="vb-plaus"][data-ans="' + ans + '"]:not([disabled])';
+      if (await vr.$(pSel)) await vr.click(pSel);
+    }
+    check(!!(await vr.$('[data-act="vb-next"]')), "verbs: item " + (item + 1) + " checks plausibility and shows full sentence");
+    await vr.click('[data-act="vb-next"]');
+  }
+  const vbSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_verbs_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(vbSaved.length === 1 && vbSaved[0].items.length === 3, "verbs: completed 3-verb VNeST session saved locally");
+  await vr.click('[data-act="vb-back-var"]');
+
+  // Launch Story & sequence retell (narr-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="narr-home"]')), "narrative: Story & sequence retell card is offered in targeted practice hub");
+  await vr.click('[data-act="narr-home"]');
+  for (let item = 0; item < 3; item++) {
+    await vr.click('[data-act="narr-start-seq"]');
+    for (let h = 0; h < 3; h++) await vr.click('[data-act="narr-hint"]');
+    await vr.click('[data-act="narr-check-seq"]');
+    check(!!(await vr.$("#narr-retell")), "narrative: story " + (item + 1) + " advances cleanly from 3-beat sequencing to retell");
+    if (item === 0) {
+      await vr.click('[data-act="narr-anchors"]');
+      check(!!(await vr.$(".dc-kw")), "narrative: optional key concept anchor chips reveal cleanly");
+    }
+    const gists = await vr.$$('[data-act="narr-gist"]');
+    for (let gi = 0; gi < gists.length; gi++) {
+      if (await vr.$('[data-act="narr-gist"].ok')) break;
+      const gSel = '[data-act="narr-gist"][data-i="' + gi + '"]:not([disabled])';
+      if (await vr.$(gSel)) await vr.click(gSel);
+    }
+    await vr.click('[data-act="narr-finish-item"]');
+    check(!!(await vr.$('[data-act="narr-next"]')), "narrative: story " + (item + 1) + " scores concept coverage cleanly");
+    await vr.click('[data-act="narr-next"]');
+  }
+  const nrSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_narrative_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(nrSaved.length === 1 && nrSaved[0].items.length === 3, "narrative: completed 3-story sequence & retell session saved locally");
+
+  await vr.click('[data-act="narr-home-exit"]');
   await vr.click('[data-act="therapist"]');
   await vr.fill("#th-pin1", "1234"); await vr.fill("#th-pin2", "1234"); await vr.click('[data-act="pin-set"]');
 
@@ -1090,15 +1147,15 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing: printable therapist summary lists all new modalities");
-  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, brief): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative: printable therapist summary lists all new modalities");
+  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, verbs, narrative, brief): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

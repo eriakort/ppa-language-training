@@ -146,6 +146,26 @@
         vRows.push({ dom: "pacing", name: pcApi.label(), n: pcMatched.length, pct: psc != null ? Math.round(psc * 100) + "%" : "–", lv: String(pcApi.level()) });
       }
     }
+    var vbApi = window.POG.verbs;
+    var vbSessions = (vbApi && vbApi.listSessions ? vbApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (vbApi && vbSessions.length) {
+      var vbMatched = [];
+      vbSessions.forEach(function (s) { vbMatched.push.apply(vbMatched, s.items || []); });
+      if (vbMatched.length) {
+        var vsc = avg(vbMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "verbs", name: vbApi.label(), n: vbMatched.length, pct: vsc != null ? Math.round(vsc * 100) + "%" : "–", lv: String(vbApi.level()) });
+      }
+    }
+    var nrApi = window.POG.narrative;
+    var nrSessions = (nrApi && nrApi.listSessions ? nrApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (nrApi && nrSessions.length) {
+      var nrMatched = [];
+      nrSessions.forEach(function (s) { nrMatched.push.apply(nrMatched, s.items || []); });
+      if (nrMatched.length) {
+        var nsc = avg(nrMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "narrative", name: nrApi.label(), n: nrMatched.length, pct: nsc != null ? Math.round(nsc * 100) + "%" : "–", lv: String(nrApi.level()) });
+      }
+    }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
     var wbApi = window.POG.wordbank;

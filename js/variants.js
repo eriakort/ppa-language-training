@@ -502,6 +502,16 @@
         '<strong>' + esc(window.POG.pacing.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.pacing.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.pacing.desc()) + '</span></button>' : '') +
+      (window.POG.verbs ? '<button class="modecard var-dcard" data-act="verbs-home">' +
+        '<span class="ico" aria-hidden="true">🤝</span>' +
+        '<strong>' + esc(window.POG.verbs.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.verbs.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.verbs.desc()) + '</span></button>' : '') +
+      (window.POG.narrative ? '<button class="modecard var-dcard" data-act="narr-home">' +
+        '<span class="ico" aria-hidden="true">📚</span>' +
+        '<strong>' + esc(window.POG.narrative.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.narrative.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.narrative.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

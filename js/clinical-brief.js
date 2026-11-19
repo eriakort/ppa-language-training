@@ -76,6 +76,8 @@
       obsDiscKw: "Ascolto quotidiano: su {tot} messaggi, {fp} compresi al primo ascolto; le parole chiave scritte hanno recuperato {kw} prove.",
       obsDiscFirst: "Ascolto quotidiano: {fp} su {tot} messaggi compresi al primo ascolto senza aiuti visivi.",
       obsPace: "Ritmo e sillabe: {sm} su {tot} produzioni fluide a ritmo (tempo prevalente: {tempo}).",
+      obsVerbs: "Reti dei verbi (VNeST): {tr} su {tot} triadi Chi-Verbo-Cosa autonome; plausibilità semantica {pl} su {tot}.",
+      obsNarrative: "Racconto connesso: {sq} su {tot} sequenze giuste al primo tentativo; copertura concetti chiave {mc}%.",
       obsAlert: "Avviso andamento ({m}): ultime {n} sessioni sotto il valore abituale.",
       obsCareTags: "Contesto segnalato dal familiare negli ultimi ingressi: {tags}.",
       briefHead: "SCHEDA DI RIEPILOGO CLINICO (USO INTERNO VISITA) · {date}",
@@ -138,6 +140,8 @@
       obsDiscKw: "Spoken message comprehension: {fp} of {tot} understood on first listen; written keywords rescued {kw} items.",
       obsDiscFirst: "Spoken message comprehension: {fp} of {tot} understood cleanly on first listen.",
       obsPace: "Speech pacing coach: {sm} of {tot} items produced smoothly on the beat (most used tempo: {tempo}).",
+      obsVerbs: "Verb networks (VNeST): {tr} of {tot} clean Agent-Verb-Object triads; semantic plausibility {pl} of {tot}.",
+      obsNarrative: "Connected story retell: {sq} of {tot} sequenced cleanly on first pass; {mc}% main-concept coverage.",
       obsAlert: "Stability alert ({m}): last {n} sessions fell below usual range.",
       obsCareTags: "Recent caregiver context tags: {tags}.",
       briefHead: "CLINICAL VISIT BRIEF (LOCAL PRACTICE SUMMARY) · {date}",
@@ -182,6 +186,8 @@
     var writing = window.POG.writing && window.POG.writing.listSessions ? window.POG.writing.listSessions() : [];
     var discourse = window.POG.discourse && window.POG.discourse.listSessions ? window.POG.discourse.listSessions() : [];
     var pacing = window.POG.pacing && window.POG.pacing.listSessions ? window.POG.pacing.listSessions() : [];
+    var verbs = window.POG.verbs && window.POG.verbs.listSessions ? window.POG.verbs.listSessions() : [];
+    var narrative = window.POG.narrative && window.POG.narrative.listSessions ? window.POG.narrative.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -192,6 +198,8 @@
       writing: writing,
       discourse: discourse,
       pacing: pacing,
+      verbs: verbs,
+      narrative: narrative,
       carelog: carelog
     };
   }
@@ -250,6 +258,19 @@
     streams.pacing.forEach(function (s) {
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.fluency != null && isFinite(+s.fluency)) buckets.speech.push(clamp01(+s.fluency));
+    });
+
+    streams.verbs.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) {
+        buckets.syntax.push(clamp01(+s.accuracy));
+        buckets.lexical.push(clamp01(+s.accuracy));
+      }
+    });
+
+    streams.narrative.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.functional.push(clamp01(+s.accuracy));
     });
 
     streams.checkins.forEach(function (k) {
@@ -355,6 +376,31 @@
         if (pp.total > 0) {
           var topTempo = Object.keys(pp.tempos).sort(function (a, b) { return pp.tempos[b] - pp.tempos[a]; })[0] || "steady";
           obs.push(api.fill(t.obsPace, { sm: pp.smooth, tot: pp.total, tempo: topTempo }));
+        }
+      }
+    }
+
+    /* 3d. Verb network (VNeST) triad & plausibility profile */
+    var vb = window.POG.verbs;
+    if (vb && vb.computeVerbsProfile) {
+      var vbSlice = streams.verbs.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (vbSlice.length) {
+        var vp = vb.computeVerbsProfile(vbSlice);
+        if (vp.total > 0) {
+          obs.push(api.fill(t.obsVerbs, { tr: vp.triadClean, tot: vp.total, pl: vp.plausClean }));
+        }
+      }
+    }
+
+    /* 3e. Connected narrative sequencing & main-concept retell */
+    var nr = window.POG.narrative;
+    if (nr && nr.computeNarrativeProfile) {
+      var nrSlice = streams.narrative.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (nrSlice.length) {
+        var np = nr.computeNarrativeProfile(nrSlice);
+        if (np.total > 0) {
+          var mcPct = np.meanConcepts != null ? Math.round(np.meanConcepts * 100) : 0;
+          obs.push(api.fill(t.obsNarrative, { sq: np.seqClean, tot: np.total, mc: mcPct }));
         }
       }
     }

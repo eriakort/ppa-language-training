@@ -166,6 +166,16 @@
         vRows.push({ dom: "narrative", name: nrApi.label(), n: nrMatched.length, pct: nsc != null ? Math.round(nsc * 100) + "%" : "–", lv: String(nrApi.level()) });
       }
     }
+    var grApi = window.POG.grammar;
+    var grSessions = (grApi && grApi.listSessions ? grApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (grApi && grSessions.length) {
+      var grMatched = [];
+      grSessions.forEach(function (s) { grMatched.push.apply(grMatched, s.items || []); });
+      if (grMatched.length) {
+        var gsc = avg(grMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "grammar", name: grApi.label(), n: grMatched.length, pct: gsc != null ? Math.round(gsc * 100) + "%" : "–", lv: String(grApi.level()) });
+      }
+    }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
     var wbApi = window.POG.wordbank;

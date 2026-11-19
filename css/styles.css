@@ -827,3 +827,16 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
   .vb-slot { min-width: 88px; font-size: 17px; padding: 6px 10px; }
   .nr-slot, .nr-card { font-size: 17px; padding: 10px 12px; }
 }
+
+/* ---------- morphosyntax cloze & communication passport ---------- */
+.gr-sent { margin: 0; font-size: clamp(24px, 4vw, 32px); font-weight: 700; line-height: 1.5; max-width: 34ch; text-wrap: balance; }
+.gr-blank { display: inline-block; min-width: 96px; padding: 2px 12px; margin: 0 4px; border-bottom: 4px dashed var(--accent); border-radius: 8px; background: var(--soft); color: var(--accent); }
+.gr-blank.ok { border-bottom: 3px solid var(--good); background: var(--good-soft); color: var(--good); }
+.pp-hero { width: 100%; max-width: 640px; background: var(--hl); border: 2px solid var(--line); border-radius: 18px; padding: 20px 22px; }
+.pp-msg { margin: 0; font-size: clamp(24px, 4.2vw, 32px); font-weight: 700; line-height: 1.4; color: var(--ink); text-wrap: balance; }
+.pp-box { width: 100%; max-width: 640px; background: var(--soft); border-radius: 16px; padding: 14px 18px; text-align: left; display: flex; flex-direction: column; gap: 8px; }
+.pp-box h2 { margin: 0; font-size: 17px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.pp-box p { margin: 0; font-size: 20px; font-weight: 700; }
+.pp-list { margin: 0; padding-left: 1.25em; display: flex; flex-direction: column; gap: 6px; font-size: 19px; }
+.pp-checks { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+

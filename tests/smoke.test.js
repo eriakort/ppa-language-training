@@ -1114,9 +1114,57 @@ async function playThrough(page, solo) {
   const nrSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_narrative_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(nrSaved.length === 1 && nrSaved[0].items.length === 3, "narrative: completed 3-story sequence & retell session saved locally");
 
-  await vr.click('[data-act="narr-home-exit"]');
+  await vr.click('[data-act="narr-back-var"]');
+
+  // Launch Grammar & word endings (gram-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="gram-home"]')), "grammar: Grammar & word endings card is offered in targeted practice hub");
+  await vr.click('[data-act="gram-home"]');
+  for (let item = 0; item < 4; item++) {
+    if (item === 0) {
+      await vr.click('[data-act="gram-hint"]');
+      check(!!(await vr.$(".wb-cuebox")), "grammar: syntactic clue box reveals cleanly");
+    }
+    const gOpts = await vr.$$('[data-act="gram-opt"]');
+    for (let gi = 0; gi < gOpts.length; gi++) {
+      if (await vr.$('[data-act="gram-next"]')) break;
+      const gSel = '[data-act="gram-opt"][data-i="' + gi + '"]:not([disabled])';
+      if (await vr.$(gSel)) await vr.click(gSel);
+    }
+    check(!!(await vr.$(".gr-blank.ok")) && !!(await vr.$('[data-act="gram-next"]')),
+      "grammar: item " + (item + 1) + " fills sentence blank cleanly");
+    await vr.click('[data-act="gram-next"]');
+  }
+  const grSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_grammar_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(grSaved.length === 1 && grSaved[0].items.length === 4, "grammar: completed 4-sentence morphosyntax cloze session saved locally");
+
+  await vr.click('[data-act="gram-home-exit"]');
+
+  // Verify Personal Communication Passport from Talk Board (freely accessible, with fullscreen card)
+  await vr.click('[data-act="board"]');
+  check(!!(await vr.$('[data-act="passport"]')), "passport: Help card shortcut appears on Talk Board");
+  await vr.click('[data-act="passport"]');
+  check(!!(await vr.$(".pp-msg")), "passport: renders high-contrast communication help message");
+  await vr.click('[data-act="pp-big"]');
+  check(!!(await vr.$(".aac-big")), "passport: fullscreen help card opens cleanly");
+  await vr.click('[data-act="pp-big-close"]');
+  await vr.click('[data-act="board"]');
+  await vr.click('[data-act="home"]');
+
   await vr.click('[data-act="therapist"]');
   await vr.fill("#th-pin1", "1234"); await vr.fill("#th-pin2", "1234"); await vr.click('[data-act="pin-set"]');
+
+  // Customise Communication Passport behind therapist PIN
+  check(!!(await vr.$('[data-act="passport"]')), "passport: Therapist area exposes Communication passport button");
+  await vr.click('[data-act="passport"]');
+  await vr.click('[data-act="pp-edit"]');
+  await vr.fill("#pp-cname", "Sarah (daughter)");
+  await vr.fill("#pp-cphone", "+44 7700 900123");
+  await vr.fill("#pp-med", "Prefers written appointment times");
+  await vr.click('[data-act="pp-save"]');
+  const ppSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_passport_card")); return JSON.parse(localStorage.getItem(k) || "null"); });
+  check(!!ppSaved && ppSaved.emergencyName === "Sarah (daughter)" && ppSaved.medNote === "Prefers written appointment times",
+    "passport: customised emergency contact and medical note saved strictly locally");
+  await vr.click('[data-act="therapist"]');
 
   // Open Caregiver communication log behind PIN
   await vr.click('[data-act="carelog"]');
@@ -1147,15 +1195,15 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative: printable therapist summary lists all new modalities");
-  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, verbs, narrative, brief): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar: printable therapist summary lists all new modalities");
+  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, verbs, narrative, grammar, passport, brief): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

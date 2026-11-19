@@ -78,7 +78,9 @@
       '<button class="tool" data-act="aac-big"' + (msg ? '' : ' disabled') + '>' + esc(t.big) + '</button>' +
       '<button class="tool" data-act="aac-clear"' + (msg ? '' : ' disabled') + '>' + esc(t.clear) + '</button></div></div>' +
       '<div class="aac-tabs" role="tablist">' + tabs + '</div>' + grid + flashHtml() +
-      '<div class="row-actions"><button class="secondary" data-act="aac-edit">' + esc(t.edit) + '</button></div>' +
+      '<div class="row-actions">' +
+      (window.POG.passport ? '<button class="secondary" data-act="passport">' + esc(window.POG.passport.shortLabel()) + '</button>' : '') +
+      '<button class="secondary" data-act="aac-edit">' + esc(t.edit) + '</button></div>' +
       '<button class="link" data-act="home">' + esc(api.t().home) + '</button></section>' +
       (big && msg ? '<div class="aac-big" data-act="aac-big-close" role="dialog" aria-label="' + esc(msg) + '"><p>' + esc(msg) + '</p><small>' + esc(t.closeBig) + '</small></div>' : '');
   }

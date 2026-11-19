@@ -512,6 +512,11 @@
         '<strong>' + esc(window.POG.narrative.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.narrative.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.narrative.desc()) + '</span></button>' : '') +
+      (window.POG.grammar ? '<button class="modecard var-dcard" data-act="gram-home">' +
+        '<span class="ico" aria-hidden="true">⚖️</span>' +
+        '<strong>' + esc(window.POG.grammar.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.grammar.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.grammar.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

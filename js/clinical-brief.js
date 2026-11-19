@@ -78,12 +78,14 @@
       obsPace: "Ritmo e sillabe: {sm} su {tot} produzioni fluide a ritmo (tempo prevalente: {tempo}).",
       obsVerbs: "Reti dei verbi (VNeST): {tr} su {tot} triadi Chi-Verbo-Cosa autonome; plausibilità semantica {pl} su {tot}.",
       obsNarrative: "Racconto connesso: {sq} su {tot} sequenze giuste al primo tentativo; copertura concetti chiave {mc}%.",
+      obsGrammar: "Morfologia e parole ponte: {ft} su {tot} scelte al primo tentativo (tempi {tn}, preposizioni {pr}, accordi {ag}).",
       obsAlert: "Avviso andamento ({m}): ultime {n} sessioni sotto il valore abituale.",
       obsCareTags: "Contesto segnalato dal familiare negli ultimi ingressi: {tags}.",
       briefHead: "SCHEDA DI RIEPILOGO CLINICO (USO INTERNO VISITA) · {date}",
       briefPatient: "Profilo: {name} · Finestra: ultimi {days} giorni vs {days} precedenti",
       briefDomainsHead: "DOMINI LINGUISTICI (0–100%):",
       briefObsHead: "PATTERN E INDICATORI:",
+      briefSupportHead: "SUPPORTI COMUNICATIVI (PASSAPORTO):",
       briefCareHead: "ULTIMA NOTA FAMILIARE:",
       briefFooter: "Nota: dati raccolti localmente dall'app di esercizio linguistico; non sostituisce la valutazione clinica."
     },
@@ -142,12 +144,14 @@
       obsPace: "Speech pacing coach: {sm} of {tot} items produced smoothly on the beat (most used tempo: {tempo}).",
       obsVerbs: "Verb networks (VNeST): {tr} of {tot} clean Agent-Verb-Object triads; semantic plausibility {pl} of {tot}.",
       obsNarrative: "Connected story retell: {sq} of {tot} sequenced cleanly on first pass; {mc}% main-concept coverage.",
+      obsGrammar: "Morphosyntax & cloze: {ft} of {tot} clean first-try inflections/relators (tense {tn}, prep {pr}, agreement {ag}).",
       obsAlert: "Stability alert ({m}): last {n} sessions fell below usual range.",
       obsCareTags: "Recent caregiver context tags: {tags}.",
       briefHead: "CLINICAL VISIT BRIEF (LOCAL PRACTICE SUMMARY) · {date}",
       briefPatient: "Profile: {name} · Window: last {days} days vs prior {days} days",
       briefDomainsHead: "LANGUAGE DOMAINS (0–100%):",
       briefObsHead: "PATTERN HIGHLIGHTS:",
+      briefSupportHead: "COMMUNICATION SUPPORTS (PASSPORT):",
       briefCareHead: "LATEST CAREGIVER NOTE:",
       briefFooter: "Note: locally recorded indicators from language practice software; not a diagnostic evaluation."
     }
@@ -188,6 +192,7 @@
     var pacing = window.POG.pacing && window.POG.pacing.listSessions ? window.POG.pacing.listSessions() : [];
     var verbs = window.POG.verbs && window.POG.verbs.listSessions ? window.POG.verbs.listSessions() : [];
     var narrative = window.POG.narrative && window.POG.narrative.listSessions ? window.POG.narrative.listSessions() : [];
+    var grammar = window.POG.grammar && window.POG.grammar.listSessions ? window.POG.grammar.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -200,6 +205,7 @@
       pacing: pacing,
       verbs: verbs,
       narrative: narrative,
+      grammar: grammar,
       carelog: carelog
     };
   }
@@ -271,6 +277,11 @@
     streams.narrative.forEach(function (s) {
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.functional.push(clamp01(+s.accuracy));
+    });
+
+    streams.grammar.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.syntax.push(clamp01(+s.accuracy));
     });
 
     streams.checkins.forEach(function (k) {
@@ -405,6 +416,25 @@
       }
     }
 
+    /* 3f. Morphosyntax cloze (tenses, prepositions, agreement) */
+    var gr = window.POG.grammar;
+    if (gr && gr.computeGrammarProfile) {
+      var grSlice = streams.grammar.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (grSlice.length) {
+        var gp = gr.computeGrammarProfile(grSlice);
+        if (gp.total > 0) {
+          var fmtKind = function (k) { var b = gp.byKind[k]; return b && b.n ? b.ok + "/" + b.n : "0/0"; };
+          obs.push(api.fill(t.obsGrammar, {
+            ft: gp.firstTry,
+            tot: gp.total,
+            tn: fmtKind("tense"),
+            pr: fmtKind("prep"),
+            ag: fmtKind("agreement")
+          }));
+        }
+      }
+    }
+
     /* 4. Stability alerts from progress engine */
     if (window.POG.progress && window.POG.progress.localAlerts) {
       var als = window.POG.progress.localAlerts();
@@ -518,6 +548,17 @@
       lines.push("");
       lines.push(t.briefObsHead);
       brief.observations.forEach(function (o) { lines.push("* " + o); });
+    }
+    var ppMod = window.POG.passport;
+    if (ppMod && ppMod.get) {
+      var ppCard = ppMod.get();
+      var ppTags = ppMod.activeStrategyLabels ? ppMod.activeStrategyLabels() : [];
+      if (ppTags.length || ppCard.medNote) {
+        lines.push("");
+        lines.push(t.briefSupportHead);
+        if (ppTags.length) lines.push("- " + ppTags.join(", "));
+        if (ppCard.medNote) lines.push("- " + ppCard.medNote);
+      }
     }
     if (brief.latestNote && brief.latestNote.note) {
       lines.push("");

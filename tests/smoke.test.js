@@ -1160,9 +1160,34 @@ async function playThrough(page, solo) {
   const srSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_surface_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(srSaved.length === 1 && srSaved[0].items.length === 4, "surface: completed 4-word surface/homophone session saved locally");
 
-  await vr.click('[data-act="surf-home-exit"]');
+  await vr.click('[data-act="surf-back-var"]');
 
-  // Verify Talk Board context quick-packs, live keyword slate, and Communication Passport
+  // Launch Word-finding bridges / circumlocution (circ-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="circ-home"]')), "circumlocution: Word-finding bridges card is offered in targeted practice hub");
+  await vr.click('[data-act="circ-home"]');
+  for (let item = 0; item < 3; item++) {
+    const clueCount = (await vr.$$('[data-act="circ-clue"]')).length;
+    for (let ci = 0; ci < clueCount; ci++) {
+      if (await vr.$('[data-act="circ-know"]')) break;
+      const cSel = '[data-act="circ-clue"][data-i="' + ci + '"]:not([disabled])';
+      if (await vr.$(cSel)) await vr.click(cSel);
+    }
+    if (item === 0) {
+      await vr.click('[data-act="circ-cue"]');
+      check(!!(await vr.$(".wb-cuebox")), "circumlocution: assembled description & sound clue appear cleanly");
+    }
+    if (item % 2 === 0) await vr.click('[data-act="circ-know"]');
+    else await vr.click('[data-act="circ-desc"]');
+    check(!!(await vr.$('[data-act="circ-next"]')),
+      "circumlocution: item " + (item + 1) + " completes bridge phase cleanly");
+    await vr.click('[data-act="circ-next"]');
+  }
+  const crSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_circumlocution_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(crSaved.length === 1 && crSaved[0].items.length === 3, "circumlocution: completed 3-item compensatory session saved locally");
+
+  await vr.click('[data-act="circ-home-exit"]');
+
+  // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, and Communication Passport
   await vr.click('[data-act="board"]');
   check(!!(await vr.$('[data-act="aac-tab"][data-t="clinic"]')) && !!(await vr.$('[data-act="aac-tab"][data-t="shop"]')),
     "aac: clinic and shop situational quick-packs are available on Talk Board");
@@ -1173,6 +1198,13 @@ async function playThrough(page, solo) {
   await vr.click('[data-act="aac-slate-big"]');
   check(/14:30 clinic/.test(await vr.textContent(".aac-big")), "aac: live keyword slate shows typed keyword in fullscreen card");
   await vr.click('[data-act="aac-big-close"]');
+
+  await vr.click('[data-act="aac-choice-toggle"]');
+  await vr.click('[data-act="aac-choice-preset"][data-i="2"]');
+  await vr.click('[data-act="aac-choice-show"]');
+  check((await vr.$$('[data-act="aac-ab-pick"]')).length === 2, "aac: two-choice split A/B overlay opens with 2 large choices");
+  await vr.click('[data-act="aac-ab-pick"][data-pick="b"]');
+  check(/Later/i.test(await vr.textContent(".aac-msg")), "aac: tapping two-choice option updates message bar cleanly");
 
   check(!!(await vr.$('[data-act="passport"]')), "passport: Help card shortcut appears on Talk Board");
   await vr.click('[data-act="passport"]');
@@ -1221,22 +1253,25 @@ async function playThrough(page, solo) {
 
   // Open Unified Clinician Domain Profile & Visit Brief behind PIN
   await vr.click('[data-act="brief"]');
-  check((await vr.$$(".br-card")).length === 5 && !!(await vr.$("svg.br-svg")) && !!(await vr.$('[data-act="brief-print"]')),
-    "clinical brief: renders all 5 domain summary cards, SVG comparison, and Print button");
+  check((await vr.$$(".br-card")).length === 5 && !!(await vr.$("svg.br-svg")) && !!(await vr.$('[data-act="brief-print"]')) && !!(await vr.$('[data-act="br-apply-focus"]')),
+    "clinical brief: renders all 5 domain summary cards, SVG comparison, practice plan button, and Print button");
+  await vr.click('[data-act="br-apply-focus"]');
+  check(/updated/i.test(await vr.textContent(".br-printarea")),
+    "clinical brief: one-click focus preset applies cleanly to targeted hub settings");
   await vr.click('[data-act="br-win"][data-d="7"]');
   check((await vr.getAttribute('[data-act="br-win"][data-d="7"]', "aria-pressed")) === "true",
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface: printable therapist summary lists all new modalities");
-  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, verbs, narrative, grammar, surface, passport, brief): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution: printable therapist summary lists all new modalities");
+  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, verbs, narrative, grammar, surface, circumlocution, passport, brief): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

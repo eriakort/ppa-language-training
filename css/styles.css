@@ -849,4 +849,21 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
   .print-area.br-printarea .br-card, .print-area.br-printarea .br-chartwrap { background: #fff; border: 1px solid #999; break-inside: avoid; }
 }
 
+/* ---------- circumlocution clues, two-choice AAC & practice plan ---------- */
+.cr-clues { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; width: 100%; max-width: 660px; }
+.cr-clue { min-height: 74px; padding: 14px 16px; border-radius: 16px; background: var(--soft); border: 3px solid var(--line); color: var(--ink); font-size: 20px; font-weight: 700; text-align: left; }
+.cr-clue:hover:not(:disabled) { border-color: var(--accent); }
+.cr-clue.ok { border-color: var(--good); background: var(--good-soft); color: var(--good); }
+.cr-clue.dim { opacity: .35; }
+.aac-presets { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.aac-ab-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; width: 100%; }
+.aac-ab-overlay { position: fixed; inset: 0; z-index: 80; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; }
+.aac-ab-ask { margin: 0; font-size: clamp(22px, 3.6vw, 30px); font-weight: 700; color: var(--muted); }
+.aac-ab-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; width: min(760px, 100%); }
+.aac-ab-btn { min-height: 150px; padding: 22px; border-radius: 22px; background: var(--surface); border: 4px solid var(--accent); color: var(--ink); font-size: clamp(28px, 5vw, 44px); font-weight: 700; }
+.aac-ab-btn:hover { background: var(--soft); }
+.aac-ab-close { font-size: 20px; }
+.br-plan { width: 100%; background: var(--soft); border-radius: 16px; padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+
+
 

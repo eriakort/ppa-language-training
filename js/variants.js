@@ -522,6 +522,11 @@
         '<strong>' + esc(window.POG.surface.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.surface.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.surface.desc()) + '</span></button>' : '') +
+      (window.POG.circumlocution ? '<button class="modecard var-dcard" data-act="circ-home">' +
+        '<span class="ico" aria-hidden="true">🌉</span>' +
+        '<strong>' + esc(window.POG.circumlocution.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.circumlocution.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.circumlocution.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

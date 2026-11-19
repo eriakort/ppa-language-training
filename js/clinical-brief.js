@@ -81,14 +81,28 @@
       obsNarrative: "Racconto connesso: {sq} su {tot} sequenze giuste al primo tentativo; copertura concetti chiave {mc}%.",
       obsGrammar: "Morfologia e parole ponte: {ft} su {tot} scelte al primo tentativo (tempi {tn}, preposizioni {pr}, accordi {ag}).",
       obsSurface: "Parole irregolari e omofoni: {ft} su {tot} scelte al primo tentativo (regolarizzazioni fonetiche: {rg}, omofoni: {hm}).",
+      obsCircumlocution: "Aggirare la parola (circonlocuzione): su {tot} prove, {dw} parole recuperate direttamente e {ds} comunicate con indizi chiari.",
       obsLatency: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (su {n} prove).",
       obsLatencySlow: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (+{diff} s rispetto al periodo precedente).",
       obsAlert: "Avviso andamento ({m}): ultime {n} sessioni sotto il valore abituale.",
       obsCareTags: "Contesto segnalato dal familiare negli ultimi ingressi: {tags}.",
+      planTitle: "Piano di esercizio suggerito",
+      planSub: "Priorità calcolate dai dati locali per orientare le sessioni mirate (non è una prescrizione medica).",
+      planApply: "🎯 Imposta profilo suggerito ({focus})",
+      planApplied: "Profilo esercizi mirati aggiornato a «{focus}».",
+      focusLabels: { mixed: "Equilibrato", nfv: "Variante non fluente", sv: "Variante semantica", lv: "Variante logopenica" },
+      planItems: {
+        lexical: "Lessico e semantica ({pct}%): dare spazio a Parole da conservare (SFA/PCA), Aggirare la parola e Reti semantiche.",
+        syntax: "Frasi e morfologia ({pct}%): allenare Costruzione frasi, Azioni e verbi (VNeST) e Morfologia.",
+        speech: "Ritmo e suoni ({pct}%): usare Allenatore ritmo, Suoni e sillabe e Ripetizione.",
+        literacy: "Lettura e scrittura ({pct}%): abbinare Scrivere per ricordare (CART) e Lettura parole difficili / quotidiana.",
+        functional: "Vita quotidiana ({pct}%): allenare Messaggi vocali con parole chiave e tabella Comunica (Scelta A / B)."
+      },
       briefHead: "SCHEDA DI RIEPILOGO CLINICO (USO INTERNO VISITA) · {date}",
       briefPatient: "Profilo: {name} · Finestra: ultimi {days} giorni vs {days} precedenti",
       briefDomainsHead: "DOMINI LINGUISTICI (0–100%):",
       briefObsHead: "PATTERN E INDICATORI:",
+      briefPlanHead: "PIANO DI ESERCIZIO SUGGERITO:",
       briefSupportHead: "SUPPORTI COMUNICATIVI (PASSAPORTO):",
       briefCareHead: "ULTIMA NOTA FAMILIARE:",
       briefFooter: "Nota: dati raccolti localmente dall'app di esercizio linguistico; non sostituisce la valutazione clinica."
@@ -151,14 +165,28 @@
       obsNarrative: "Connected story retell: {sq} of {tot} sequenced cleanly on first pass; {mc}% main-concept coverage.",
       obsGrammar: "Morphosyntax & cloze: {ft} of {tot} clean first-try inflections/relators (tense {tn}, prep {pr}, agreement {ag}).",
       obsSurface: "Surface & irregular reading: {ft} of {tot} clean first-try matches (phonetic regularizations: {rg}, homophone foils: {hm}).",
+      obsCircumlocution: "Word-finding bridges (circumlocution): {dw} of {tot} words unlocked directly; {ds} communicated clearly using descriptive clues.",
       obsLatency: "Targeted response speed: median {cur} s per item (across {n} items).",
       obsLatencySlow: "Targeted response speed: median {cur} s per item (+{diff} s slower vs prior window).",
       obsAlert: "Stability alert ({m}): last {n} sessions fell below usual range.",
       obsCareTags: "Recent caregiver context tags: {tags}.",
+      planTitle: "Suggested practice plan",
+      planSub: "Quantitative priorities based on local domain scores to guide home sessions (not a medical prescription).",
+      planApply: "🎯 Apply suggested focus ({focus})",
+      planApplied: "Targeted hub focus updated to “{focus}”.",
+      focusLabels: { mixed: "Balanced", nfv: "Non-fluent focus", sv: "Semantic focus", lv: "Logopenic focus" },
+      planItems: {
+        lexical: "Lexical & semantics ({pct}%): prioritise Word Bank (SFA/PCA), Word-finding bridges, and Semantic links.",
+        syntax: "Sentence & morphosyntax ({pct}%): practise Sentence building, Verbs (VNeST), and Grammar cloze.",
+        speech: "Motor speech & span ({pct}%): focus on Speech pacing coach and Sound/syllable span.",
+        literacy: "Reading & spelling ({pct}%): pair Write to keep (CART) with Surface & Everyday reading.",
+        functional: "Daily communication ({pct}%): practise Spoken messages (keywords) and Talk Board two-choice mode."
+      },
       briefHead: "CLINICAL VISIT BRIEF (LOCAL PRACTICE SUMMARY) · {date}",
       briefPatient: "Profile: {name} · Window: last {days} days vs prior {days} days",
       briefDomainsHead: "LANGUAGE DOMAINS (0–100%):",
       briefObsHead: "PATTERN HIGHLIGHTS:",
+      briefPlanHead: "SUGGESTED PRACTICE PLAN:",
       briefSupportHead: "COMMUNICATION SUPPORTS (PASSPORT):",
       briefCareHead: "LATEST CAREGIVER NOTE:",
       briefFooter: "Note: locally recorded indicators from language practice software; not a diagnostic evaluation."
@@ -198,7 +226,7 @@
 
   function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
     var out = [];
-    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing].forEach(function (list) {
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution].forEach(function (list) {
       (list || []).forEach(function (s) {
         if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
         (s.items || []).forEach(function (it) {
@@ -222,6 +250,7 @@
     var narrative = window.POG.narrative && window.POG.narrative.listSessions ? window.POG.narrative.listSessions() : [];
     var grammar = window.POG.grammar && window.POG.grammar.listSessions ? window.POG.grammar.listSessions() : [];
     var surface = window.POG.surface && window.POG.surface.listSessions ? window.POG.surface.listSessions() : [];
+    var circumlocution = window.POG.circumlocution && window.POG.circumlocution.listSessions ? window.POG.circumlocution.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -236,6 +265,7 @@
       narrative: narrative,
       grammar: grammar,
       surface: surface,
+      circumlocution: circumlocution,
       carelog: carelog
     };
   }
@@ -317,6 +347,11 @@
     streams.surface.forEach(function (s) {
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.literacy.push(clamp01(+s.accuracy));
+    });
+
+    streams.circumlocution.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.lexical.push(clamp01(+s.accuracy));
     });
 
     streams.checkins.forEach(function (k) {
@@ -487,6 +522,22 @@
       }
     }
 
+    /* 3h. Compensatory circumlocution / word-finding bridge profile */
+    var cr = window.POG.circumlocution;
+    if (cr && cr.computeCircumlocutionProfile) {
+      var crSlice = streams.circumlocution.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (crSlice.length) {
+        var cp2 = cr.computeCircumlocutionProfile(crSlice);
+        if (cp2.total > 0) {
+          obs.push(api.fill(t.obsCircumlocution, {
+            dw: cp2.directWords,
+            ds: cp2.describedSuccess,
+            tot: cp2.total
+          }));
+        }
+      }
+    }
+
     /* 4. Stability alerts from progress engine */
     if (window.POG.progress && window.POG.progress.localAlerts) {
       var als = window.POG.progress.localAlerts();
@@ -525,6 +576,42 @@
     return obs;
   }
 
+  function recommendFocusPlan(brief, tOpt) {
+    var t = tOpt || T();
+    var scored = (brief && brief.domains || []).filter(function (d) { return d.cur != null; }).slice();
+    scored.sort(function (a, b) {
+      var sa = a.cur - (a.status === "down" ? 8 : 0);
+      var sb = b.cur - (b.status === "down" ? 8 : 0);
+      return sa - sb;
+    });
+    var top = scored.slice(0, 3);
+    var items = top.map(function (d) {
+      return {
+        key: d.key,
+        pct: d.cur,
+        text: api.fill((t.planItems && t.planItems[d.key]) || "", { pct: String(d.cur) })
+      };
+    }).filter(function (x) { return !!x.text; });
+
+    var byKey = {};
+    (brief && brief.domains || []).forEach(function (d) { byKey[d.key] = d.cur; });
+    var recommendedFocus = "mixed";
+    if (top.length) {
+      var primary = top[0].key;
+      var gapOk = scored.length < 2 || (top[top.length - 1].cur - top[0].cur >= 10) || top[0].cur < 75;
+      if (gapOk) {
+        if (primary === "syntax") recommendedFocus = "nfv";
+        else if (primary === "speech") recommendedFocus = (byKey.syntax != null && byKey.syntax < 75) ? "nfv" : "lv";
+        else if (primary === "lexical" || primary === "literacy") recommendedFocus = "sv";
+      }
+    }
+    return {
+      recommendedFocus: recommendedFocus,
+      focusLabel: (t.focusLabels && t.focusLabels[recommendedFocus]) || recommendedFocus,
+      items: items
+    };
+  }
+
   function buildBrief(windowDays, nowMs) {
     var t = T();
     var days = windowDays === 7 || windowDays === 90 ? windowDays : 30;
@@ -560,8 +647,7 @@
     var observations = deriveObservations(streams, curFrom, end, t, prevFrom);
     var notesCare = streams.carelog.filter(function (c) { return c.note; });
     var latestNote = notesCare.length ? notesCare[notesCare.length - 1] : null;
-
-    return {
+    var result = {
       windowDays: days,
       curFrom: curFrom,
       curTo: end,
@@ -570,6 +656,8 @@
       observations: observations,
       latestNote: latestNote
     };
+    result.plan = recommendFocusPlan(result, t);
+    return result;
   }
 
   function renderDomainSvg(domains, t) {
@@ -613,6 +701,11 @@
       lines.push("");
       lines.push(t.briefObsHead);
       brief.observations.forEach(function (o) { lines.push("* " + o); });
+    }
+    if (brief.plan && brief.plan.items && brief.plan.items.length) {
+      lines.push("");
+      lines.push(t.briefPlanHead);
+      brief.plan.items.forEach(function (p) { lines.push("- " + p.text); });
     }
     var ppMod = window.POG.passport;
     if (ppMod && ppMod.get) {
@@ -672,6 +765,16 @@
       ? '<ul class="br-obs">' + b.observations.map(function (o) { return '<li>' + esc(o) + '</li>'; }).join("") + '</ul>'
       : '<p class="sub">' + esc(t.obsNone) + '</p>';
 
+    var planHtml = (b.plan && b.plan.items && b.plan.items.length)
+      ? '<div class="br-plan">' +
+        '<h2>' + esc(t.planTitle) + '</h2>' +
+        '<p class="note">' + esc(t.planSub) + '</p>' +
+        '<ul class="br-obs">' + b.plan.items.map(function (p) { return '<li>' + esc(p.text) + '</li>'; }).join("") + '</ul>' +
+        '<div class="row-actions no-print"><button type="button" class="secondary" data-act="br-apply-focus" data-f="' + esc(b.plan.recommendedFocus) + '">' +
+        esc(api.fill(t.planApply, { focus: b.plan.focusLabel })) + '</button></div>' +
+        '</div>'
+      : '';
+
     var inHost = api.inHost && api.inHost();
     return api.header(false) + '<section class="card">' +
       '<article class="print-area br-printarea">' +
@@ -682,6 +785,7 @@
       renderDomainSvg(b.domains, t) +
       '<div class="report">' +
       '<h2>' + esc(t.obsTitle) + '</h2>' + obsHtml +
+      planHtml +
       '<h2 class="no-print">' + esc(t.briefTitle) + '</h2>' +
       '<p class="note no-print">' + esc(t.briefHelp) + '</p>' +
       '<div class="row-actions no-print"><button type="button" class="secondary" data-act="brief-copy">' + esc(t.copyBtn) + '</button>' +
@@ -702,6 +806,16 @@
   A["br-win"] = function (b) {
     var d = +b.getAttribute("data-d");
     V.windowDays = d === 7 || d === 90 ? d : 30;
+    api.render();
+  };
+  A["br-apply-focus"] = function (b) {
+    var f = b.getAttribute("data-f");
+    if (["mixed", "nfv", "sv", "lv"].indexOf(f) < 0) return;
+    var curCfg = api.load("variant_settings") || {};
+    curCfg.focus = f;
+    api.save("variant_settings", curCfg);
+    var t = T();
+    if (api.flash) api.flash(api.fill(t.planApplied, { focus: (t.focusLabels && t.focusLabels[f]) || f }));
     api.render();
   };
   A["brief-print"] = function () { try { window.print(); } catch (e) {} };
@@ -734,6 +848,7 @@
   window.POG.brief = {
     DOMAIN_KEYS: DOMAIN_KEYS,
     buildBrief: buildBrief,
+    recommendFocusPlan: recommendFocusPlan,
     buildPlainTextBrief: buildPlainTextBrief,
     renderDomainSvg: renderDomainSvg,
     label: function () { return T().btn; }

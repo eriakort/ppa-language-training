@@ -230,7 +230,7 @@
      Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
      therapist PIN ask for it again, then continue to where you were. */
   var UI_KEY = "pog_ui";
-  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, passport: 1, pick: 1, "pick-ask": 1 };
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, circumlocution: 1, passport: 1, pick: 1, "pick-ask": 1 };
   var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
   var UI_PIN = { "chk-results": 1, report: 1, progress: 1, carelog: 1, "wb-manage": 1, brief: 1 };
   function saveUi() {
@@ -1423,6 +1423,12 @@
     (load("surface_sessions") || []).forEach(function (s) {
       (s.items || []).forEach(function (i) {
         lines.push([s.date, s.id, "surface", s.who || "solo", i.kind || "surface", i.lv, i.label || i.id, "", i.result, i.hintUsed ? 1 : 0, i.firstTry ? "first_try" : "assisted", i.errType || "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+      });
+    });
+    (load("circumlocution_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "circumlocution", s.who || "solo", i.bridgeMode || "circumlocution", i.lv, i.label || i.id, "", i.result, i.cueUsed ? 1 : 0, i.clueClean ? "clues_clean" : "clues_assisted", "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
           "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
       });
     });

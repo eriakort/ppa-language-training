@@ -196,6 +196,16 @@
         vRows.push({ dom: "circumlocution", name: crApi.label(), n: crMatched.length, pct: csc != null ? Math.round(csc * 100) + "%" : "–", lv: String(crApi.level()) });
       }
     }
+    var nmApi = window.POG.numbers;
+    var nmSessions = (nmApi && nmApi.listSessions ? nmApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (nmApi && nmSessions.length) {
+      var nmMatched = [];
+      nmSessions.forEach(function (s) { nmMatched.push.apply(nmMatched, s.items || []); });
+      if (nmMatched.length) {
+        var nmsc = avg(nmMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "numbers", name: nmApi.label(), n: nmMatched.length, pct: nmsc != null ? Math.round(nmsc * 100) + "%" : "–", lv: String(nmApi.level()) });
+      }
+    }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
     var wbApi = window.POG.wordbank;

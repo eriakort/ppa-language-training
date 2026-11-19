@@ -26,6 +26,7 @@
       medTitle: "Note mediche o allergie (facoltativo)",
       sayBtn: "🔊 Leggi ad alta voce",
       bigBtn: "⛶ Mostra grande",
+      printBtn: "🖨️ Stampa biglietto",
       closeBig: "Tocca per chiudere",
       editBtn: "✏️ Modifica dati e preferenze",
       backBoard: "Torna alla tabella",
@@ -69,6 +70,7 @@
       medTitle: "Medical notes or allergies (optional)",
       sayBtn: "🔊 Read aloud",
       bigBtn: "⛶ Show large card",
+      printBtn: "🖨️ Print wallet card",
       closeBig: "Tap anywhere to close",
       editBtn: "✏️ Edit card & preferences",
       backBoard: "Back to talk board",
@@ -154,19 +156,23 @@
       ? '<div class="pp-box"><strong>' + esc(t.medTitle) + '</strong><p>' + esc(card.medNote) + '</p></div>'
       : '';
 
+    var inHost = api.inHost && api.inHost();
     return api.header(false) +
       '<section class="card">' +
+      '<article class="print-area pp-printarea">' +
       '<p class="tag">' + esc(t.title + (whoName ? " · " + whoName : "")) + '</p>' +
       '<div class="pp-hero"><p class="pp-msg">' + esc(mainText) + '</p></div>' +
-      '<div class="tools">' +
+      '<div class="tools no-print">' +
       '<button type="button" class="tool" data-act="pp-say">' + esc(t.sayBtn) + '</button>' +
       '<button type="button" class="tool" data-act="pp-big">' + esc(t.bigBtn) + '</button>' +
+      (!inHost ? '<button type="button" class="tool" data-act="pp-print">' + esc(t.printBtn) + '</button>' : '') +
       '</div>' +
       (stratHtml ? '<div class="pp-box"><h2>' + esc(t.howTitle) + '</h2>' + stratHtml + '</div>' : '') +
       contactHtml +
       medHtml +
-      (f ? '<p class="nudge" role="status">' + esc(f) + '</p>' : '') +
-      '<div class="row-actions">' +
+      '</article>' +
+      (f ? '<p class="nudge no-print" role="status">' + esc(f) + '</p>' : '') +
+      '<div class="row-actions no-print">' +
       '<button type="button" class="secondary" data-act="pp-edit">' + esc(t.editBtn) + '</button>' +
       (fromScreen === "therapist"
         ? '<button type="button" class="link" data-act="therapist">' + esc(t.backTher) + '</button>'
@@ -222,6 +228,7 @@
   };
   A["pp-big"] = function () { big = true; api.render(); };
   A["pp-big-close"] = function () { big = false; api.render(); };
+  A["pp-print"] = function () { try { window.print(); } catch (e) {} };
   A["pp-save"] = function () {
     var msgEl = document.getElementById("pp-message");
     var nameEl = document.getElementById("pp-cname");

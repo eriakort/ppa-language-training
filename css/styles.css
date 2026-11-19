@@ -865,5 +865,13 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .aac-ab-close { font-size: 20px; }
 .br-plan { width: 100%; background: var(--soft); border-radius: 16px; padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
 
-
-
+/* ---------- quick numbers picker, visit note & printable passport ---------- */
+.aac-nums { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.aac-num-btn { min-width: 68px; font-size: 20px; font-weight: 700; }
+.nm-opt { font-variant-numeric: tabular-nums; font-size: 24px; }
+.br-plan input { width: 100%; min-height: 48px; font: inherit; font-size: 18px; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); }
+@media print {
+  .print-area.pp-printarea { max-width: 110mm; padding: 14px; border: 2px solid #222; border-radius: 12px; background: #fff; color: #111; }
+  .print-area.pp-printarea .pp-hero { background: #f4f4f4; border: 1px solid #888; }
+  .print-area.pp-printarea .pp-box { background: #fff; border: 1px solid #aaa; }
+}

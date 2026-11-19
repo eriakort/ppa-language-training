@@ -1185,9 +1185,31 @@ async function playThrough(page, solo) {
   const crSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_circumlocution_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(crSaved.length === 1 && crSaved[0].items.length === 3, "circumlocution: completed 3-item compensatory session saved locally");
 
-  await vr.click('[data-act="circ-home-exit"]');
+  await vr.click('[data-act="circ-back-var"]');
 
-  // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, and Communication Passport
+  // Launch Numbers, times & prices (num-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="num-home"]')), "numbers: Numbers, times & prices card is offered in targeted practice hub");
+  await vr.click('[data-act="num-home"]');
+  for (let item = 0; item < 4; item++) {
+    if (item === 0) {
+      await vr.click('[data-act="num-hint"]');
+      check(!!(await vr.$(".hint")), "numbers: place-value / time clue box reveals cleanly");
+    }
+    const optCount = (await vr.$$('[data-act="num-pick"]')).length;
+    for (let oi = 0; oi < optCount; oi++) {
+      if (await vr.$('[data-act="num-next"]')) break;
+      const oSel = '[data-act="num-pick"][data-i="' + oi + '"]:not([disabled])';
+      if (await vr.$(oSel)) await vr.click(oSel);
+    }
+    check(!!(await vr.$('[data-act="num-next"]')), "numbers: item " + (item + 1) + " resolves cleanly");
+    await vr.click('[data-act="num-next"]');
+  }
+  const nmSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_numbers_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(nmSaved.length === 1 && nmSaved[0].items.length === 4, "numbers: completed 4-item numbers/time session saved locally");
+
+  await vr.click('[data-act="num-back"]');
+
+  // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, numbers quick picker, and Communication Passport
   await vr.click('[data-act="board"]');
   check(!!(await vr.$('[data-act="aac-tab"][data-t="clinic"]')) && !!(await vr.$('[data-act="aac-tab"][data-t="shop"]')),
     "aac: clinic and shop situational quick-packs are available on Talk Board");
@@ -1206,9 +1228,14 @@ async function playThrough(page, solo) {
   await vr.click('[data-act="aac-ab-pick"][data-pick="b"]');
   check(/Later/i.test(await vr.textContent(".aac-msg")), "aac: tapping two-choice option updates message bar cleanly");
 
+  await vr.click('[data-act="aac-num-toggle"]');
+  check((await vr.$$('[data-act="aac-num-pick"]')).length >= 10, "aac: numbers & time quick picker opens cleanly");
+  await vr.click('[data-act="aac-num-pick"][data-i="9"]');
+  check(/10:30/.test(await vr.textContent(".aac-msg")), "aac: tapping quick time updates Talk Board message bar");
+
   check(!!(await vr.$('[data-act="passport"]')), "passport: Help card shortcut appears on Talk Board");
   await vr.click('[data-act="passport"]');
-  check(!!(await vr.$(".pp-msg")), "passport: renders high-contrast communication help message");
+  check(!!(await vr.$(".pp-msg")) && !!(await vr.$('[data-act="pp-print"]')), "passport: renders high-contrast communication help message and Print button");
   await vr.click('[data-act="pp-big"]');
   check(!!(await vr.$(".aac-big")), "passport: fullscreen help card opens cleanly");
   await vr.click('[data-act="pp-big-close"]');
@@ -1253,8 +1280,10 @@ async function playThrough(page, solo) {
 
   // Open Unified Clinician Domain Profile & Visit Brief behind PIN
   await vr.click('[data-act="brief"]');
-  check((await vr.$$(".br-card")).length === 5 && !!(await vr.$("svg.br-svg")) && !!(await vr.$('[data-act="brief-print"]')) && !!(await vr.$('[data-act="br-apply-focus"]')),
-    "clinical brief: renders all 5 domain summary cards, SVG comparison, practice plan button, and Print button");
+  check((await vr.$$(".br-card")).length === 5 && !!(await vr.$("svg.br-svg")) && !!(await vr.$('[data-act="brief-print"]')) && !!(await vr.$('[data-act="br-apply-focus"]')) && !!(await vr.$("#br-visit-note")),
+    "clinical brief: renders all 5 domain summary cards, SVG comparison, practice plan button, visit goal note, and Print button");
+  await vr.fill("#br-visit-note", "Ask about large-print medication schedule card");
+  await vr.click('[data-act="br-save-note"]');
   await vr.click('[data-act="br-apply-focus"]');
   check(/updated/i.test(await vr.textContent(".br-printarea")),
     "clinical brief: one-click focus preset applies cleanly to targeted hub settings");
@@ -1263,15 +1292,15 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution: printable therapist summary lists all new modalities");
-  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, verbs, narrative, grammar, surface, circumlocution, passport, brief): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers: printable therapist summary lists all new modalities");
+  check(vr.errors.length === 0, "no page errors (all modalities, passport, brief): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

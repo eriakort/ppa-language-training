@@ -82,6 +82,7 @@
       obsGrammar: "Morfologia e parole ponte: {ft} su {tot} scelte al primo tentativo (tempi {tn}, preposizioni {pr}, accordi {ag}).",
       obsSurface: "Parole irregolari e omofoni: {ft} su {tot} scelte al primo tentativo (regolarizzazioni fonetiche: {rg}, omofoni: {hm}).",
       obsCircumlocution: "Aggirare la parola (circonlocuzione): su {tot} prove, {dw} parole recuperate direttamente e {ds} comunicate con indizi chiari.",
+      obsNumbers: "Numeri, orari e prezzi: {ft} su {tot} scelte al primo tentativo (inversioni cifre: {tr}, ordine grandezza: {mg}).",
       obsLatency: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (su {n} prove).",
       obsLatencySlow: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (+{diff} s rispetto al periodo precedente).",
       obsAlert: "Avviso andamento ({m}): ultime {n} sessioni sotto il valore abituale.",
@@ -96,13 +97,18 @@
         syntax: "Frasi e morfologia ({pct}%): allenare Costruzione frasi, Azioni e verbi (VNeST) e Morfologia.",
         speech: "Ritmo e suoni ({pct}%): usare Allenatore ritmo, Suoni e sillabe e Ripetizione.",
         literacy: "Lettura e scrittura ({pct}%): abbinare Scrivere per ricordare (CART) e Lettura parole difficili / quotidiana.",
-        functional: "Vita quotidiana ({pct}%): allenare Messaggi vocali con parole chiave e tabella Comunica (Scelta A / B)."
+        functional: "Vita quotidiana ({pct}%): allenare Messaggi vocali, Numeri/orari e tabella Comunica (Scelta A / B)."
       },
+      visitNoteLabel: "Domande o obiettivi per la prossima visita (solo su questo dispositivo)",
+      visitNotePh: "Es.: chiedere strategie per la stanchezza serale o orari dei farmaci…",
+      visitNoteSave: "Salva promemoria visita",
+      visitNoteSaved: "Promemoria per la visita salvato nella scheda.",
       briefHead: "SCHEDA DI RIEPILOGO CLINICO (USO INTERNO VISITA) · {date}",
       briefPatient: "Profilo: {name} · Finestra: ultimi {days} giorni vs {days} precedenti",
       briefDomainsHead: "DOMINI LINGUISTICI (0–100%):",
       briefObsHead: "PATTERN E INDICATORI:",
       briefPlanHead: "PIANO DI ESERCIZIO SUGGERITO:",
+      briefVisitHead: "DOMANDE / OBIETTIVI PER LA VISITA:",
       briefSupportHead: "SUPPORTI COMUNICATIVI (PASSAPORTO):",
       briefCareHead: "ULTIMA NOTA FAMILIARE:",
       briefFooter: "Nota: dati raccolti localmente dall'app di esercizio linguistico; non sostituisce la valutazione clinica."
@@ -166,6 +172,7 @@
       obsGrammar: "Morphosyntax & cloze: {ft} of {tot} clean first-try inflections/relators (tense {tn}, prep {pr}, agreement {ag}).",
       obsSurface: "Surface & irregular reading: {ft} of {tot} clean first-try matches (phonetic regularizations: {rg}, homophone foils: {hm}).",
       obsCircumlocution: "Word-finding bridges (circumlocution): {dw} of {tot} words unlocked directly; {ds} communicated clearly using descriptive clues.",
+      obsNumbers: "Functional numbers, times & prices: {ft} of {tot} clean first-try matches (transposition errors: {tr}, magnitude foils: {mg}).",
       obsLatency: "Targeted response speed: median {cur} s per item (across {n} items).",
       obsLatencySlow: "Targeted response speed: median {cur} s per item (+{diff} s slower vs prior window).",
       obsAlert: "Stability alert ({m}): last {n} sessions fell below usual range.",
@@ -180,13 +187,18 @@
         syntax: "Sentence & morphosyntax ({pct}%): practise Sentence building, Verbs (VNeST), and Grammar cloze.",
         speech: "Motor speech & span ({pct}%): focus on Speech pacing coach and Sound/syllable span.",
         literacy: "Reading & spelling ({pct}%): pair Write to keep (CART) with Surface & Everyday reading.",
-        functional: "Daily communication ({pct}%): practise Spoken messages (keywords) and Talk Board two-choice mode."
+        functional: "Daily communication ({pct}%): practise Spoken messages, Numbers & times, and Talk Board two-choice mode."
       },
+      visitNoteLabel: "Questions or goals for next clinic visit (device-local)",
+      visitNotePh: "Example: ask about evening fatigue, pill schedule aids, or board vocabulary…",
+      visitNoteSave: "Save visit note",
+      visitNoteSaved: "Visit question saved into the brief.",
       briefHead: "CLINICAL VISIT BRIEF (LOCAL PRACTICE SUMMARY) · {date}",
       briefPatient: "Profile: {name} · Window: last {days} days vs prior {days} days",
       briefDomainsHead: "LANGUAGE DOMAINS (0–100%):",
       briefObsHead: "PATTERN HIGHLIGHTS:",
       briefPlanHead: "SUGGESTED PRACTICE PLAN:",
+      briefVisitHead: "QUESTIONS / GOALS FOR NEXT VISIT:",
       briefSupportHead: "COMMUNICATION SUPPORTS (PASSPORT):",
       briefCareHead: "LATEST CAREGIVER NOTE:",
       briefFooter: "Note: locally recorded indicators from language practice software; not a diagnostic evaluation."
@@ -226,7 +238,7 @@
 
   function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
     var out = [];
-    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution].forEach(function (list) {
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers].forEach(function (list) {
       (list || []).forEach(function (s) {
         if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
         (s.items || []).forEach(function (it) {
@@ -251,6 +263,7 @@
     var grammar = window.POG.grammar && window.POG.grammar.listSessions ? window.POG.grammar.listSessions() : [];
     var surface = window.POG.surface && window.POG.surface.listSessions ? window.POG.surface.listSessions() : [];
     var circumlocution = window.POG.circumlocution && window.POG.circumlocution.listSessions ? window.POG.circumlocution.listSessions() : [];
+    var numbers = window.POG.numbers && window.POG.numbers.listSessions ? window.POG.numbers.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -266,6 +279,7 @@
       grammar: grammar,
       surface: surface,
       circumlocution: circumlocution,
+      numbers: numbers,
       carelog: carelog
     };
   }
@@ -352,6 +366,11 @@
     streams.circumlocution.forEach(function (s) {
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.lexical.push(clamp01(+s.accuracy));
+    });
+
+    streams.numbers.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.functional.push(clamp01(+s.accuracy));
     });
 
     streams.checkins.forEach(function (k) {
@@ -538,6 +557,23 @@
       }
     }
 
+    /* 3i. Functional numbers, times & prices transcoding profile */
+    var nm = window.POG.numbers;
+    if (nm && nm.computeNumbersProfile) {
+      var nmSlice = streams.numbers.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (nmSlice.length) {
+        var np2 = nm.computeNumbersProfile(nmSlice);
+        if (np2.total > 0) {
+          obs.push(api.fill(t.obsNumbers, {
+            ft: np2.firstTry,
+            tot: np2.total,
+            tr: np2.errors.transposition,
+            mg: np2.errors.magnitude
+          }));
+        }
+      }
+    }
+
     /* 4. Stability alerts from progress engine */
     if (window.POG.progress && window.POG.progress.localAlerts) {
       var als = window.POG.progress.localAlerts();
@@ -707,6 +743,12 @@
       lines.push(t.briefPlanHead);
       brief.plan.items.forEach(function (p) { lines.push("- " + p.text); });
     }
+    var visitNote = getVisitNote();
+    if (visitNote) {
+      lines.push("");
+      lines.push(t.briefVisitHead);
+      lines.push("- " + visitNote);
+    }
     var ppMod = window.POG.passport;
     if (ppMod && ppMod.get) {
       var ppCard = ppMod.get();
@@ -726,6 +768,11 @@
     lines.push("");
     lines.push(t.briefFooter);
     return lines.join("\n");
+  }
+
+  function getVisitNote() {
+    var v = api.load("brief_visit_note");
+    return typeof v === "string" ? v.trim() : "";
   }
 
   var V = { windowDays: 30 };
@@ -775,6 +822,12 @@
         '</div>'
       : '';
 
+    var visitNoteHtml = '<div class="br-plan no-print">' +
+      '<label for="br-visit-note" class="vb-sub">' + esc(t.visitNoteLabel) + '</label>' +
+      '<input id="br-visit-note" type="text" maxlength="200" placeholder="' + esc(t.visitNotePh) + '" value="' + esc(getVisitNote()) + '">' +
+      '<div class="row-actions"><button type="button" class="secondary" data-act="br-save-note">' + esc(t.visitNoteSave) + '</button></div>' +
+      '</div>';
+
     var inHost = api.inHost && api.inHost();
     return api.header(false) + '<section class="card">' +
       '<article class="print-area br-printarea">' +
@@ -786,6 +839,7 @@
       '<div class="report">' +
       '<h2>' + esc(t.obsTitle) + '</h2>' + obsHtml +
       planHtml +
+      visitNoteHtml +
       '<h2 class="no-print">' + esc(t.briefTitle) + '</h2>' +
       '<p class="note no-print">' + esc(t.briefHelp) + '</p>' +
       '<div class="row-actions no-print"><button type="button" class="secondary" data-act="brief-copy">' + esc(t.copyBtn) + '</button>' +
@@ -816,6 +870,14 @@
     api.save("variant_settings", curCfg);
     var t = T();
     if (api.flash) api.flash(api.fill(t.planApplied, { focus: (t.focusLabels && t.focusLabels[f]) || f }));
+    api.render();
+  };
+  A["br-save-note"] = function () {
+    var el = document.getElementById("br-visit-note");
+    var val = (el ? el.value : "").trim().slice(0, 200);
+    api.save("brief_visit_note", val);
+    var t = T();
+    if (api.flash) api.flash(t.visitNoteSaved);
     api.render();
   };
   A["brief-print"] = function () { try { window.print(); } catch (e) {} };

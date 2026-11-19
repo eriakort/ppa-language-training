@@ -20,6 +20,8 @@
       slateBtn: "✏️ Scrivi parola", slatePh: "Scrivi qui una parola, cifra o orario...", slateSay: "🔊 Leggi", slateBig: "⛶ Mostra grande",
       choiceBtn: "⚖️ Scelta A / B", choiceTitle: "Proponi due scelte chiare", choiceA: "Scelta A", choiceB: "Scelta B", choiceShow: "⛶ Mostra A / B", choiceAsk: "Tocca la tua scelta",
       choicePresets: [["🍵 Tè", "☕ Caffè"], ["✅ Sì", "❌ No"], ["⏱️ Adesso", "🕒 Dopo"], ["🔥 Caldo", "❄️ Freddo"]],
+      numBtn: "🔢 Numeri e orari", numTitle: "Tocca un numero, orario o importo",
+      numTokens: ["1", "2", "3", "4", "5", "10", "15", "30", "09:30", "10:30", "14:30", "16:30", "€ 5", "€ 10", "€ 20"],
       edit: "Modifica la tabella", editTitle: "Modifica la tabella",
       editHelp: "Una frase per riga, nel formato «simbolo | frase». Per esempio: 💧 | Ho sete",
       save: "Salva", reset: "Ripristina le frasi predefinite", saved: "Tabella salvata.", restored: "Frasi predefinite ripristinate.",
@@ -33,6 +35,8 @@
       slateBtn: "✏️ Type keyword", slatePh: "Type a word, name, or time...", slateSay: "🔊 Speak", slateBig: "⛶ Show large",
       choiceBtn: "⚖️ Two choices", choiceTitle: "Offer two clear choices", choiceA: "Choice A", choiceB: "Choice B", choiceShow: "⛶ Show A / B", choiceAsk: "Tap your choice",
       choicePresets: [["🍵 Tea", "☕ Coffee"], ["✅ Yes", "❌ No"], ["⏱️ Now", "🕒 Later"], ["🔥 Hot", "❄️ Cold"]],
+      numBtn: "🔢 Numbers & time", numTitle: "Tap a number, time, or amount",
+      numTokens: ["1", "2", "3", "4", "5", "10", "15", "30", "09:30", "10:30", "14:30", "16:30", "£5", "£10", "£20"],
       edit: "Edit the board", editTitle: "Edit the board",
       editHelp: "One phrase per line, as “symbol | phrase”. For example: 💧 | I'm thirsty",
       save: "Save", reset: "Restore the default phrases", saved: "Board saved.", restored: "Default phrases restored.",
@@ -75,7 +79,7 @@
     return window.POG.album && window.POG.album.tiles ? window.POG.album.tiles(tab) : [];
   }
 
-  var tab = "need", msg = "", big = false, slateOpen = false, slateVal = "", choiceOpen = false, choiceShow = false, chA = "", chB = "", shown = [];
+  var tab = "need", msg = "", big = false, slateOpen = false, slateVal = "", choiceOpen = false, choiceShow = false, numOpen = false, chA = "", chB = "", shown = [];
   function stripEmoji(s) { return String(s || "").replace(/^[\u2600-\u27BF\uD83C-\uDBFF\uDC00-\uDFFF\s]+/, "").trim() || String(s || "").trim(); }
 
   function viewBoard() {
@@ -123,14 +127,22 @@
         '<button type="button" class="link aac-ab-close" data-act="aac-ab-close">' + esc(t.closeBig) + '</button>' +
         '</div>'
       : '';
+    var numBox = numOpen
+      ? '<div class="aac-slate">' +
+        '<p class="vb-sub">' + esc(t.numTitle) + '</p>' +
+        '<div class="aac-nums">' + t.numTokens.map(function (tok, idx) {
+          return '<button type="button" class="tool aac-num-btn" data-act="aac-num-pick" data-i="' + idx + '">' + esc(tok) + '</button>';
+        }).join("") + '</div></div>'
+      : '';
     return api.header(false) + '<section class="card aac">' +
       '<div class="aac-bar"><p class="aac-msg' + (msg ? '' : ' empty') + '" aria-live="polite">' + esc(msg || t.placeholder) + '</p>' +
       '<div class="aac-tools"><button class="tool" data-act="aac-say"' + (msg ? '' : ' disabled') + '>' + esc(t.repeat) + '</button>' +
       '<button class="tool" data-act="aac-big"' + (msg ? '' : ' disabled') + '>' + esc(t.big) + '</button>' +
       '<button class="tool" data-act="aac-clear"' + (msg ? '' : ' disabled') + '>' + esc(t.clear) + '</button>' +
       '<button class="tool" data-act="aac-slate-toggle" aria-pressed="' + slateOpen + '">' + esc(t.slateBtn) + '</button>' +
-      '<button class="tool" data-act="aac-choice-toggle" aria-pressed="' + choiceOpen + '">' + esc(t.choiceBtn) + '</button></div>' +
-      slateBox + choiceBox + '</div>' +
+      '<button class="tool" data-act="aac-choice-toggle" aria-pressed="' + choiceOpen + '">' + esc(t.choiceBtn) + '</button>' +
+      '<button class="tool" data-act="aac-num-toggle" aria-pressed="' + numOpen + '">' + esc(t.numBtn) + '</button></div>' +
+      slateBox + choiceBox + numBox + '</div>' +
       '<div class="aac-tabs" role="tablist">' + tabs + '</div>' + grid + flashHtml() +
       '<div class="row-actions">' +
       (window.POG.passport ? '<button class="secondary" data-act="passport">' + esc(window.POG.passport.shortLabel()) + '</button>' : '') +
@@ -153,7 +165,8 @@
     /* Every phrase on the board, for recording family voices. */
     phrases: function () { return essentials().map(function (x) { return x.text; }); },
     contextTabs: function () { return Object.keys(CONTEXT_PACKS); },
-    choicePresets: function () { return T().choicePresets.slice(); }
+    choicePresets: function () { return T().choicePresets.slice(); },
+    numberTokens: function () { return T().numTokens.slice(); }
   };
 
   var ext = window.POG.ext;
@@ -175,7 +188,7 @@
   A["aac-big-close"] = function () { big = false; api.render(); };
   A["aac-slate-toggle"] = function () {
     slateOpen = !slateOpen;
-    if (slateOpen) choiceOpen = false;
+    if (slateOpen) { choiceOpen = false; numOpen = false; }
     api.render();
     if (slateOpen) {
       var el = document.getElementById("aac-slate-in");
@@ -184,7 +197,19 @@
   };
   A["aac-choice-toggle"] = function () {
     choiceOpen = !choiceOpen;
-    if (choiceOpen) slateOpen = false;
+    if (choiceOpen) { slateOpen = false; numOpen = false; }
+    api.render();
+  };
+  A["aac-num-toggle"] = function () {
+    numOpen = !numOpen;
+    if (numOpen) { slateOpen = false; choiceOpen = false; }
+    api.render();
+  };
+  A["aac-num-pick"] = function (b) {
+    var tok = T().numTokens[+b.getAttribute("data-i")];
+    if (!tok) return;
+    msg = tok;
+    api.speak(tok);
     api.render();
   };
   A["aac-choice-preset"] = function (b) {

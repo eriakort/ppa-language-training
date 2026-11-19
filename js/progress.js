@@ -39,7 +39,7 @@
       ckNaming: "Controllo: nomi giusti (su 10)", ckFlu: "Controllo: animali in un minuto", ckFluRep: "Controllo: ripetizioni animali", ckLetterFlu: "Controllo: fluenza per lettera", ckFluRatio: "Controllo: rapporto animali / lettera", ckIcu: "Controllo: concetti cucina (su 12)", ckIcuRate: "Controllo: concetti al minuto", ckRep: "Controllo: ripetizione", ckWpm: "Controllo: parole al minuto",
       varSentence: "Mirato: frasi e verbi", varSemantic: "Mirato: reti semantiche", varSoundspan: "Mirato: suoni, sillabe e memoria",
       funcReading: "Mirato: lettura quotidiana", careFc: "Familiare: comunicazione quotidiana",
-      wbRetention: "Parole da conservare: senza aiuto", cueIndep: "Risposte autonome (senza indizi)",
+      wbRetention: "Parole da conservare: senza aiuto", wrAccuracy: "Scrittura funzionale (CART): precisione", cueIndep: "Risposte autonome (senza indizi)",
       settings: "Soglie", kLabel: "Un cambiamento conta se supera", kOpt: "{k} volte la variazione abituale", runLabel: "Avviso dopo", runOpt: "{n} sessioni di fila sotto il solito", save: "Salva le soglie", saved: "Soglie salvate.",
       method: "Come si calcola: si usano le mediane, così un giorno storto pesa poco. «Variazione abituale» è la dispersione robusta del periodo A (MAD × 1,4826). Un cambiamento conta solo se è più grande della soglia; la tendenza usa la pendenza di Theil–Sen e il test di Mann–Kendall (p < 0,05). I controlli del parlato sono la misura più affidabile, perché sono sempre uguali e usano parole che non compaiono negli esercizi. Con meno di 5 sessioni (2 controlli) per periodo il risultato è «dati insufficienti». Valori indicativi, non una valutazione clinica: le soglie vanno decise dal logopedista.",
       back: "Torna all'area logopedista", backCloud: "Torna allo storico condiviso", remote: "Dati dal cloud: {n} (sola lettura)", none: "–", perMonth: "al mese", unitS: "s", pct: "%"
@@ -65,7 +65,7 @@
       ckNaming: "Check-in: names correct (of 10)", ckFlu: "Check-in: animals in one minute", ckFluRep: "Check-in: repeated animals", ckLetterFlu: "Check-in: letter fluency", ckFluRatio: "Check-in: animal / letter fluency ratio", ckIcu: "Check-in: kitchen concepts (of 12)", ckIcuRate: "Check-in: concepts per minute", ckRep: "Check-in: repetition", ckWpm: "Check-in: words per minute",
       varSentence: "Targeted: sentence building", varSemantic: "Targeted: semantic links", varSoundspan: "Targeted: sound & word span",
       funcReading: "Targeted: everyday reading", careFc: "Caregiver: daily communication",
-      wbRetention: "Words to keep: recalled uncued", cueIndep: "Independent responses (no cues)",
+      wbRetention: "Words to keep: recalled uncued", wrAccuracy: "Written expression (CART): accuracy", cueIndep: "Independent responses (no cues)",
       settings: "Thresholds", kLabel: "A change counts when it exceeds", kOpt: "{k} times the usual variation", runLabel: "Notice after", runOpt: "{n} sessions in a row below usual", save: "Save thresholds", saved: "Thresholds saved.",
       method: "How it's worked out: medians are used, so one bad day counts for little. \"Usual variation\" is the robust spread of period A (MAD × 1.4826). A change counts only when it is larger than the threshold; the trend uses the Theil–Sen slope and the Mann–Kendall test (p < 0.05). Speech check-ins are the most reliable measure, because they are always the same and use words that don't appear in the exercises. With fewer than 5 sessions (2 check-ins) in a period the result is \"not enough data\". These are indicators, not a clinical assessment: the therapist should decide the thresholds.",
       back: "Back to the therapist area", backCloud: "Back to the shared history", remote: "Cloud data: {n} (read-only)", none: "–", perMonth: "a month", unitS: "s", pct: "%"
@@ -162,6 +162,7 @@
       { key: "func_reading", label: t.funcReading, better: "up", min: 0.15, dec: 0, pct: true, src: "f", get: function (s) { return variantAvg(s, "functional"); } },
       { key: "care_fc", label: t.careFc, better: "up", min: 0.12, dec: 0, pct: true, src: "k", get: function (e) { return e && e.fcIndex != null ? e.fcIndex : null; } },
       { key: "wb_retention", label: t.wbRetention, better: "up", min: 0.15, dec: 0, pct: true, src: "w", get: function (s) { return s && s.retentionRate != null ? s.retentionRate : null; } },
+      { key: "wr_accuracy", label: t.wrAccuracy, better: "up", min: 0.15, dec: 0, pct: true, src: "r", get: function (s) { return s && s.accuracy != null ? s.accuracy : variantAvg(s, "writing"); } },
       { key: "cue_indep", label: t.cueIndep, better: "up", min: 0.15, dec: 0, pct: true, src: "s", get: function (e) { return e && e.indep != null ? e.indep : null; } });
     return list;
   }
@@ -175,11 +176,13 @@
   function functionalSessions() { return SRC ? (SRC.functional || []) : (window.POG.functional && window.POG.functional.listSessions ? window.POG.functional.listSessions() : []); }
   function careLogs() { return SRC ? (SRC.carelog || []) : (window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : []); }
   function wordbankSessions() { return SRC ? (SRC.wordbank || []) : (window.POG.wordbank && window.POG.wordbank.listSessions ? window.POG.wordbank.listSessions() : []); }
+  function writingSessions() { return SRC ? (SRC.writing || []) : (window.POG.writing && window.POG.writing.listSessions ? window.POG.writing.listSessions() : []); }
   function pointsFor(m, who, from, to) {
     var src = m.src === "c" ? checkins().map(function (k) { return { t: new Date(k.date).getTime(), who: k.who, raw: k }; })
       : m.src === "v" ? variantSessions().map(function (s) { return { t: new Date(s.date).getTime(), who: s.who || "solo", raw: s }; })
       : m.src === "f" ? functionalSessions().map(function (s) { return { t: new Date(s.date).getTime(), who: s.who || "solo", raw: s }; })
       : m.src === "w" ? wordbankSessions().map(function (s) { return { t: new Date(s.date).getTime(), who: s.who || "solo", raw: s }; })
+      : m.src === "r" ? writingSessions().map(function (s) { return { t: new Date(s.date).getTime(), who: s.who || "solo", raw: s }; })
       : m.src === "k" ? careLogs().map(function (e) { return { t: new Date(e.date).getTime(), who: "assist", raw: e }; })
       : log().map(function (e) { return { t: e.t, who: e.who, raw: e }; });
     return src.filter(function (p) { return (who === "all" || p.who === who) && (from == null || p.t >= from) && (to == null || p.t < to); })

@@ -30,6 +30,7 @@
       cmp: "Confronto con il periodo precedente", cmpHelp: "Mediane del periodo (B) e dei {m} mesi prima (A). «Stabile» se la differenza è entro la variazione abituale; dettagli in «Andamento e statistiche».",
       varTitle: "Esercizi mirati PPA", varCols: ["Dominio", "Prove", "Precisione", "Livello attuale"],
       wbTitle: "Parole da conservare e profilo degli indizi", wbCols: ["Voce", "Valore"], wbWords: "Parole mantenute (riquadro ≥ 3)", wbFragile: "Parole fragili / da ripassare", wbIndep: "Risposte autonome (senza indizi)", wbSemCue: "Aiuti semantici (SFA)", wbPhonCue: "Aiuti fonemici (PCA)", wbErrs: "Errori vocali (fonemici / semantici)",
+      wrTitle: "Scrittura funzionale e copia-richiamo (CART)", wrCols: ["Voce", "Valore"], wrAccuracy: "Precisione complessiva", wrIndep: "Prove autonome", wrCart: "Prove risolte con CART / aiuto", wrErrs: "Errori (superficiali / omissioni)",
       careTitle: "Osservazioni del familiare", careCols: ["Data", "Indice globale", "Contesto / Note"]
     },
     en: {
@@ -51,6 +52,7 @@
       cmp: "Compared with the previous period", cmpHelp: "Medians for the period (B) and the {m} months before (A). \"Stable\" when the difference is within the usual variation; details in \"Progress and statistics\".",
       varTitle: "Targeted PPA practice", varCols: ["Domain", "Items", "Accuracy", "Current level"],
       wbTitle: "Word preservation & cue profile", wbCols: ["Measure", "Value"], wbWords: "Core words maintained (Box ≥ 3)", wbFragile: "Fragile / due words", wbIndep: "Independent responses (uncued)", wbSemCue: "Semantic cues helped", wbPhonCue: "Phonemic cues helped", wbErrs: "Spoken errors (phonemic / semantic)",
+      wrTitle: "Written expression & CART", wrCols: ["Measure", "Value"], wrAccuracy: "Overall score", wrIndep: "Written uncued", wrCart: "Resolved with CART / cue", wrErrs: "Errors (surface-phonetic / omission)",
       careTitle: "Caregiver observations", careCols: ["Date", "Overall index", "Context / Note"]
     }
   };
@@ -136,7 +138,10 @@
       var profCue = wbApi.computeCueErrorProfile ? wbApi.computeCueErrorProfile(sessions, wbSessions) : null;
       wbSummary = { deckTotal: deck.length, maintained: maintained, fragile: fragile, profile: profCue };
     }
-    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks, variants: vRows, carelog: cgEntries, wordbank: wbSummary };
+    var wrApi = window.POG.writing;
+    var wrSessions = (wrApi && wrApi.listSessions ? wrApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    var wrSummary = (wrApi && wrSessions.length && wrApi.computeWritingProfile) ? wrApi.computeWritingProfile(wrSessions) : null;
+    return { since: since, now: now, sessions: sessions, days: Object.keys(daysSet).length, minutes: Math.round(ms / 60000), levels: levels, months: monthRows, perSession: perSession, checks: checks, variants: vRows, carelog: cgEntries, wordbank: wbSummary, writing: wrSummary };
   }
 
   function view() {
@@ -201,6 +206,12 @@
         if (p && p.totalErrors > 0) out.push([c.wbErrs, p.errs.phonemic + " / " + p.errs.semantic]);
         return out;
       })()) : '') +
+      (d.writing && d.writing.total > 0 ? '<h2>' + esc(c.wrTitle) + '</h2>' + table(c.wrCols, [
+        [c.wrAccuracy, d.writing.accuracy != null ? Math.round(d.writing.accuracy * 100) + "%" : "–"],
+        [c.wrIndep, d.writing.independent + " / " + d.writing.total],
+        [c.wrCart, d.writing.cartAssisted + " / " + d.writing.total],
+        [c.wrErrs, d.writing.errors.surface_phonetic + " / " + d.writing.errors.omission]
+      ]) : '') +
       (d.carelog && d.carelog.length && window.POG.carelog ? '<h2>' + esc(c.careTitle) + '</h2>' + table(c.careCols, d.carelog.slice(-8).map(function (e) {
         var cg = window.POG.carelog;
         var tags = (e.tags || []).map(function (k) { return cg.tagLabel(k); }).join(" · ");

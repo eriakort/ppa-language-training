@@ -971,6 +971,51 @@ async function playThrough(page, solo) {
   check(wbSaved.length === 1 && wbSaved[0].items.length === 5, "wordbank: completed 5-word spaced-retrieval session saved locally");
 
   await vr.click('[data-act="wb-home-exit"]');
+  await vr.click('[data-act="var-home"]');
+
+  // Launch Write to keep (CART) from the targeted practice hub
+  check(!!(await vr.$('[data-act="wr-home"]')), "writing: Write to keep (CART) card is offered in targeted practice hub");
+  await vr.click('[data-act="wr-home"]');
+  for (let item = 0; item < 4; item++) {
+    if (item === 0) {
+      // Test hint + phonetic nudge on first item, then CART Copy -> Hide -> Recall via tiles
+      const targetMeta = await vr.evaluate(() => {
+        const promptText = document.querySelector(".instr") ? document.querySelector(".instr").textContent : "";
+        const bank = (window.POG.content.WRITING && window.POG.content.WRITING.en) || [];
+        const match = bank.find((x) => x.prompt === promptText);
+        return match || null;
+      });
+      if (targetMeta && targetMeta.phoneticSkeletons && targetMeta.phoneticSkeletons[0]) {
+        await vr.fill("#wr-input", targetMeta.phoneticSkeletons[0]);
+        await vr.click('[data-act="wr-check"]');
+        check(!!(await vr.$('.nudge[role="status"]')), "writing: phonetic spelling attempt displays helpful orthographic nudge");
+        await vr.click('[data-act="wr-clear"]');
+      }
+      await vr.click('[data-act="wr-cart"]');
+      check(!!(await vr.$(".wr-model")), "writing: CART Step 1 shows written model for clean copying");
+      const modelTxt = (await vr.textContent(".wr-model")).trim();
+      await vr.fill("#wr-input", modelTxt);
+      await vr.click('[data-act="wr-copy-done"]');
+      check(!(await vr.$(".wr-model")) && !!(await vr.$(".wr-cartbox")), "writing: CART Step 2 hides model for delayed recall");
+      await vr.fill("#wr-input", modelTxt);
+      await vr.click('[data-act="wr-check"]');
+    } else {
+      const targetTxt = await vr.evaluate(() => {
+        const promptText = document.querySelector(".instr") ? document.querySelector(".instr").textContent : "";
+        const bank = (window.POG.content.WRITING && window.POG.content.WRITING.en) || [];
+        const match = bank.find((x) => x.prompt === promptText);
+        return match ? match.target : "";
+      });
+      await vr.fill("#wr-input", targetTxt);
+      await vr.click('[data-act="wr-check"]');
+    }
+    check(!!(await vr.$('[data-act="wr-next"]')), "writing: item " + (item + 1) + " verified and ready for next");
+    await vr.click('[data-act="wr-next"]');
+  }
+  const wrSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_writing_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(wrSaved.length === 1 && wrSaved[0].items.length === 4, "writing: completed 4-item CART session saved locally");
+
+  await vr.click('[data-act="wr-home-exit"]');
   await vr.click('[data-act="therapist"]');
   await vr.fill("#th-pin1", "1234"); await vr.fill("#th-pin2", "1234"); await vr.click('[data-act="pin-set"]');
 
@@ -994,11 +1039,24 @@ async function playThrough(page, solo) {
   check(/pharmacy/i.test(await vr.textContent(".card")), "wordbank curator: custom everyday word added to personal deck");
   await vr.click('[data-act="therapist"]');
 
+  // Open Unified Clinician Domain Profile & Visit Brief behind PIN
+  await vr.click('[data-act="brief"]');
+  check((await vr.$$(".br-card")).length === 5 && !!(await vr.$("svg.br-svg")),
+    "clinical brief: renders all 5 domain summary cards and SVG trajectory comparison");
+  await vr.click('[data-act="br-win"][data-d="7"]');
+  check((await vr.getAttribute('[data-act="br-win"][data-d="7"]', "aria-pressed")) === "true",
+    "clinical brief: switches comparison time window cleanly");
+  await vr.click('[data-act="brief-copy"]');
+  const briefTxtVal = await vr.inputValue("#brief-text");
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal),
+    "clinical brief: generates structured plain-text visit brief and triggers copy");
+  await vr.click('[data-act="br-back"]');
+
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank: printable therapist summary lists targeted domains, everyday reading, word preservation, and caregiver observations");
-  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing: printable therapist summary lists targeted domains, everyday reading, word preservation, written expression, and caregiver observations");
+  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, brief): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

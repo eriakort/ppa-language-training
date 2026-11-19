@@ -487,6 +487,11 @@
         '<strong>' + esc(window.POG.wordbank.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.wordbank.badge()) + '</span>' +
         '<span>' + esc(window.POG.wordbank.desc()) + '</span></button>' : '') +
+      (window.POG.writing ? '<button class="modecard var-dcard" data-act="wr-home">' +
+        '<span class="ico" aria-hidden="true">✍️</span>' +
+        '<strong>' + esc(window.POG.writing.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.writing.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.writing.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

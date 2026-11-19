@@ -126,6 +126,26 @@
         vRows.push({ dom: "functional", name: fnApi.label(), n: fnMatched.length, pct: fsc != null ? Math.round(fsc * 100) + "%" : "–", lv: String(fnApi.level()) });
       }
     }
+    var dcApi = window.POG.discourse;
+    var dcSessions = (dcApi && dcApi.listSessions ? dcApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (dcApi && dcSessions.length) {
+      var dcMatched = [];
+      dcSessions.forEach(function (s) { dcMatched.push.apply(dcMatched, s.items || []); });
+      if (dcMatched.length) {
+        var dsc = avg(dcMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "discourse", name: dcApi.label(), n: dcMatched.length, pct: dsc != null ? Math.round(dsc * 100) + "%" : "–", lv: String(dcApi.level()) });
+      }
+    }
+    var pcApi = window.POG.pacing;
+    var pcSessions = (pcApi && pcApi.listSessions ? pcApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (pcApi && pcSessions.length) {
+      var pcMatched = [];
+      pcSessions.forEach(function (s) { pcMatched.push.apply(pcMatched, s.items || []); });
+      if (pcMatched.length) {
+        var psc = avg(pcMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "pacing", name: pcApi.label(), n: pcMatched.length, pct: psc != null ? Math.round(psc * 100) + "%" : "–", lv: String(pcApi.level()) });
+      }
+    }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
     var wbApi = window.POG.wordbank;

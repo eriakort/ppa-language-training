@@ -73,6 +73,9 @@
       obsWrSurface: "Scrittura (CART): errori prevalentemente fonetici/superficiali ({sf} su {tot}); recupero con copia-richiamo su {ca} prove.",
       obsWrOmit: "Scrittura (CART): prevalgono omissioni o riduzioni ortografiche ({om} su {tot}); utile continuare la copia guidata.",
       obsWrSummary: "Scrittura (CART): precisione complessiva {acc}% su {tot} prove.",
+      obsDiscKw: "Ascolto quotidiano: su {tot} messaggi, {fp} compresi al primo ascolto; le parole chiave scritte hanno recuperato {kw} prove.",
+      obsDiscFirst: "Ascolto quotidiano: {fp} su {tot} messaggi compresi al primo ascolto senza aiuti visivi.",
+      obsPace: "Ritmo e sillabe: {sm} su {tot} produzioni fluide a ritmo (tempo prevalente: {tempo}).",
       obsAlert: "Avviso andamento ({m}): ultime {n} sessioni sotto il valore abituale.",
       obsCareTags: "Contesto segnalato dal familiare negli ultimi ingressi: {tags}.",
       briefHead: "SCHEDA DI RIEPILOGO CLINICO (USO INTERNO VISITA) · {date}",
@@ -132,6 +135,9 @@
       obsWrSurface: "Written expression (CART): primarily surface-phonetic spelling errors ({sf} of {tot} items); CART copy-recall supported {ca} items.",
       obsWrOmit: "Written expression (CART): letter/word omissions predominated ({om} of {tot} items); continue CART visual copying.",
       obsWrSummary: "Written expression (CART): {acc}% overall score across {tot} items.",
+      obsDiscKw: "Spoken message comprehension: {fp} of {tot} understood on first listen; written keywords rescued {kw} items.",
+      obsDiscFirst: "Spoken message comprehension: {fp} of {tot} understood cleanly on first listen.",
+      obsPace: "Speech pacing coach: {sm} of {tot} items produced smoothly on the beat (most used tempo: {tempo}).",
       obsAlert: "Stability alert ({m}): last {n} sessions fell below usual range.",
       obsCareTags: "Recent caregiver context tags: {tags}.",
       briefHead: "CLINICAL VISIT BRIEF (LOCAL PRACTICE SUMMARY) · {date}",
@@ -153,9 +159,9 @@
 
   function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
-  function inRange(dateStr, fromMs, toMs) {
+  function inRange(dateStr, fromMs, toMs, inclusiveEnd) {
     var ms = new Date(dateStr).getTime();
-    return isFinite(ms) && ms >= fromMs && ms < toMs;
+    return isFinite(ms) && ms >= fromMs && (inclusiveEnd ? ms <= toMs : ms < toMs);
   }
 
   function scoreSessionItem(it) {
@@ -174,6 +180,8 @@
     var functional = window.POG.functional && window.POG.functional.listSessions ? window.POG.functional.listSessions() : [];
     var wordbank = window.POG.wordbank && window.POG.wordbank.listSessions ? window.POG.wordbank.listSessions() : [];
     var writing = window.POG.writing && window.POG.writing.listSessions ? window.POG.writing.listSessions() : [];
+    var discourse = window.POG.discourse && window.POG.discourse.listSessions ? window.POG.discourse.listSessions() : [];
+    var pacing = window.POG.pacing && window.POG.pacing.listSessions ? window.POG.pacing.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -182,15 +190,17 @@
       functional: functional,
       wordbank: wordbank,
       writing: writing,
+      discourse: discourse,
+      pacing: pacing,
       carelog: carelog
     };
   }
 
-  function windowScores(streams, fromMs, toMs) {
+  function windowScores(streams, fromMs, toMs, inclusiveEnd) {
     var buckets = { lexical: [], syntax: [], speech: [], literacy: [], functional: [] };
 
     streams.sessions.forEach(function (s) {
-      if (!inRange(s.date, fromMs, toMs)) return;
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       (s.items || []).forEach(function (it) {
         var v = scoreSessionItem(it);
         if (v == null) return;
@@ -204,7 +214,7 @@
     });
 
     streams.variants.forEach(function (s) {
-      if (!inRange(s.date, fromMs, toMs)) return;
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       (s.items || []).forEach(function (it) {
         var v = scoreSessionItem(it);
         if (v == null) return;
@@ -215,12 +225,12 @@
     });
 
     streams.wordbank.forEach(function (s) {
-      if (!inRange(s.date, fromMs, toMs)) return;
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.retentionRate != null && isFinite(+s.retentionRate)) buckets.lexical.push(clamp01(+s.retentionRate));
     });
 
     streams.functional.forEach(function (s) {
-      if (!inRange(s.date, fromMs, toMs)) return;
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       (s.items || []).forEach(function (it) {
         var v = scoreSessionItem(it);
         if (v != null) buckets.literacy.push(v);
@@ -228,19 +238,29 @@
     });
 
     streams.writing.forEach(function (s) {
-      if (!inRange(s.date, fromMs, toMs)) return;
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.literacy.push(clamp01(+s.accuracy));
     });
 
+    streams.discourse.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.functional.push(clamp01(+s.accuracy));
+    });
+
+    streams.pacing.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.fluency != null && isFinite(+s.fluency)) buckets.speech.push(clamp01(+s.fluency));
+    });
+
     streams.checkins.forEach(function (k) {
-      if (!inRange(k.date, fromMs, toMs)) return;
+      if (!inRange(k.date, fromMs, toMs, inclusiveEnd)) return;
       if (k.naming && k.naming.correct != null) buckets.lexical.push(clamp01(k.naming.correct / 10));
       if (k.rep && k.rep.avg != null) buckets.speech.push(clamp01(+k.rep.avg));
       if (k.desc && k.desc.icu != null) buckets.functional.push(clamp01(k.desc.icu / (k.desc.icuTotal || 12)));
     });
 
     streams.carelog.forEach(function (c) {
-      if (!inRange(c.date, fromMs, toMs)) return;
+      if (!inRange(c.date, fromMs, toMs, inclusiveEnd)) return;
       if (c.fcIndex != null && isFinite(+c.fcIndex)) buckets.functional.push(clamp01(+c.fcIndex));
     });
 
@@ -258,7 +278,7 @@
   function deriveObservations(streams, curFrom, curTo, t) {
     var obs = [];
     /* 1. Fluency divergence (animal vs phonemic letter) from latest check-ins */
-    var recentChecks = streams.checkins.filter(function (k) { return inRange(k.date, curFrom, curTo); });
+    var recentChecks = streams.checkins.filter(function (k) { return inRange(k.date, curFrom, curTo, true); });
     if (!recentChecks.length) recentChecks = streams.checkins;
     var bothChecks = recentChecks.filter(function (k) {
       return k.flu && k.flu.count != null && k.letterFlu && k.letterFlu.count > 0;
@@ -277,8 +297,8 @@
     /* 2. Cue responsiveness (SFA vs PCA) via wordbank */
     var wb = window.POG.wordbank;
     if (wb && wb.computeCueErrorProfile) {
-      var cuedSess = streams.sessions.filter(function (s) { return inRange(s.date, curFrom, curTo); });
-      var cuedWb = streams.wordbank.filter(function (s) { return inRange(s.date, curFrom, curTo); });
+      var cuedSess = streams.sessions.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      var cuedWb = streams.wordbank.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
       var cp = wb.computeCueErrorProfile(cuedSess.length ? cuedSess : streams.sessions, cuedWb.length ? cuedWb : streams.wordbank);
       if (cp && cp.totalCued > 0) {
         var indepPct = Math.round((cp.cues.independent / cp.totalCued) * 100);
@@ -295,7 +315,7 @@
     /* 3. Written expression / dysgraphia profile */
     var wr = window.POG.writing;
     if (wr && wr.computeWritingProfile) {
-      var wrSlice = streams.writing.filter(function (s) { return inRange(s.date, curFrom, curTo); });
+      var wrSlice = streams.writing.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
       if (wrSlice.length) {
         var wp = wr.computeWritingProfile(wrSlice);
         if (wp.total > 0) {
@@ -310,6 +330,35 @@
       }
     }
 
+    /* 3b. Auditory message comprehension & written-keyword rescue */
+    var dc = window.POG.discourse;
+    if (dc && dc.computeDiscourseProfile) {
+      var dcSlice = streams.discourse.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (dcSlice.length) {
+        var dp = dc.computeDiscourseProfile(dcSlice);
+        if (dp.total > 0) {
+          if (dp.keywordRescued > 0) {
+            obs.push(api.fill(t.obsDiscKw, { fp: dp.firstPass, tot: dp.total, kw: dp.keywordRescued }));
+          } else {
+            obs.push(api.fill(t.obsDiscFirst, { fp: dp.firstPass, tot: dp.total }));
+          }
+        }
+      }
+    }
+
+    /* 3c. Rhythmic speech pacing fluency & preferred tempo */
+    var pc = window.POG.pacing;
+    if (pc && pc.computePacingProfile) {
+      var pcSlice = streams.pacing.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (pcSlice.length) {
+        var pp = pc.computePacingProfile(pcSlice);
+        if (pp.total > 0) {
+          var topTempo = Object.keys(pp.tempos).sort(function (a, b) { return pp.tempos[b] - pp.tempos[a]; })[0] || "steady";
+          obs.push(api.fill(t.obsPace, { sm: pp.smooth, tot: pp.total, tempo: topTempo }));
+        }
+      }
+    }
+
     /* 4. Stability alerts from progress engine */
     if (window.POG.progress && window.POG.progress.localAlerts) {
       var als = window.POG.progress.localAlerts();
@@ -320,7 +369,7 @@
 
     /* 5. Recent caregiver context tags */
     var cg = window.POG.carelog;
-    var recentCare = streams.carelog.filter(function (c) { return inRange(c.date, curFrom, curTo); });
+    var recentCare = streams.carelog.filter(function (c) { return inRange(c.date, curFrom, curTo, true); });
     if (recentCare.length && cg && cg.tagLabel) {
       var tagCounts = {};
       recentCare.forEach(function (e) {
@@ -338,12 +387,12 @@
   function buildBrief(windowDays, nowMs) {
     var t = T();
     var days = windowDays === 7 || windowDays === 90 ? windowDays : 30;
-    var end = nowMs != null ? nowMs : Date.now();
+    var end = nowMs != null ? nowMs : new Date().getTime();
     var curFrom = end - days * DAY;
     var prevFrom = curFrom - days * DAY;
     var streams = collectStreams();
-    var cur = windowScores(streams, curFrom, end);
-    var prev = windowScores(streams, prevFrom, curFrom);
+    var cur = windowScores(streams, curFrom, end, true);
+    var prev = windowScores(streams, prevFrom, curFrom, false);
 
     var domains = DOMAIN_KEYS.map(function (k) {
       var c = cur[k], p = prev[k];

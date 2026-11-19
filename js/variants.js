@@ -492,6 +492,16 @@
         '<strong>' + esc(window.POG.writing.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.writing.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.writing.desc()) + '</span></button>' : '') +
+      (window.POG.discourse ? '<button class="modecard var-dcard" data-act="disc-home">' +
+        '<span class="ico" aria-hidden="true">🎧</span>' +
+        '<strong>' + esc(window.POG.discourse.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.discourse.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.discourse.desc()) + '</span></button>' : '') +
+      (window.POG.pacing ? '<button class="modecard var-dcard" data-act="pace-home">' +
+        '<span class="ico" aria-hidden="true">🥁</span>' +
+        '<strong>' + esc(window.POG.pacing.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.pacing.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.pacing.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

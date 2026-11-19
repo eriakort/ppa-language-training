@@ -1015,7 +1015,49 @@ async function playThrough(page, solo) {
   const wrSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_writing_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(wrSaved.length === 1 && wrSaved[0].items.length === 4, "writing: completed 4-item CART session saved locally");
 
-  await vr.click('[data-act="wr-home-exit"]');
+  await vr.click('[data-act="wr-back-var"]');
+
+  // Launch Spoken messages (disc-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="disc-home"]')), "discourse: Spoken messages card is offered in targeted practice hub");
+  await vr.click('[data-act="disc-home"]');
+  for (let item = 0; item < 3; item++) {
+    if (item === 0) {
+      await vr.click('[data-act="disc-slow"]');
+      await vr.click('[data-act="disc-kw"]');
+      check(!!(await vr.$(".dc-kw")), "discourse: written keyword anchors reveal cleanly");
+    }
+    const opts = await vr.$$('[data-act="disc-opt"]');
+    for (let i = 0; i < opts.length; i++) {
+      if (await vr.$('[data-act="disc-next"]')) break;
+      const sel = '[data-act="disc-opt"][data-i="' + i + '"]:not([disabled])';
+      if (await vr.$(sel)) await vr.click(sel);
+    }
+    check(!!(await vr.$('[data-act="disc-next"]')), "discourse: message " + (item + 1) + " verified cleanly");
+    await vr.click('[data-act="disc-next"]');
+  }
+  const dcSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_discourse_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(dcSaved.length === 1 && dcSaved[0].items.length === 3, "discourse: completed 3-message comprehension session saved locally");
+  await vr.click('[data-act="disc-back-var"]');
+
+  // Launch Speech pacing coach (pace-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="pace-home"]')), "pacing: Speech pacing coach card is offered in targeted practice hub");
+  await vr.click('[data-act="pace-home"]');
+  for (let item = 0; item < 4; item++) {
+    if (item === 0) {
+      await vr.click('[data-act="pace-retry"]');
+      check((await vr.getAttribute('[data-act="pace-tempo"][data-v="slow"]', "aria-pressed")) === "true",
+        "pacing: slow down & retry sets beat tempo cleanly to slow");
+      await vr.click('[data-act="pace-tap"][data-i="0"]');
+      check(!!(await vr.$(".pc-syl.on")), "pacing: tapping a syllable highlights the active beat");
+    }
+    await vr.click('[data-act="pace-rate"][data-r="good"]');
+    check(!!(await vr.$('[data-act="pace-next"]')), "pacing: item " + (item + 1) + " rated cleanly");
+    await vr.click('[data-act="pace-next"]');
+  }
+  const pcSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_pacing_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(pcSaved.length === 1 && pcSaved[0].items.length === 4, "pacing: completed 4-item speech pacing session saved locally");
+
+  await vr.click('[data-act="pace-home-exit"]');
   await vr.click('[data-act="therapist"]');
   await vr.fill("#th-pin1", "1234"); await vr.fill("#th-pin2", "1234"); await vr.click('[data-act="pin-set"]');
 
@@ -1048,15 +1090,15 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing: printable therapist summary lists targeted domains, everyday reading, word preservation, written expression, and caregiver observations");
-  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, brief): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing: printable therapist summary lists all new modalities");
+  check(vr.errors.length === 0, "no page errors (variants, functional, carelog, wordbank, writing, discourse, pacing, brief): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

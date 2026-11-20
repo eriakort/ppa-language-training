@@ -23,6 +23,7 @@
       numBtn: "🔢 Numeri e orari", numTitle: "Tocca un numero, orario o importo",
       numTokens: ["1", "2", "3", "4", "5", "10", "15", "30", "09:30", "10:30", "14:30", "16:30", "€ 5", "€ 10", "€ 20"],
       repairCues: ["✋ Un attimo, sto cercando la parola", "🔁 Può ripetere più piano?", "✅ Ho capito"],
+      chainBtn: "🧩 Componi frase", chainBack: "⌫ Indietro", chainEmpty: "Tocca le tessere per unirle in una frase.",
       edit: "Modifica la tabella", editTitle: "Modifica la tabella",
       editHelp: "Una frase per riga, nel formato «simbolo | frase». Per esempio: 💧 | Ho sete",
       save: "Salva", reset: "Ripristina le frasi predefinite", saved: "Tabella salvata.", restored: "Frasi predefinite ripristinate.",
@@ -39,6 +40,7 @@
       numBtn: "🔢 Numbers & time", numTitle: "Tap a number, time, or amount",
       numTokens: ["1", "2", "3", "4", "5", "10", "15", "30", "09:30", "10:30", "14:30", "16:30", "£5", "£10", "£20"],
       repairCues: ["✋ One moment, finding my words", "🔁 Could you repeat slowly?", "✅ I understand"],
+      chainBtn: "🧩 Build phrase", chainBack: "⌫ Undo step", chainEmpty: "Tap tiles across tabs to join them into a phrase.",
       edit: "Edit the board", editTitle: "Edit the board",
       editHelp: "One phrase per line, as “symbol | phrase”. For example: 💧 | I'm thirsty",
       save: "Save", reset: "Restore the default phrases", saved: "Board saved.", restored: "Default phrases restored.",
@@ -81,8 +83,20 @@
     return window.POG.album && window.POG.album.tiles ? window.POG.album.tiles(tab) : [];
   }
 
-  var tab = "need", msg = "", big = false, slateOpen = false, slateVal = "", choiceOpen = false, choiceShow = false, numOpen = false, chA = "", chB = "", shown = [];
+  var tab = "need", msg = "", big = false, slateOpen = false, slateVal = "", choiceOpen = false, choiceShow = false, numOpen = false, chainMode = false, chain = [], chA = "", chB = "", shown = [];
   function stripEmoji(s) { return String(s || "").replace(/^[\u2600-\u27BF\uD83C-\uDBFF\uDC00-\uDFFF\s]+/, "").trim() || String(s || "").trim(); }
+  function pushPhrasePart(text) {
+    var clean = String(text || "").trim();
+    if (!clean) return;
+    if (chainMode) {
+      if (chain.length < 6) chain.push(clean);
+      msg = chain.join(" · ");
+      api.speak(clean);
+    } else {
+      msg = clean;
+      api.speak(clean);
+    }
+  }
 
   function viewBoard() {
     var t = T();
@@ -139,15 +153,25 @@
     var repairBar = '<div class="aac-repairs">' + t.repairCues.map(function (cue, idx) {
       return '<button type="button" class="tool aac-repair-btn" data-act="aac-repair" data-i="' + idx + '">' + esc(cue) + '</button>';
     }).join("") + '</div>';
+    var chainBar = chainMode
+      ? '<div class="aac-chain-strip">' +
+        (chain.length
+          ? chain.map(function (part, idx) {
+              return '<button type="button" class="aac-chain-chip" data-act="aac-chain-rm" data-i="' + idx + '" aria-label="' + esc(part) + ' ×">' + esc(part) + ' <span aria-hidden="true">×</span></button>';
+            }).join("") + '<button type="button" class="tool" data-act="aac-chain-back">' + esc(t.chainBack) + '</button>'
+          : '<span class="note">' + esc(t.chainEmpty) + '</span>') +
+        '</div>'
+      : '';
     return api.header(false) + '<section class="card aac">' +
       '<div class="aac-bar"><p class="aac-msg' + (msg ? '' : ' empty') + '" aria-live="polite">' + esc(msg || t.placeholder) + '</p>' +
       '<div class="aac-tools"><button class="tool" data-act="aac-say"' + (msg ? '' : ' disabled') + '>' + esc(t.repeat) + '</button>' +
       '<button class="tool" data-act="aac-big"' + (msg ? '' : ' disabled') + '>' + esc(t.big) + '</button>' +
-      '<button class="tool" data-act="aac-clear"' + (msg ? '' : ' disabled') + '>' + esc(t.clear) + '</button>' +
+      '<button class="tool" data-act="aac-clear"' + (msg || chain.length ? '' : ' disabled') + '>' + esc(t.clear) + '</button>' +
+      '<button class="tool" data-act="aac-chain-toggle" aria-pressed="' + chainMode + '">' + esc(t.chainBtn) + '</button>' +
       '<button class="tool" data-act="aac-slate-toggle" aria-pressed="' + slateOpen + '">' + esc(t.slateBtn) + '</button>' +
       '<button class="tool" data-act="aac-choice-toggle" aria-pressed="' + choiceOpen + '">' + esc(t.choiceBtn) + '</button>' +
       '<button class="tool" data-act="aac-num-toggle" aria-pressed="' + numOpen + '">' + esc(t.numBtn) + '</button></div>' +
-      repairBar + slateBox + choiceBox + numBox + '</div>' +
+      chainBar + repairBar + slateBox + choiceBox + numBox + '</div>' +
       '<div class="aac-tabs" role="tablist">' + tabs + '</div>' + grid + flashHtml() +
       '<div class="row-actions">' +
       (window.POG.passport ? '<button class="secondary" data-act="passport">' + esc(window.POG.passport.shortLabel()) + '</button>' : '') +
@@ -172,7 +196,9 @@
     contextTabs: function () { return Object.keys(CONTEXT_PACKS); },
     choicePresets: function () { return T().choicePresets.slice(); },
     numberTokens: function () { return T().numTokens.slice(); },
-    repairCues: function () { return T().repairCues.slice(); }
+    repairCues: function () { return T().repairCues.slice(); },
+    isChainMode: function () { return chainMode; },
+    chainParts: function () { return chain.slice(); }
   };
 
   var ext = window.POG.ext;
@@ -186,12 +212,32 @@
   A["aac-tab"] = function (b) { tab = b.getAttribute("data-t") || "need"; api.render(); };
   A["aac-tile"] = function (b) {
     var x = shown[+b.getAttribute("data-i")]; if (!x) return;
-    msg = x.text; api.speak(x.text); api.render();
+    pushPhrasePart(x.text); api.render();
   };
   A["aac-say"] = function () { if (msg) api.speak(msg); };
-  A["aac-clear"] = function () { msg = ""; slateVal = ""; big = false; choiceShow = false; api.stopVoice(); api.render(); };
+  A["aac-clear"] = function () { msg = ""; slateVal = ""; chain = []; big = false; choiceShow = false; api.stopVoice(); api.render(); };
   A["aac-big"] = function () { if (msg) { big = true; api.render(); } };
   A["aac-big-close"] = function () { big = false; api.render(); };
+  A["aac-chain-toggle"] = function () {
+    chainMode = !chainMode;
+    if (chainMode && msg && !chain.length) chain = [msg];
+    if (!chainMode) chain = [];
+    api.render();
+  };
+  A["aac-chain-rm"] = function (b) {
+    var idx = +b.getAttribute("data-i");
+    if (idx >= 0 && idx < chain.length) {
+      chain.splice(idx, 1);
+      msg = chain.join(" · ");
+      api.render();
+    }
+  };
+  A["aac-chain-back"] = function () {
+    if (!chain.length) return;
+    chain.pop();
+    msg = chain.join(" · ");
+    api.render();
+  };
   A["aac-slate-toggle"] = function () {
     slateOpen = !slateOpen;
     if (slateOpen) { choiceOpen = false; numOpen = false; }
@@ -214,8 +260,7 @@
   A["aac-num-pick"] = function (b) {
     var tok = T().numTokens[+b.getAttribute("data-i")];
     if (!tok) return;
-    msg = tok;
-    api.speak(tok);
+    pushPhrasePart(tok);
     api.render();
   };
   A["aac-repair"] = function (b) {
@@ -243,9 +288,8 @@
   A["aac-ab-pick"] = function (b) {
     var raw = b.getAttribute("data-pick") === "b" ? chB : chA;
     var spoken = stripEmoji(raw);
-    msg = spoken || raw;
     choiceShow = false;
-    api.speak(msg);
+    pushPhrasePart(spoken || raw);
     api.render();
   };
   A["aac-ab-close"] = function () { choiceShow = false; api.render(); };
@@ -253,7 +297,7 @@
     var el = document.getElementById("aac-slate-in");
     var txt = (el ? el.value : slateVal).trim();
     if (!txt) return;
-    slateVal = txt; msg = txt; api.speak(txt); api.render();
+    slateVal = txt; pushPhrasePart(txt); api.render();
   };
   A["aac-slate-big"] = function () {
     var el = document.getElementById("aac-slate-in");
@@ -288,6 +332,9 @@
   window.addEventListener("pog:languagechange", function () {
     chA = ""; chB = "";
     if (api.screen() === "board" || api.screen() === "aac-edit") setTimeout(api.render, 0);
+  });
+  window.addEventListener("pog:profile-change", function () {
+    chainMode = false; chain = []; msg = ""; big = false; slateOpen = false; choiceOpen = false; numOpen = false;
   });
 
   if (api.screen() === "home") api.render();

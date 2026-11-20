@@ -1239,7 +1239,29 @@ async function playThrough(page, solo) {
   const dgSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_dialogue_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(dgSaved.length === 1 && dgSaved[0].items.length === 3, "dialogue: completed 3-dialogue session saved locally");
 
-  await vr.click('[data-act="dg-back"]');
+  await vr.click('[data-act="dg-var-hub"]');
+  check(!!(await vr.$('[data-act="inst-home"]')), "variants hub: exposes Follow instructions module");
+  await vr.click('[data-act="inst-home"]');
+  for (let item = 0; item < 3; item++) {
+    await vr.click('[data-act="inst-hint"]');
+    for (let pass = 0; pass < 4; pass++) {
+      if (await vr.$('[data-act="inst-next"]')) break;
+      const tokIds = await vr.evaluate(() =>
+        Array.from(document.querySelectorAll('[data-act="inst-pick"]:not([disabled])')).map((b) => b.getAttribute("data-id"))
+      );
+      for (const id of tokIds) {
+        if (await vr.$('[data-act="inst-next"]')) break;
+        const sel = '[data-act="inst-pick"][data-id="' + id + '"]:not([disabled])';
+        if (await vr.$(sel)) await vr.click(sel);
+      }
+    }
+    check(!!(await vr.$('[data-act="inst-next"]')), "instructions: item " + (item + 1) + " completes multi-step instruction cleanly");
+    await vr.click('[data-act="inst-next"]');
+  }
+  const instSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_instructions_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(instSaved.length === 1 && instSaved[0].items.length === 3, "instructions: completed 3-instruction session saved locally");
+
+  await vr.click('[data-act="inst-back"]');
 
   // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, numbers quick picker, repair cues, and Communication Passport
   await vr.click('[data-act="board"]');
@@ -1267,6 +1289,16 @@ async function playThrough(page, solo) {
   check((await vr.$$('[data-act="aac-num-pick"]')).length >= 10, "aac: numbers & time quick picker opens cleanly");
   await vr.click('[data-act="aac-num-pick"][data-i="9"]');
   check(/10:30/.test(await vr.textContent(".aac-msg")), "aac: tapping quick time updates Talk Board message bar");
+
+  await vr.click('[data-act="aac-clear"]');
+  await vr.click('[data-act="aac-chain-toggle"]');
+  await vr.click('[data-act="aac-tab"][data-t="need"]');
+  await vr.click('[data-act="aac-tile"][data-i="0"]');
+  await vr.click('[data-act="aac-num-pick"][data-i="9"]');
+  check((await vr.$$(".aac-chain-chip")).length === 2 && /10:30/.test(await vr.textContent(".aac-msg")),
+    "aac: multi-tile phrase builder chains tiles across tabs & numbers picker");
+  await vr.click('[data-act="aac-chain-toggle"]');
+  await vr.click('[data-act="aac-clear"]');
 
   check(!!(await vr.$('[data-act="passport"]')), "passport: Help card shortcut appears on Talk Board");
   await vr.click('[data-act="passport"]');
@@ -1327,14 +1359,14 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /PRACTICE ACTIVITY:/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /Everyday dialogues:/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /PRACTICE ACTIVITY:/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /Everyday dialogues:/.test(briefTxtVal) && /Multi-step instruction following:/.test(briefTxtVal) && /Caregiver–practice concordance:/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Everyday dialogues/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers & dialogue: printable therapist summary lists all new modalities");
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Everyday dialogues/.test(rpVar) && /Follow instructions/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers & dialogue & instructions: printable therapist summary lists all new modalities");
   check(vr.errors.length === 0, "no page errors (all modalities, passport, brief): " + vr.errors.join("; "));
   await browser12.close();
 

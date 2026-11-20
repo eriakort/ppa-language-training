@@ -527,8 +527,8 @@ html[data-patient-lock="1"] .util-menu { display: none !important; }
 @media (max-width: 520px) {
   .aac { gap: 12px; }
   .aac-msg { min-height: 64px; padding: 10px 14px; }
-  .aac-tools { flex-wrap: nowrap; }
-  .aac-tools .tool { min-height: 44px; padding: 6px 10px; font-size: 15px; flex: 1 1 0; justify-content: center; }
+  .aac-tools { flex-wrap: wrap; }
+  .aac-tools .tool { min-height: 44px; padding: 6px 10px; font-size: 15px; flex: 1 1 auto; justify-content: center; }
   .aac-tabs { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; width: 100%; padding-bottom: 4px; }
   .aac-tab { flex: none; min-height: 46px; padding: 6px 14px; }
 }
@@ -885,3 +885,20 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .br-adherence > div { background: var(--soft); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; text-align: center; }
 .br-adherence span { font-size: 14px; color: var(--muted); }
 .br-adherence strong { font-size: 26px; color: var(--accent); }
+
+/* ---------- multi-tile Talk Board phrase chain & multi-step instruction tray ---------- */
+.aac-chain-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; width: 100%; background: var(--soft); border: 2px dashed var(--accent); border-radius: 14px; padding: 8px 12px; }
+.aac-chain-chip { min-height: 44px; padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 2px solid var(--accent); color: var(--ink); font-size: 16px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+.aac-chain-chip:hover { background: var(--worse-soft); border-color: var(--worse); }
+.inst-tray { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; max-width: 660px; }
+.inst-step { min-width: 120px; min-height: 54px; padding: 8px 14px; border-radius: 14px; border: 2px dashed var(--line); background: var(--bg); color: var(--muted); font-size: 18px; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; }
+.inst-step.ok { border-style: solid; border-color: var(--good); background: var(--good-soft); color: var(--good); }
+.inst-board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 100%; max-width: 620px; }
+.inst-tok { min-height: 92px; padding: 14px; border-radius: 16px; background: var(--soft); border: 3px solid var(--line); color: var(--ink); font-size: 20px; font-weight: 700; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+.inst-tok:hover:not(:disabled) { border-color: var(--accent); }
+.inst-tok.ok { border-color: var(--good); background: var(--good-soft); color: var(--good); }
+.inst-tok.dim { opacity: .35; }
+@media (max-width: 520px) {
+  .inst-board { grid-template-columns: 1fr; }
+  .inst-tok { min-height: 72px; font-size: 18px; }
+}

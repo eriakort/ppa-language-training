@@ -55,10 +55,10 @@
       },
       domSub: {
         lexical: "Denominazione, parole da conservare, reti semantiche",
-        syntax: "Ordine parole, morfologia, completamento frasi",
+        syntax: "Ordine parole, morfologia, completamento, istruzioni",
         speech: "Ripetizione, sillabe, memoria fonologica, velocità",
         literacy: "Lettura quotidiana, ortografia e copia-richiamo",
-        functional: "Diario del familiare, descrizione scene, dialoghi"
+        functional: "Diario del familiare, descrizione scene, dialoghi, istruzioni"
       },
       trendUp: "In aumento",
       trendDown: "In calo",
@@ -84,6 +84,10 @@
       obsCircumlocution: "Aggirare la parola (circonlocuzione): su {tot} prove, {dw} parole recuperate direttamente e {ds} comunicate con indizi chiari.",
       obsNumbers: "Numeri, orari e prezzi: {ft} su {tot} scelte al primo tentativo (inversioni cifre: {tr}, ordine grandezza: {mg}).",
       obsDialogue: "Dialoghi quotidiani: {ft} su {tot} scambi a due turni completati al primo tentativo.",
+      obsInstructions: "Comprensione istruzioni a più passi: {ft} su {tot} seguite al primo colpo (errori d'ordine: {ord}, trappole clausole/attributi: {cl}).",
+      obsCareAligned: "Concordanza familiare/pratica: valutazione del familiare ({care}%) in linea con le prove mirate ({obj}%).",
+      obsCareLower: "Concordanza familiare/pratica: il familiare segnala un funzionamento quotidiano più faticoso ({care}% vs {obj}%, −{abs} pt) — verificare il trasferimento nella vita reale.",
+      obsCareHigher: "Concordanza familiare/pratica: il familiare rileva un buon adattamento quotidiano ({care}%) superiore di +{abs} pt rispetto alle prove ({obj}%) — strategie compensative efficaci.",
       adhDays: "Giorni attivi",
       adhSessions: "Sessioni totali",
       adhItems: "Prove completate",
@@ -99,7 +103,7 @@
       focusLabels: { mixed: "Equilibrato", nfv: "Variante non fluente", sv: "Variante semantica", lv: "Variante logopenica" },
       planItems: {
         lexical: "Lessico e semantica ({pct}%): dare spazio a Parole da conservare (SFA/PCA), Aggirare la parola e Reti semantiche.",
-        syntax: "Frasi e morfologia ({pct}%): allenare Costruzione frasi, Azioni e verbi (VNeST) e Morfologia.",
+        syntax: "Frasi e morfologia ({pct}%): allenare Costruzione frasi, Azioni e verbi (VNeST), Morfologia e Segui i passaggi.",
         speech: "Ritmo e suoni ({pct}%): usare Allenatore ritmo, Suoni e sillabe e Ripetizione.",
         literacy: "Lettura e scrittura ({pct}%): abbinare Scrivere per ricordare (CART) e Lettura parole difficili / quotidiana.",
         functional: "Vita quotidiana ({pct}%): allenare Dialoghi quotidiani, Messaggi vocali, Numeri/orari e tabella Comunica."
@@ -150,10 +154,10 @@
       },
       domSub: {
         lexical: "Naming, Word Bank retention, semantic links",
-        syntax: "Word order, inflection, sentence cloze",
+        syntax: "Word order, inflection, cloze, instructions",
         speech: "Repetition, syllable span, speech timing",
         literacy: "Everyday reading, spelling & CART recall",
-        functional: "Caregiver log, scene concepts, dialogue"
+        functional: "Caregiver log, scene concepts, dialogue, instructions"
       },
       trendUp: "Higher",
       trendDown: "Lower",
@@ -179,6 +183,10 @@
       obsCircumlocution: "Word-finding bridges (circumlocution): {dw} of {tot} words unlocked directly; {ds} communicated clearly using descriptive clues.",
       obsNumbers: "Functional numbers, times & prices: {ft} of {tot} clean first-try matches (transposition errors: {tr}, magnitude foils: {mg}).",
       obsDialogue: "Everyday dialogues: {ft} of {tot} two-turn exchanges handled cleanly on first pass.",
+      obsInstructions: "Multi-step instruction following: {ft} of {tot} clean first passes (order slips: {ord}, clause/attribute traps: {cl}).",
+      obsCareAligned: "Caregiver–practice concordance: caregiver rating ({care}%) aligns with objective domain score ({obj}%).",
+      obsCareLower: "Caregiver–practice concordance: caregiver rating ({care}%) runs {abs} pt below objective domain score ({obj}%) — review real-world transfer barriers.",
+      obsCareHigher: "Caregiver–practice concordance: caregiver rating ({care}%) runs +{abs} pt above objective domain score ({obj}%) — compensatory strategies appear effective.",
       adhDays: "Active days",
       adhSessions: "Total sessions",
       adhItems: "Items completed",
@@ -194,7 +202,7 @@
       focusLabels: { mixed: "Balanced", nfv: "Non-fluent focus", sv: "Semantic focus", lv: "Logopenic focus" },
       planItems: {
         lexical: "Lexical & semantics ({pct}%): prioritise Word Bank (SFA/PCA), Word-finding bridges, and Semantic links.",
-        syntax: "Sentence & morphosyntax ({pct}%): practise Sentence building, Verbs (VNeST), and Grammar cloze.",
+        syntax: "Sentence & morphosyntax ({pct}%): practise Sentence building, Verbs (VNeST), Grammar cloze, and Follow instructions.",
         speech: "Motor speech & span ({pct}%): focus on Speech pacing coach and Sound/syllable span.",
         literacy: "Reading & spelling ({pct}%): pair Write to keep (CART) with Surface & Everyday reading.",
         functional: "Daily communication ({pct}%): practise Everyday dialogues, Spoken messages, Numbers & times, and Talk Board."
@@ -248,7 +256,7 @@
 
   function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
     var out = [];
-    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue].forEach(function (list) {
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions].forEach(function (list) {
       (list || []).forEach(function (s) {
         if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
         (s.items || []).forEach(function (it) {
@@ -275,6 +283,7 @@
     var circumlocution = window.POG.circumlocution && window.POG.circumlocution.listSessions ? window.POG.circumlocution.listSessions() : [];
     var numbers = window.POG.numbers && window.POG.numbers.listSessions ? window.POG.numbers.listSessions() : [];
     var dialogue = window.POG.dialogue && window.POG.dialogue.listSessions ? window.POG.dialogue.listSessions() : [];
+    var instructions = window.POG.instructions && window.POG.instructions.listSessions ? window.POG.instructions.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -292,6 +301,7 @@
       circumlocution: circumlocution,
       numbers: numbers,
       dialogue: dialogue,
+      instructions: instructions,
       carelog: carelog
     };
   }
@@ -302,7 +312,7 @@
       streams.sessions, streams.checkins, streams.variants, streams.functional,
       streams.wordbank, streams.writing, streams.discourse, streams.pacing,
       streams.verbs, streams.narrative, streams.grammar, streams.surface,
-      streams.circumlocution, streams.numbers, streams.dialogue
+      streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions
     ];
     lists.forEach(function (list) {
       (list || []).forEach(function (s) {
@@ -407,6 +417,14 @@
     streams.dialogue.forEach(function (s) {
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.functional.push(clamp01(+s.accuracy));
+    });
+
+    (streams.instructions || []).forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) {
+        buckets.syntax.push(clamp01(+s.accuracy));
+        buckets.functional.push(clamp01(+s.accuracy));
+      }
     });
 
     streams.checkins.forEach(function (k) {
@@ -622,6 +640,23 @@
       }
     }
 
+    /* 3k. Multi-step receptive syntax & instruction following */
+    var instMod = window.POG.instructions;
+    if (instMod && instMod.computeInstructionsProfile) {
+      var instSlice = (streams.instructions || []).filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (instSlice.length) {
+        var ip = instMod.computeInstructionsProfile(instSlice);
+        if (ip.total > 0) {
+          obs.push(api.fill(t.obsInstructions, {
+            ft: ip.firstTry,
+            tot: ip.total,
+            ord: ip.errors.order_error || 0,
+            cl: (ip.errors.attribute_foil || 0) + (ip.errors.clause_trap || 0)
+          }));
+        }
+      }
+    }
+
     /* 4. Stability alerts from progress engine */
     if (window.POG.progress && window.POG.progress.localAlerts) {
       var als = window.POG.progress.localAlerts();
@@ -658,6 +693,23 @@
     }
 
     return obs;
+  }
+
+  function computeCareConcordance(streams, domains, curFrom, curTo) {
+    var cg = (streams && streams.carelog || []).filter(function (c) {
+      return c && c.date && inRange(c.date, curFrom, curTo, true) && c.fcIndex != null && isFinite(+c.fcIndex);
+    });
+    var careMean = mean(cg.map(function (c) { return clamp01(+c.fcIndex); }));
+    var carePct = careMean == null ? null : Math.round(careMean * 100);
+    var scored = (domains || []).filter(function (d) { return d && d.cur != null && isFinite(+d.cur); });
+    var objMean = mean(scored.map(function (d) { return +d.cur; }));
+    var objPct = objMean == null ? null : Math.round(objMean);
+    if (carePct == null || objPct == null) {
+      return { carePct: carePct, objPct: objPct, diffPt: null, status: "empty" };
+    }
+    var diffPt = carePct - objPct;
+    var status = diffPt <= -10 ? "lower" : diffPt >= 10 ? "higher" : "aligned";
+    return { carePct: carePct, objPct: objPct, diffPt: diffPt, status: status };
   }
 
   function recommendFocusPlan(brief, tOpt) {
@@ -729,6 +781,15 @@
     });
 
     var observations = deriveObservations(streams, curFrom, end, t, prevFrom);
+    var concordance = computeCareConcordance(streams, domains, curFrom, end);
+    if (concordance.status !== "empty") {
+      var cTpl = concordance.status === "lower" ? t.obsCareLower : concordance.status === "higher" ? t.obsCareHigher : t.obsCareAligned;
+      observations.push(api.fill(cTpl, {
+        care: concordance.carePct,
+        obj: concordance.objPct,
+        abs: Math.abs(concordance.diffPt)
+      }));
+    }
     var notesCare = streams.carelog.filter(function (c) { return c.note; });
     var latestNote = notesCare.length ? notesCare[notesCare.length - 1] : null;
     var result = {
@@ -739,6 +800,7 @@
       adherence: computeAdherenceSummary(streams, curFrom, end),
       domains: domains,
       observations: observations,
+      concordance: concordance,
       latestNote: latestNote
     };
     result.plan = recommendFocusPlan(result, t);
@@ -977,6 +1039,7 @@
     buildBrief: buildBrief,
     recommendFocusPlan: recommendFocusPlan,
     computeAdherenceSummary: computeAdherenceSummary,
+    computeCareConcordance: computeCareConcordance,
     buildPlainTextBrief: buildPlainTextBrief,
     renderDomainSvg: renderDomainSvg,
     label: function () { return T().btn; }

@@ -1334,13 +1334,8 @@
     }
     return head +
       '<div class="report"><h2>' + esc(t.thTrends) + '</h2>' + trend + '<p class="note">' + esc(t.thTrendsNote) + '</p>' +
-      '<div class="row-actions"><button class="secondary" data-act="chk-results">' + esc(t.thCheckins) + '</button><button class="secondary" data-act="report">' + esc(t.thReport) + '</button>' +
-        (window.POG.progress ? '<button class="secondary" data-act="progress">' + esc(window.POG.progress.label()) + '</button>' : '') +
-        (window.POG.carelog ? '<button class="secondary" data-act="carelog">' + esc(window.POG.carelog.label()) + '</button>' : '') +
-        (window.POG.wordbank ? '<button class="secondary" data-act="wb-manage">' + esc(window.POG.wordbank.manageLabel()) + '</button>' : '') +
-        (window.POG.passport ? '<button class="secondary" data-act="passport">' + esc(window.POG.passport.label()) + '</button>' : '') +
-        (window.POG.brief ? '<button class="secondary" data-act="brief">' + esc(window.POG.brief.label()) + '</button>' : '') + '</div>' +
       (window.POG.progress && window.POG.progress.localAlerts().length ? '<p class="nudge">⚠ ' + esc(t.thAlert) + '</p>' : '') +
+      thTools(t) +
       '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
       '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
       thActions(t) + '</div>' + foot;
@@ -1354,6 +1349,19 @@
   function thConfirm(question, yesAct, yesLabel) {
     return '<div class="act-confirm" role="group"><p>' + esc(question) + '</p><div class="row-actions">' +
       '<button class="secondary danger" data-act="' + yesAct + '">' + esc(yesLabel) + '</button><button class="secondary" data-act="th-cancel">' + esc(T[lang].no) + '</button></div></div>';
+  }
+  /* Reports and tools: the same card-and-row style, split into "follow progress" and "everyday tools". */
+  function thTools(t) {
+    var P = window.POG;
+    var follow = (P.progress ? thRow("progress", "📈", P.progress.label(), t.dProgress) : '') +
+      thRow("chk-results", "🗣️", t.thCheckins, t.dCheckins) +
+      thRow("report", "🖨️", t.thReport, t.dReport) +
+      (P.brief ? thRow("brief", "🩺", P.brief.label(), t.dBrief) : '');
+    var tools = (P.carelog ? thRow("carelog", "📓", P.carelog.label(), t.dCarelog) : '') +
+      (P.wordbank ? thRow("wb-manage", "🗂️", P.wordbank.manageLabel(), t.dWordbank) : '') +
+      (P.passport ? thRow("passport", "🪪", P.passport.label(), t.dPassport) : '');
+    return '<div class="act-groups"><div class="act-col"><section class="act-card"><h3>' + esc(t.secThFollow) + '</h3>' + follow + '</section></div>' +
+      (tools ? '<div class="act-col"><section class="act-card"><h3>' + esc(t.secThTools) + '</h3>' + tools + '</section></div>' : '') + '</div>';
   }
   function thActions(t) {
     var data = (IN_HOST ? '' : thRow("export", "📊", t.exportCsv, t.dExportCsv) + thRow("local-backup", "💾", t.backupJson, t.dBackupJson)) +

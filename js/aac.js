@@ -22,6 +22,7 @@
       choicePresets: [["🍵 Tè", "☕ Caffè"], ["✅ Sì", "❌ No"], ["⏱️ Adesso", "🕒 Dopo"], ["🔥 Caldo", "❄️ Freddo"]],
       numBtn: "🔢 Numeri e orari", numTitle: "Tocca un numero, orario o importo",
       numTokens: ["1", "2", "3", "4", "5", "10", "15", "30", "09:30", "10:30", "14:30", "16:30", "€ 5", "€ 10", "€ 20"],
+      repairCues: ["✋ Un attimo, sto cercando la parola", "🔁 Può ripetere più piano?", "✅ Ho capito"],
       edit: "Modifica la tabella", editTitle: "Modifica la tabella",
       editHelp: "Una frase per riga, nel formato «simbolo | frase». Per esempio: 💧 | Ho sete",
       save: "Salva", reset: "Ripristina le frasi predefinite", saved: "Tabella salvata.", restored: "Frasi predefinite ripristinate.",
@@ -37,6 +38,7 @@
       choicePresets: [["🍵 Tea", "☕ Coffee"], ["✅ Yes", "❌ No"], ["⏱️ Now", "🕒 Later"], ["🔥 Hot", "❄️ Cold"]],
       numBtn: "🔢 Numbers & time", numTitle: "Tap a number, time, or amount",
       numTokens: ["1", "2", "3", "4", "5", "10", "15", "30", "09:30", "10:30", "14:30", "16:30", "£5", "£10", "£20"],
+      repairCues: ["✋ One moment, finding my words", "🔁 Could you repeat slowly?", "✅ I understand"],
       edit: "Edit the board", editTitle: "Edit the board",
       editHelp: "One phrase per line, as “symbol | phrase”. For example: 💧 | I'm thirsty",
       save: "Save", reset: "Restore the default phrases", saved: "Board saved.", restored: "Default phrases restored.",
@@ -134,6 +136,9 @@
           return '<button type="button" class="tool aac-num-btn" data-act="aac-num-pick" data-i="' + idx + '">' + esc(tok) + '</button>';
         }).join("") + '</div></div>'
       : '';
+    var repairBar = '<div class="aac-repairs">' + t.repairCues.map(function (cue, idx) {
+      return '<button type="button" class="tool aac-repair-btn" data-act="aac-repair" data-i="' + idx + '">' + esc(cue) + '</button>';
+    }).join("") + '</div>';
     return api.header(false) + '<section class="card aac">' +
       '<div class="aac-bar"><p class="aac-msg' + (msg ? '' : ' empty') + '" aria-live="polite">' + esc(msg || t.placeholder) + '</p>' +
       '<div class="aac-tools"><button class="tool" data-act="aac-say"' + (msg ? '' : ' disabled') + '>' + esc(t.repeat) + '</button>' +
@@ -142,7 +147,7 @@
       '<button class="tool" data-act="aac-slate-toggle" aria-pressed="' + slateOpen + '">' + esc(t.slateBtn) + '</button>' +
       '<button class="tool" data-act="aac-choice-toggle" aria-pressed="' + choiceOpen + '">' + esc(t.choiceBtn) + '</button>' +
       '<button class="tool" data-act="aac-num-toggle" aria-pressed="' + numOpen + '">' + esc(t.numBtn) + '</button></div>' +
-      slateBox + choiceBox + numBox + '</div>' +
+      repairBar + slateBox + choiceBox + numBox + '</div>' +
       '<div class="aac-tabs" role="tablist">' + tabs + '</div>' + grid + flashHtml() +
       '<div class="row-actions">' +
       (window.POG.passport ? '<button class="secondary" data-act="passport">' + esc(window.POG.passport.shortLabel()) + '</button>' : '') +
@@ -166,7 +171,8 @@
     phrases: function () { return essentials().map(function (x) { return x.text; }); },
     contextTabs: function () { return Object.keys(CONTEXT_PACKS); },
     choicePresets: function () { return T().choicePresets.slice(); },
-    numberTokens: function () { return T().numTokens.slice(); }
+    numberTokens: function () { return T().numTokens.slice(); },
+    repairCues: function () { return T().repairCues.slice(); }
   };
 
   var ext = window.POG.ext;
@@ -210,6 +216,14 @@
     if (!tok) return;
     msg = tok;
     api.speak(tok);
+    api.render();
+  };
+  A["aac-repair"] = function (b) {
+    var raw = T().repairCues[+b.getAttribute("data-i")];
+    if (!raw) return;
+    var spoken = stripEmoji(raw);
+    msg = spoken || raw;
+    api.speak(msg);
     api.render();
   };
   A["aac-choice-preset"] = function (b) {

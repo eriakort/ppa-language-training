@@ -1207,10 +1207,45 @@ async function playThrough(page, solo) {
   const nmSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_numbers_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(nmSaved.length === 1 && nmSaved[0].items.length === 4, "numbers: completed 4-item numbers/time session saved locally");
 
-  await vr.click('[data-act="num-back"]');
+  await vr.click('[data-act="num-var-hub"]');
 
-  // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, numbers quick picker, and Communication Passport
+  // Launch Everyday dialogues (dg-home) from targeted practice hub
+  check(!!(await vr.$('[data-act="dg-home"]')), "dialogue: Everyday dialogues card is offered in targeted practice hub");
+  await vr.click('[data-act="dg-home"]');
+  for (let item = 0; item < 3; item++) {
+    if (item === 0) {
+      await vr.click('[data-act="dg-hint"]');
+      check(!!(await vr.$(".hint")), "dialogue: social intent clue box reveals cleanly");
+    }
+    const rCount = (await vr.$$('[data-act="dg-pick"]')).length;
+    for (let ri = 0; ri < rCount; ri++) {
+      if (await vr.$('[data-act="dg-next"]')) break;
+      const rSel = '[data-act="dg-pick"][data-i="' + ri + '"]:not([disabled])';
+      if (await vr.$(rSel)) {
+        const prevTag = await vr.textContent(".tag");
+        await vr.click(rSel);
+        if ((await vr.textContent(".tag")) !== prevTag) break;
+      }
+    }
+    const fCount = (await vr.$$('[data-act="dg-pick"]')).length;
+    for (let fi = 0; fi < fCount; fi++) {
+      if (await vr.$('[data-act="dg-next"]')) break;
+      const fSel = '[data-act="dg-pick"][data-i="' + fi + '"]:not([disabled])';
+      if (await vr.$(fSel)) await vr.click(fSel);
+    }
+    check(!!(await vr.$('[data-act="dg-next"]')), "dialogue: item " + (item + 1) + " completes two-turn exchange cleanly");
+    await vr.click('[data-act="dg-next"]');
+  }
+  const dgSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_dialogue_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(dgSaved.length === 1 && dgSaved[0].items.length === 3, "dialogue: completed 3-dialogue session saved locally");
+
+  await vr.click('[data-act="dg-back"]');
+
+  // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, numbers quick picker, repair cues, and Communication Passport
   await vr.click('[data-act="board"]');
+  check((await vr.$$('[data-act="aac-repair"]')).length === 3, "aac: 3 one-tap conversational repair cues appear on Talk Board");
+  await vr.click('[data-act="aac-repair"][data-i="0"]');
+  check(/One moment/i.test(await vr.textContent(".aac-msg")), "aac: tapping repair cue updates message bar cleanly");
   check(!!(await vr.$('[data-act="aac-tab"][data-t="clinic"]')) && !!(await vr.$('[data-act="aac-tab"][data-t="shop"]')),
     "aac: clinic and shop situational quick-packs are available on Talk Board");
   await vr.click('[data-act="aac-tab"][data-t="clinic"]');
@@ -1280,8 +1315,8 @@ async function playThrough(page, solo) {
 
   // Open Unified Clinician Domain Profile & Visit Brief behind PIN
   await vr.click('[data-act="brief"]');
-  check((await vr.$$(".br-card")).length === 5 && !!(await vr.$("svg.br-svg")) && !!(await vr.$('[data-act="brief-print"]')) && !!(await vr.$('[data-act="br-apply-focus"]')) && !!(await vr.$("#br-visit-note")),
-    "clinical brief: renders all 5 domain summary cards, SVG comparison, practice plan button, visit goal note, and Print button");
+  check((await vr.$$(".br-card")).length === 5 && !!(await vr.$(".br-adherence")) && !!(await vr.$("svg.br-svg")) && !!(await vr.$('[data-act="brief-print"]')) && !!(await vr.$('[data-act="br-apply-focus"]')) && !!(await vr.$("#br-visit-note")),
+    "clinical brief: renders adherence bar, all 5 domain summary cards, SVG comparison, practice plan button, visit goal note, and Print button");
   await vr.fill("#br-visit-note", "Ask about large-print medication schedule card");
   await vr.click('[data-act="br-save-note"]');
   await vr.click('[data-act="br-apply-focus"]');
@@ -1292,14 +1327,14 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /PRACTICE ACTIVITY:/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /Everyday dialogues:/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers: printable therapist summary lists all new modalities");
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Everyday dialogues/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers & dialogue: printable therapist summary lists all new modalities");
   check(vr.errors.length === 0, "no page errors (all modalities, passport, brief): " + vr.errors.join("; "));
   await browser12.close();
 

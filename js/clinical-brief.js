@@ -83,6 +83,11 @@
       obsSurface: "Parole irregolari e omofoni: {ft} su {tot} scelte al primo tentativo (regolarizzazioni fonetiche: {rg}, omofoni: {hm}).",
       obsCircumlocution: "Aggirare la parola (circonlocuzione): su {tot} prove, {dw} parole recuperate direttamente e {ds} comunicate con indizi chiari.",
       obsNumbers: "Numeri, orari e prezzi: {ft} su {tot} scelte al primo tentativo (inversioni cifre: {tr}, ordine grandezza: {mg}).",
+      obsDialogue: "Dialoghi quotidiani: {ft} su {tot} scambi a due turni completati al primo tentativo.",
+      adhDays: "Giorni attivi",
+      adhSessions: "Sessioni totali",
+      adhItems: "Prove completate",
+      briefActivity: "ATTIVITÀ NEL PERIODO: {days} giorni attivi · {sessions} sessioni · {items} prove",
       obsLatency: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (su {n} prove).",
       obsLatencySlow: "Velocità di risposta nelle prove mirate: mediana {cur} s/voce (+{diff} s rispetto al periodo precedente).",
       obsAlert: "Avviso andamento ({m}): ultime {n} sessioni sotto il valore abituale.",
@@ -97,7 +102,7 @@
         syntax: "Frasi e morfologia ({pct}%): allenare Costruzione frasi, Azioni e verbi (VNeST) e Morfologia.",
         speech: "Ritmo e suoni ({pct}%): usare Allenatore ritmo, Suoni e sillabe e Ripetizione.",
         literacy: "Lettura e scrittura ({pct}%): abbinare Scrivere per ricordare (CART) e Lettura parole difficili / quotidiana.",
-        functional: "Vita quotidiana ({pct}%): allenare Messaggi vocali, Numeri/orari e tabella Comunica (Scelta A / B)."
+        functional: "Vita quotidiana ({pct}%): allenare Dialoghi quotidiani, Messaggi vocali, Numeri/orari e tabella Comunica."
       },
       visitNoteLabel: "Domande o obiettivi per la prossima visita (solo su questo dispositivo)",
       visitNotePh: "Es.: chiedere strategie per la stanchezza serale o orari dei farmaci…",
@@ -173,6 +178,11 @@
       obsSurface: "Surface & irregular reading: {ft} of {tot} clean first-try matches (phonetic regularizations: {rg}, homophone foils: {hm}).",
       obsCircumlocution: "Word-finding bridges (circumlocution): {dw} of {tot} words unlocked directly; {ds} communicated clearly using descriptive clues.",
       obsNumbers: "Functional numbers, times & prices: {ft} of {tot} clean first-try matches (transposition errors: {tr}, magnitude foils: {mg}).",
+      obsDialogue: "Everyday dialogues: {ft} of {tot} two-turn exchanges handled cleanly on first pass.",
+      adhDays: "Active days",
+      adhSessions: "Total sessions",
+      adhItems: "Items completed",
+      briefActivity: "PRACTICE ACTIVITY: {days} active days · {sessions} sessions · {items} items",
       obsLatency: "Targeted response speed: median {cur} s per item (across {n} items).",
       obsLatencySlow: "Targeted response speed: median {cur} s per item (+{diff} s slower vs prior window).",
       obsAlert: "Stability alert ({m}): last {n} sessions fell below usual range.",
@@ -187,7 +197,7 @@
         syntax: "Sentence & morphosyntax ({pct}%): practise Sentence building, Verbs (VNeST), and Grammar cloze.",
         speech: "Motor speech & span ({pct}%): focus on Speech pacing coach and Sound/syllable span.",
         literacy: "Reading & spelling ({pct}%): pair Write to keep (CART) with Surface & Everyday reading.",
-        functional: "Daily communication ({pct}%): practise Spoken messages, Numbers & times, and Talk Board two-choice mode."
+        functional: "Daily communication ({pct}%): practise Everyday dialogues, Spoken messages, Numbers & times, and Talk Board."
       },
       visitNoteLabel: "Questions or goals for next clinic visit (device-local)",
       visitNotePh: "Example: ask about evening fatigue, pill schedule aids, or board vocabulary…",
@@ -238,7 +248,7 @@
 
   function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
     var out = [];
-    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers].forEach(function (list) {
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue].forEach(function (list) {
       (list || []).forEach(function (s) {
         if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
         (s.items || []).forEach(function (it) {
@@ -264,6 +274,7 @@
     var surface = window.POG.surface && window.POG.surface.listSessions ? window.POG.surface.listSessions() : [];
     var circumlocution = window.POG.circumlocution && window.POG.circumlocution.listSessions ? window.POG.circumlocution.listSessions() : [];
     var numbers = window.POG.numbers && window.POG.numbers.listSessions ? window.POG.numbers.listSessions() : [];
+    var dialogue = window.POG.dialogue && window.POG.dialogue.listSessions ? window.POG.dialogue.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -280,8 +291,28 @@
       surface: surface,
       circumlocution: circumlocution,
       numbers: numbers,
+      dialogue: dialogue,
       carelog: carelog
     };
+  }
+
+  function computeAdherenceSummary(streams, fromMs, toMs) {
+    var days = {}, sessionCount = 0, itemCount = 0;
+    var lists = [
+      streams.sessions, streams.checkins, streams.variants, streams.functional,
+      streams.wordbank, streams.writing, streams.discourse, streams.pacing,
+      streams.verbs, streams.narrative, streams.grammar, streams.surface,
+      streams.circumlocution, streams.numbers, streams.dialogue
+    ];
+    lists.forEach(function (list) {
+      (list || []).forEach(function (s) {
+        if (!s || !s.date || !inRange(s.date, fromMs, toMs, true)) return;
+        sessionCount++;
+        days[String(s.date).slice(0, 10)] = true;
+        itemCount += Array.isArray(s.items) ? s.items.length : 1;
+      });
+    });
+    return { activeDays: Object.keys(days).length, sessionCount: sessionCount, itemCount: itemCount };
   }
 
   function windowScores(streams, fromMs, toMs, inclusiveEnd) {
@@ -369,6 +400,11 @@
     });
 
     streams.numbers.forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.functional.push(clamp01(+s.accuracy));
+    });
+
+    streams.dialogue.forEach(function (s) {
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.functional.push(clamp01(+s.accuracy));
     });
@@ -574,6 +610,18 @@
       }
     }
 
+    /* 3j. Everyday conversational scripts & two-turn repair profile */
+    var dg = window.POG.dialogue;
+    if (dg && dg.computeDialogueProfile) {
+      var dgSlice = streams.dialogue.filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (dgSlice.length) {
+        var dp2 = dg.computeDialogueProfile(dgSlice);
+        if (dp2.total > 0) {
+          obs.push(api.fill(t.obsDialogue, { ft: dp2.cleanBoth, tot: dp2.total }));
+        }
+      }
+    }
+
     /* 4. Stability alerts from progress engine */
     if (window.POG.progress && window.POG.progress.localAlerts) {
       var als = window.POG.progress.localAlerts();
@@ -688,6 +736,7 @@
       curFrom: curFrom,
       curTo: end,
       prevFrom: prevFrom,
+      adherence: computeAdherenceSummary(streams, curFrom, end),
       domains: domains,
       observations: observations,
       latestNote: latestNote
@@ -725,6 +774,13 @@
     var today = new Date().toLocaleDateString(loc(), { day: "numeric", month: "short", year: "numeric" });
     lines.push(api.fill(t.briefHead, { date: today }));
     lines.push(api.fill(t.briefPatient, { name: (profile && profile.name) || "—", days: brief.windowDays }));
+    if (brief.adherence) {
+      lines.push(api.fill(t.briefActivity, {
+        days: brief.adherence.activeDays,
+        sessions: brief.adherence.sessionCount,
+        items: brief.adherence.itemCount
+      }));
+    }
     lines.push("");
     lines.push(t.briefDomainsHead);
     brief.domains.forEach(function (d) {
@@ -828,12 +884,21 @@
       '<div class="row-actions"><button type="button" class="secondary" data-act="br-save-note">' + esc(t.visitNoteSave) + '</button></div>' +
       '</div>';
 
+    var adhHtml = b.adherence
+      ? '<div class="br-adherence">' +
+        '<div><span>' + esc(t.adhDays) + '</span><strong>' + b.adherence.activeDays + '</strong></div>' +
+        '<div><span>' + esc(t.adhSessions) + '</span><strong>' + b.adherence.sessionCount + '</strong></div>' +
+        '<div><span>' + esc(t.adhItems) + '</span><strong>' + b.adherence.itemCount + '</strong></div>' +
+        '</div>'
+      : '';
+
     var inHost = api.inHost && api.inHost();
     return api.header(false) + '<section class="card">' +
       '<article class="print-area br-printarea">' +
       '<h1 class="instr">' + esc(t.title) + '</h1>' +
       '<p class="sub">' + esc(t.intro) + '</p>' +
       '<div class="no-print">' + seg + '</div>' +
+      adhHtml +
       cards +
       renderDomainSvg(b.domains, t) +
       '<div class="report">' +
@@ -911,6 +976,7 @@
     DOMAIN_KEYS: DOMAIN_KEYS,
     buildBrief: buildBrief,
     recommendFocusPlan: recommendFocusPlan,
+    computeAdherenceSummary: computeAdherenceSummary,
     buildPlainTextBrief: buildPlainTextBrief,
     renderDomainSvg: renderDomainSvg,
     label: function () { return T().btn; }

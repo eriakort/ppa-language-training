@@ -85,7 +85,9 @@
       recentHead: "Ultime sessioni mirate",
       colDomain: "Dominio", colRes: "Esito", colTime: "Tempo (s)",
       autoAdapt: "Adatta i livelli automaticamente",
-      noTtsHint: "Suggerimento: "
+      noTtsHint: "Suggerimento: ",
+      filterLabel: "Filtra per area",
+      filters: { all: "Tutti", nfv: "Frasi e ritmo", sv: "Parole e significati", lv: "Suoni e memoria", daily: "Vita quotidiana" }
     },
     en: {
       homeBtn: "Targeted PPA practice",
@@ -146,7 +148,9 @@
       recentHead: "Recent targeted sessions",
       colDomain: "Domain", colRes: "Result", colTime: "Time (s)",
       autoAdapt: "Adjust levels automatically",
-      noTtsHint: "Clue: "
+      noTtsHint: "Clue: ",
+      filterLabel: "Filter by focus",
+      filters: { all: "All", nfv: "Grammar & speech", sv: "Words & meaning", lv: "Sounds & recall", daily: "Everyday life" }
     }
   };
 
@@ -457,6 +461,33 @@
     step();
   }
 
+  var hubFilter = "all";
+  var CARD_GROUPS = {
+    sentence: ["nfv"],
+    semantic: ["sv"],
+    soundspan: ["lv"],
+    functional: ["nfv", "daily"],
+    wordbank: ["sv", "lv"],
+    writing: ["sv", "daily"],
+    discourse: ["daily", "lv"],
+    pacing: ["nfv", "lv"],
+    verbs: ["nfv", "sv"],
+    narrative: ["nfv", "daily"],
+    grammar: ["nfv"],
+    surface: ["sv"],
+    circumlocution: ["sv", "lv"],
+    numbers: ["daily"],
+    dialogue: ["daily", "sv"],
+    instructions: ["nfv", "daily"],
+    pragmatics: ["sv", "daily"],
+    fluency: ["nfv", "sv", "lv"]
+  };
+  function cardVisible(id) {
+    if (hubFilter === "all") return true;
+    var g = CARD_GROUPS[id] || [];
+    return g.indexOf(hubFilter) >= 0;
+  }
+
   /* ---------- Views ---------- */
   function viewHub() {
     var t = T(), cfg = getSettings(), lvs = getLevels(), locked = api.isLocked(), hist = listSessions().slice().reverse();
@@ -469,7 +500,12 @@
         '<label class="check"><input type="checkbox" id="var-auto"' + (cfg.auto ? ' checked' : '') + '>' + esc(t.autoAdapt) + '</label></div>'
       : '';
 
-    var domainCards = '<div class="var-grid">' + DOMAINS.map(function (d) {
+    var filterBar = '<div class="var-filter" role="group" aria-label="' + esc(t.filterLabel) + '">' +
+      ["all", "nfv", "sv", "lv", "daily"].map(function (fk) {
+        return '<button type="button" class="var-fbtn" data-act="var-filter" data-f="' + fk + '" aria-pressed="' + (hubFilter === fk) + '">' + esc(t.filters[fk]) + '</button>';
+      }).join("") + '</div>';
+
+    var domainCards = filterBar + '<div class="var-grid">' + DOMAINS.filter(cardVisible).map(function (d) {
       var lv = lvs[d], icon = d === "sentence" ? "🧩" : d === "semantic" ? "🧠" : "🔊";
       return '<button class="modecard var-dcard" data-act="var-start" data-m="' + d + '">' +
         '<span class="ico" aria-hidden="true">' + icon + '</span>' +
@@ -477,76 +513,81 @@
         '<span class="var-badge">' + esc(api.fill(t.lvTag, { n: lv, name: t.lvNames[lv - 1] })) + '</span>' +
         '<span>' + esc(t.domainDesc[d]) + '</span></button>';
     }).join("") +
-      (window.POG.functional ? '<button class="modecard var-dcard" data-act="func-home">' +
+      (cardVisible("functional") && window.POG.functional ? '<button class="modecard var-dcard" data-act="func-home">' +
         '<span class="ico" aria-hidden="true">📖</span>' +
         '<strong>' + esc(window.POG.functional.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.functional.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.functional.desc()) + '</span></button>' : '') +
-      (window.POG.wordbank ? '<button class="modecard var-dcard" data-act="wb-home">' +
+      (cardVisible("wordbank") && window.POG.wordbank ? '<button class="modecard var-dcard" data-act="wb-home">' +
         '<span class="ico" aria-hidden="true">🗂️</span>' +
         '<strong>' + esc(window.POG.wordbank.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.wordbank.badge()) + '</span>' +
         '<span>' + esc(window.POG.wordbank.desc()) + '</span></button>' : '') +
-      (window.POG.writing ? '<button class="modecard var-dcard" data-act="wr-home">' +
+      (cardVisible("writing") && window.POG.writing ? '<button class="modecard var-dcard" data-act="wr-home">' +
         '<span class="ico" aria-hidden="true">✍️</span>' +
         '<strong>' + esc(window.POG.writing.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.writing.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.writing.desc()) + '</span></button>' : '') +
-      (window.POG.discourse ? '<button class="modecard var-dcard" data-act="disc-home">' +
+      (cardVisible("discourse") && window.POG.discourse ? '<button class="modecard var-dcard" data-act="disc-home">' +
         '<span class="ico" aria-hidden="true">🎧</span>' +
         '<strong>' + esc(window.POG.discourse.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.discourse.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.discourse.desc()) + '</span></button>' : '') +
-      (window.POG.pacing ? '<button class="modecard var-dcard" data-act="pace-home">' +
+      (cardVisible("pacing") && window.POG.pacing ? '<button class="modecard var-dcard" data-act="pace-home">' +
         '<span class="ico" aria-hidden="true">🥁</span>' +
         '<strong>' + esc(window.POG.pacing.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.pacing.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.pacing.desc()) + '</span></button>' : '') +
-      (window.POG.verbs ? '<button class="modecard var-dcard" data-act="verbs-home">' +
+      (cardVisible("verbs") && window.POG.verbs ? '<button class="modecard var-dcard" data-act="verbs-home">' +
         '<span class="ico" aria-hidden="true">🤝</span>' +
         '<strong>' + esc(window.POG.verbs.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.verbs.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.verbs.desc()) + '</span></button>' : '') +
-      (window.POG.narrative ? '<button class="modecard var-dcard" data-act="narr-home">' +
+      (cardVisible("narrative") && window.POG.narrative ? '<button class="modecard var-dcard" data-act="narr-home">' +
         '<span class="ico" aria-hidden="true">📚</span>' +
         '<strong>' + esc(window.POG.narrative.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.narrative.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.narrative.desc()) + '</span></button>' : '') +
-      (window.POG.grammar ? '<button class="modecard var-dcard" data-act="gram-home">' +
+      (cardVisible("grammar") && window.POG.grammar ? '<button class="modecard var-dcard" data-act="gram-home">' +
         '<span class="ico" aria-hidden="true">⚖️</span>' +
         '<strong>' + esc(window.POG.grammar.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.grammar.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.grammar.desc()) + '</span></button>' : '') +
-      (window.POG.surface ? '<button class="modecard var-dcard" data-act="surf-home">' +
+      (cardVisible("surface") && window.POG.surface ? '<button class="modecard var-dcard" data-act="surf-home">' +
         '<span class="ico" aria-hidden="true">🔍</span>' +
         '<strong>' + esc(window.POG.surface.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.surface.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.surface.desc()) + '</span></button>' : '') +
-      (window.POG.circumlocution ? '<button class="modecard var-dcard" data-act="circ-home">' +
+      (cardVisible("circumlocution") && window.POG.circumlocution ? '<button class="modecard var-dcard" data-act="circ-home">' +
         '<span class="ico" aria-hidden="true">🌉</span>' +
         '<strong>' + esc(window.POG.circumlocution.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.circumlocution.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.circumlocution.desc()) + '</span></button>' : '') +
-      (window.POG.numbers ? '<button class="modecard var-dcard" data-act="num-home">' +
+      (cardVisible("numbers") && window.POG.numbers ? '<button class="modecard var-dcard" data-act="num-home">' +
         '<span class="ico" aria-hidden="true">🕒</span>' +
         '<strong>' + esc(window.POG.numbers.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.numbers.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.numbers.desc()) + '</span></button>' : '') +
-      (window.POG.dialogue ? '<button class="modecard var-dcard" data-act="dg-home">' +
+      (cardVisible("dialogue") && window.POG.dialogue ? '<button class="modecard var-dcard" data-act="dg-home">' +
         '<span class="ico" aria-hidden="true">🗣️</span>' +
         '<strong>' + esc(window.POG.dialogue.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.dialogue.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.dialogue.desc()) + '</span></button>' : '') +
-      (window.POG.instructions ? '<button class="modecard var-dcard" data-act="inst-home">' +
+      (cardVisible("instructions") && window.POG.instructions ? '<button class="modecard var-dcard" data-act="inst-home">' +
         '<span class="ico" aria-hidden="true">🧭</span>' +
         '<strong>' + esc(window.POG.instructions.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.instructions.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.instructions.desc()) + '</span></button>' : '') +
-      (window.POG.pragmatics ? '<button class="modecard var-dcard" data-act="prag-home">' +
+      (cardVisible("pragmatics") && window.POG.pragmatics ? '<button class="modecard var-dcard" data-act="prag-home">' +
         '<span class="ico" aria-hidden="true">🧠</span>' +
         '<strong>' + esc(window.POG.pragmatics.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.pragmatics.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.pragmatics.desc()) + '</span></button>' : '') +
+      (cardVisible("fluency") && window.POG.fluency ? '<button class="modecard var-dcard" data-act="flu-home">' +
+        '<span class="ico" aria-hidden="true">⚡</span>' +
+        '<strong>' + esc(window.POG.fluency.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.fluency.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.fluency.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length
@@ -782,6 +823,13 @@
     if (!FOCUS_WEIGHTS[f]) return;
     var cfg = getSettings(); cfg.focus = f;
     api.save("variant_settings", cfg);
+    api.render();
+  };
+
+  A["var-filter"] = function (b) {
+    var f = b.getAttribute("data-f");
+    if (!T().filters[f]) return;
+    hubFilter = f;
     api.render();
   };
 
@@ -1046,6 +1094,7 @@
   window.addEventListener("pog:profile-change", function () {
     stopVoice();
     V = null;
+    hubFilter = "all";
   });
 
   window.POG.variants = {

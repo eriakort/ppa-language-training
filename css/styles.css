@@ -906,3 +906,18 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .account-danger-btn { min-height: 52px; border-radius: 12px; border: 0; background: var(--worse); color: #fff; font-weight: 700; font-size: 18px; padding: 10px 16px; }
 .account-danger-btn:disabled { opacity: .45; }
 
+/* ---------- targeted hub filter & word-finding sprint ---------- */
+.var-filter { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; margin: 4px 0 6px; }
+.fl-meter { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.fl-meter .var-badge.ok { background: var(--good-soft); color: var(--good); border-color: var(--good); }
+.fl-entry { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; max-width: 620px; align-items: center; justify-content: center; }
+.fl-entry input { flex: 1 1 200px; min-height: 50px; font: inherit; font-size: 20px; padding: 8px 14px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); }
+.fl-words { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; max-width: 620px; }
+.fl-wpill { min-height: 44px; padding: 6px 14px; border-radius: 999px; background: var(--good-soft); border: 2px solid var(--good); color: var(--good); font-weight: 700; font-size: 18px; display: inline-flex; align-items: center; gap: 6px; }
+.fl-scaffolds { width: 100%; max-width: 640px; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.fl-cluster { background: var(--soft); border: 2px solid var(--line); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.fl-cluster strong { font-size: 16px; color: var(--accent); }
+.fl-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fl-chip { min-height: 42px; font-size: 17px; padding: 6px 12px; }
+
+

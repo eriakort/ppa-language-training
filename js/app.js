@@ -230,7 +230,7 @@
      Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
      therapist PIN ask for it again, then continue to where you were. */
   var UI_KEY = "pog_ui";
-  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, circumlocution: 1, numbers: 1, dialogue: 1, instructions: 1, pragmatics: 1, passport: 1, pick: 1, "pick-ask": 1 };
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, circumlocution: 1, numbers: 1, dialogue: 1, instructions: 1, pragmatics: 1, fluency: 1, passport: 1, pick: 1, "pick-ask": 1 };
   var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
   var UI_PIN = { "chk-results": 1, report: 1, progress: 1, carelog: 1, "wb-manage": 1, brief: 1 };
   function saveUi() {
@@ -1132,10 +1132,13 @@
   }
 
   function viewProfiles() {
-    var t = T[lang], list = profileList();
+    var t = T[lang], list = profileList(), locked = isLocked();
     return header(false) + '<section class="card home"><h1>' + esc(t.profilesTitle) + '</h1><p class="sub">' + esc(t.profilesHelp) + '</p>' +
       '<div class="profile-list">' + list.map(function (p) { return '<button class="modecard profile-card" data-act="profile-switch" data-id="' + esc(p.id) + '"><strong>' + esc(p.name || t.unnamedProfile) + '</strong><span>' + esc(p.id === activeProfileId ? t.profileCurrent : t.profileChoose) + '</span></button>'; }).join("") + '</div>' +
-      '<button class="primary" data-act="profile-add">' + esc(t.profileAdd) + '</button><button class="link" data-act="home">' + esc(t.back) + '</button><p class="note">' + esc(t.localNote) + '</p></section>';
+      (flash ? '<p class="nudge" role="status">' + esc(flash) + '</p>' : '') +
+      '<button class="primary" data-act="profile-add">' + esc(t.profileAdd) + '</button>' +
+      (!locked ? '<button class="secondary" data-act="local-restore">' + esc(t.restoreJson) + '</button><input id="local-restore-in" type="file" accept=".json,application/json" hidden><p class="note">' + esc(t.backupProfilesHint) + '</p>' : '') +
+      '<button class="link" data-act="home">' + esc(t.back) + '</button><p class="note">' + esc(t.localNote) + '</p></section>';
   }
   function viewOnboard() {
     var t = T[lang], p = getProfile() || {};
@@ -1341,7 +1344,8 @@
       '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
       '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
       '<div class="row-actions">' +
-      (IN_HOST ? '' : '<button class="secondary" data-act="export">' + esc(t.exportCsv) + '</button>') +
+      (IN_HOST ? '' : '<button class="secondary" data-act="export">' + esc(t.exportCsv) + '</button><button class="secondary" data-act="local-backup">' + esc(t.backupJson) + '</button>') +
+      '<button class="secondary" data-act="local-restore">' + esc(t.restoreJson) + '</button><input id="local-restore-in" type="file" accept=".json,application/json" hidden>' +
       (TH.confirm === "clear"
         ? '<button class="secondary danger" data-act="rec-clear-yes">' + esc(t.clearRecsQ) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button>'
         : '<button class="secondary" data-act="rec-clear">' + esc(t.clearRecs) + '</button>') +
@@ -1349,7 +1353,8 @@
         ? '<div class="confirm"><span>' + esc(t.wipeLocalQ) + '</span><button class="secondary danger" data-act="local-wipe-yes">' + esc(t.confirmDelete) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button></div>'
         : '<button class="secondary danger" data-act="local-wipe">' + esc(t.wipeLocal) + '</button>') +
       '<button class="secondary" data-act="pin-change">' + esc(t.pinChange) + '</button>' +
-      '<button class="secondary" data-act="th-lock">' + esc(t.lock) + '</button></div></div>' + foot;
+      '<button class="secondary" data-act="th-lock">' + esc(t.lock) + '</button></div>' +
+      '<p class="note">' + esc(t.backupNote) + '</p></div>' + foot;
   }
   function wipeLocalProfileData(pid) {
     var targetId = pid == null ? activeProfileId : String(pid);
@@ -1399,6 +1404,97 @@
     return Promise.all([recClear, albClear]).then(function () {
       return { clearedKeys: clearedKeys.length, profileId: targetId };
     });
+  }
+  /* ---------- Offline Portable Local Profile Backup & Validated JSON Restore ---------- */
+  var BACKUP_KEYS = [
+    "profile", "settings", "placement", "history", "sessions", "scripts_it", "scripts_en", "active_session",
+    "theme", "game_choice", "board_phrases", "family_voice_consent", "checkins", "checkin_settings",
+    "progress_log", "progress_settings", "variant_settings", "variant_levels", "variant_sessions",
+    "functional_level", "functional_sessions", "caregiver_logs", "wordbank_deck", "wordbank_sessions",
+    "writing_level", "writing_sessions", "discourse_level", "discourse_sessions", "pacing_level", "pacing_sessions",
+    "verbs_level", "verbs_sessions", "narrative_level", "narrative_sessions", "grammar_level", "grammar_sessions",
+    "surface_level", "surface_sessions", "circ_level", "circumlocution_sessions", "numbers_level", "numbers_sessions",
+    "dialogue_level", "dialogue_sessions", "instructions_level", "instructions_sessions",
+    "pragmatics_level", "pragmatics_sessions", "fluency_level", "fluency_sessions",
+    "passport_card", "brief_visit_note"
+  ];
+  var BACKUP_ALLOWED = (function () {
+    var map = {};
+    BACKUP_KEYS.forEach(function (k) { map[k] = true; });
+    return map;
+  })();
+  function buildLocalProfileBackup(pid) {
+    var targetId = pid == null ? activeProfileId : String(pid);
+    if (!targetId) return null;
+    var payload = {};
+    BACKUP_KEYS.forEach(function (k) {
+      if (k === "pin" || k.indexOf("pog_cloud_") === 0) return;
+      try {
+        var raw = localStorage.getItem("pog_p_" + targetId + "_" + k);
+        if (raw !== null) payload[k] = JSON.parse(raw);
+      } catch (e) {}
+    });
+    var dir = profileList().filter(function (x) { return x && x.id === targetId; })[0];
+    var name = (payload.profile && payload.profile.name) || (dir && dir.name) || "";
+    return {
+      format: "pog-local-backup",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profileId: targetId,
+      profileName: name,
+      excludes: ["pin", "indexeddb_recordings", "indexeddb_album_photos", "indexeddb_family_voices", "pog_cloud"],
+      data: payload
+    };
+  }
+  function exportLocalProfileBackup(pid) {
+    var t = T[lang], doc = buildLocalProfileBackup(pid);
+    if (!doc || !doc.data || !Object.keys(doc.data).length) return null;
+    var slug = String(doc.profileName || doc.profileId || "profile").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "profile";
+    var blob = new Blob([JSON.stringify(doc, null, 2)], { type: "application/json;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "parole-backup-" + slug + "-" + new Date().toISOString().slice(0, 10) + ".json";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    flash = t.backupExported;
+    return doc;
+  }
+  function importLocalProfileBackup(rawInput) {
+    var t = T[lang], parsed = rawInput;
+    if (typeof rawInput === "string") {
+      try { parsed = JSON.parse(rawInput); } catch (e) { return { ok: false, error: t.restoreInvalid }; }
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ok: false, error: t.restoreInvalid };
+    if (parsed.format !== "pog-local-backup" && parsed.version !== 1) return { ok: false, error: t.restoreInvalid };
+    if (!parsed.data || typeof parsed.data !== "object" || Array.isArray(parsed.data)) return { ok: false, error: t.restoreInvalid };
+    var profObj = parsed.data.profile;
+    var cleanName = profObj && typeof profObj.name === "string" ? profObj.name.trim().slice(0, 40) : (typeof parsed.profileName === "string" ? parsed.profileName.trim().slice(0, 40) : "");
+    if (!cleanName) return { ok: false, error: t.restoreInvalid };
+
+    var newId = createLocalProfile(cleanName);
+    var importedKeys = 0, ignoredKeys = 0;
+    Object.keys(parsed.data).forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(BACKUP_ALLOWED, k) || k === "pin" || k.indexOf("pog_cloud_") === 0) {
+        ignoredKeys++;
+        return;
+      }
+      var val = parsed.data[k];
+      if (val === undefined) return;
+      try {
+        localStorage.setItem("pog_p_" + newId + "_" + k, JSON.stringify(val));
+        importedKeys++;
+      } catch (e) {}
+    });
+    if (!parsed.data.profile) {
+      try { localStorage.setItem("pog_p_" + newId + "_profile", JSON.stringify({ name: cleanName, interests: [] })); } catch (e) {}
+    }
+    try { localStorage.removeItem("pog_p_" + newId + "_pin"); } catch (e) {}
+    thLock();
+    S = null;
+    setActiveProfile(newId);
+    applyTheme();
+    flash = fill(t.restoreDone, { name: cleanName, n: importedKeys });
+    return { ok: true, profileId: newId, name: cleanName, importedKeys: importedKeys, ignoredKeys: ignoredKeys };
   }
   function exportCsv() {
     var t = T[lang], sessions = load("sessions") || [];
@@ -1506,6 +1602,12 @@
       (s.items || []).forEach(function (i) {
         lines.push([s.date, s.id, "pragmatics", s.who || "solo", i.kind || "idiom", i.lv, i.label || i.id, "", i.result, i.hintUsed ? 1 : 0, i.firstTry ? "first_try" : "assisted", i.errType || "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
           "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+      });
+    });
+    (load("fluency_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "fluency", s.who || "solo", i.kind || "category", i.lv, i.label || i.id, "", i.result, i.scaffoldsUsed || 0, i.independent ? "uncued" : "assisted", "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", i.producedCount != null ? i.producedCount : "", "", ""].map(csvCell).join(","));
       });
     });
     var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
@@ -1945,16 +2047,35 @@
   /* Keeps what was typed when the screen redraws (language switch, validation message). */
   function snapForm() {
     var s = { v: {}, ints: null };
-    [].forEach.call(app.querySelectorAll("input[id]"), function (el) { s.v[el.id] = el.type === "checkbox" ? el.checked : el.value; });
+    [].forEach.call(app.querySelectorAll("input[id]"), function (el) { if (el.type !== "file") s.v[el.id] = el.type === "checkbox" ? el.checked : el.value; });
     var chips = app.querySelectorAll('[data-act="int"]');
     if (chips.length) s.ints = [].filter.call(chips, function (el) { return el.getAttribute("aria-pressed") === "true"; }).map(function (el) { return el.getAttribute("data-k"); });
     return s;
   }
   function restoreForm(s) {
-    Object.keys(s.v).forEach(function (id) { var el = document.getElementById(id); if (!el) return; if (el.type === "checkbox") el.checked = s.v[id]; else el.value = s.v[id]; });
+    Object.keys(s.v).forEach(function (id) { var el = document.getElementById(id); if (!el || el.type === "file") return; if (el.type === "checkbox") el.checked = s.v[id]; else el.value = s.v[id]; });
     if (s.ints) [].forEach.call(app.querySelectorAll('[data-act="int"]'), function (el) { el.setAttribute("aria-pressed", String(s.ints.indexOf(el.getAttribute("data-k")) >= 0)); });
   }
   function rerenderKeep() { var s = snapForm(); render(); restoreForm(s); }
+
+  app.addEventListener("change", function (e) {
+    var el = e.target;
+    if (!el || el.id !== "local-restore-in" || !el.files || !el.files[0]) return;
+    var f = el.files[0], t = T[lang];
+    function handleText(txt) {
+      var res = importLocalProfileBackup(txt);
+      if (!res.ok) { flash = res.error || t.restoreInvalid; render(); return; }
+      screen = "profiles";
+      render();
+    }
+    if (f.text) f.text().then(handleText, function () { flash = t.restoreInvalid; render(); });
+    else if (typeof FileReader !== "undefined") {
+      var fr = new FileReader();
+      fr.onload = function () { handleText(String(fr.result || "")); };
+      fr.onerror = function () { flash = t.restoreInvalid; render(); };
+      fr.readAsText(f);
+    }
+  });
 
   window.addEventListener("pog:authchange", function (ev) {
     accountSignedOut = !!(ev.detail && ev.detail.signedOut);
@@ -2093,6 +2214,8 @@
       });
       return;
     }
+    if (act === "local-backup") { exportLocalProfileBackup(activeProfileId); render(); return; }
+    if (act === "local-restore") { var ri = document.getElementById("local-restore-in"); if (ri) { ri.value = ""; ri.click(); } return; }
     if (act === "export") { exportCsv(); render(); return; }
     if (act === "rec-on") { screen = "consent"; render(); return; }
     if (act === "consent-yes") {
@@ -2261,6 +2384,8 @@
     therapistUnlocked: function () { return !!TH.unlocked; }, therapistView: function () { screen = "therapist"; return viewTherapist(); }, lockTherapist: function () { thLock(); },
     settings: getSettings, games: function () { return GAMES.slice(); }, maxLevels: function () { return Object.assign({}, MAXLV); }, inHost: function () { return IN_HOST; },
     wipeLocalProfileData: wipeLocalProfileData,
+    buildLocalProfileBackup: buildLocalProfileBackup,
+    importLocalProfileBackup: importLocalProfileBackup,
     history: function () { return load("history") || {}; }, sessions: function () { var s = load("sessions"); return Array.isArray(s) ? s : []; }
   };
   RECS.purge().catch(function () {});

@@ -54,7 +54,7 @@
         functional: "Comunicazione nella vita quotidiana"
       },
       domSub: {
-        lexical: "Denominazione, parole da conservare, reti semantiche, senso figurato",
+        lexical: "Denominazione, scatto di parole, parole da conservare, reti semantiche, senso figurato",
         syntax: "Ordine parole, morfologia, completamento, istruzioni",
         speech: "Ripetizione, sillabe, memoria fonologica, velocità",
         literacy: "Lettura quotidiana, ortografia e copia-richiamo",
@@ -86,6 +86,7 @@
       obsDialogue: "Dialoghi quotidiani: {ft} su {tot} scambi a due turni completati al primo tentativo.",
       obsInstructions: "Comprensione istruzioni a più passi: {ft} su {tot} seguite al primo colpo (errori d'ordine: {ord}, trappole clausole/attributi: {cl}).",
       obsPragmatics: "Linguaggio figurato e contesto: {ft} su {tot} significati colti al primo colpo (trappole letterali: {lit}, scivoloni contestuali: {ctx}).",
+      obsFluency: "Scatto di parole: media {avg} parole su {tot} prove ({indep}% senza gruppi/aiuti; gruppi usati: {cl}).",
       obsCareAligned: "Concordanza familiare/pratica: valutazione del familiare ({care}%) in linea con le prove mirate ({obj}%).",
       obsCareLower: "Concordanza familiare/pratica: il familiare segnala un funzionamento quotidiano più faticoso ({care}% vs {obj}%, −{abs} pt) — verificare il trasferimento nella vita reale.",
       obsCareHigher: "Concordanza familiare/pratica: il familiare rileva un buon adattamento quotidiano ({care}%) superiore di +{abs} pt rispetto alle prove ({obj}%) — strategie compensative efficaci.",
@@ -154,7 +155,7 @@
         functional: "Functional everyday communication"
       },
       domSub: {
-        lexical: "Naming, Word Bank retention, semantic links, idioms",
+        lexical: "Naming, word sprint, Word Bank retention, semantic links, idioms",
         syntax: "Word order, inflection, cloze, instructions",
         speech: "Repetition, syllable span, speech timing",
         literacy: "Everyday reading, spelling & CART recall",
@@ -186,6 +187,7 @@
       obsDialogue: "Everyday dialogues: {ft} of {tot} two-turn exchanges handled cleanly on first pass.",
       obsInstructions: "Multi-step instruction following: {ft} of {tot} clean first passes (order slips: {ord}, clause/attribute traps: {cl}).",
       obsPragmatics: "Non-literal & pragmatics: {ft} of {tot} intended meanings on first try (literal traps: {lit}, context slips: {ctx}).",
+      obsFluency: "Word-finding sprint: average {avg} words across {tot} prompts ({indep}% uncued; clusters used: {cl}).",
       obsCareAligned: "Caregiver–practice concordance: caregiver rating ({care}%) aligns with objective domain score ({obj}%).",
       obsCareLower: "Caregiver–practice concordance: caregiver rating ({care}%) runs {abs} pt below objective domain score ({obj}%) — review real-world transfer barriers.",
       obsCareHigher: "Caregiver–practice concordance: caregiver rating ({care}%) runs +{abs} pt above objective domain score ({obj}%) — compensatory strategies appear effective.",
@@ -258,7 +260,7 @@
 
   function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
     var out = [];
-    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions, streams.pragmatics].forEach(function (list) {
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions, streams.pragmatics, streams.fluency].forEach(function (list) {
       (list || []).forEach(function (s) {
         if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
         (s.items || []).forEach(function (it) {
@@ -287,6 +289,7 @@
     var dialogue = window.POG.dialogue && window.POG.dialogue.listSessions ? window.POG.dialogue.listSessions() : [];
     var instructions = window.POG.instructions && window.POG.instructions.listSessions ? window.POG.instructions.listSessions() : [];
     var pragmatics = window.POG.pragmatics && window.POG.pragmatics.listSessions ? window.POG.pragmatics.listSessions() : [];
+    var fluency = window.POG.fluency && window.POG.fluency.listSessions ? window.POG.fluency.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -306,6 +309,7 @@
       dialogue: dialogue,
       instructions: instructions,
       pragmatics: pragmatics,
+      fluency: fluency,
       carelog: carelog
     };
   }
@@ -317,7 +321,7 @@
       streams.wordbank, streams.writing, streams.discourse, streams.pacing,
       streams.verbs, streams.narrative, streams.grammar, streams.surface,
       streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions,
-      streams.pragmatics
+      streams.pragmatics, streams.fluency
     ];
     lists.forEach(function (list) {
       (list || []).forEach(function (s) {
@@ -438,6 +442,11 @@
         buckets.lexical.push(clamp01(+s.accuracy));
         buckets.functional.push(clamp01(+s.accuracy));
       }
+    });
+
+    (streams.fluency || []).forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) buckets.lexical.push(clamp01(+s.accuracy));
     });
 
     streams.checkins.forEach(function (k) {
@@ -682,6 +691,23 @@
             tot: pp2.total,
             lit: pp2.errors.literal_trap || 0,
             ctx: pp2.errors.context_slip || 0
+          }));
+        }
+      }
+    }
+
+    /* 3m. Scaffolded word-finding & category sprint */
+    var flMod = window.POG.fluency;
+    if (flMod && flMod.computeFluencyProfile) {
+      var flSlice = (streams.fluency || []).filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (flSlice.length) {
+        var fp2 = flMod.computeFluencyProfile(flSlice);
+        if (fp2.total > 0) {
+          obs.push(api.fill(t.obsFluency, {
+            avg: String(fp2.avgProduced != null ? fp2.avgProduced : 0),
+            tot: fp2.total,
+            indep: Math.round((fp2.independentRate || 0) * 100),
+            cl: String(fp2.meanClusters != null ? fp2.meanClusters : 0)
           }));
         }
       }

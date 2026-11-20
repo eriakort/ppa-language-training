@@ -1343,18 +1343,31 @@
       (window.POG.progress && window.POG.progress.localAlerts().length ? '<p class="nudge">⚠ ' + esc(t.thAlert) + '</p>' : '') +
       '<h2>' + esc(t.thRecs) + '</h2>' + recHtml +
       '<p class="note">' + esc(fill(t.thRetention, { n: RECS.retentionDays })) + '</p>' +
-      '<div class="row-actions">' +
-      (IN_HOST ? '' : '<button class="secondary" data-act="export">' + esc(t.exportCsv) + '</button><button class="secondary" data-act="local-backup">' + esc(t.backupJson) + '</button>') +
-      '<button class="secondary" data-act="local-restore">' + esc(t.restoreJson) + '</button><input id="local-restore-in" type="file" accept=".json,application/json" hidden>' +
-      (TH.confirm === "clear"
-        ? '<button class="secondary danger" data-act="rec-clear-yes">' + esc(t.clearRecsQ) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button>'
-        : '<button class="secondary" data-act="rec-clear">' + esc(t.clearRecs) + '</button>') +
-      (TH.confirm === "local-wipe"
-        ? '<div class="confirm"><span>' + esc(t.wipeLocalQ) + '</span><button class="secondary danger" data-act="local-wipe-yes">' + esc(t.confirmDelete) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button></div>'
-        : '<button class="secondary danger" data-act="local-wipe">' + esc(t.wipeLocal) + '</button>') +
-      '<button class="secondary" data-act="pin-change">' + esc(t.pinChange) + '</button>' +
-      '<button class="secondary" data-act="th-lock">' + esc(t.lock) + '</button></div>' +
-      '<p class="note">' + esc(t.backupNote) + '</p></div>' + foot;
+      thActions(t) + '</div>' + foot;
+  }
+  /* Therapist area: data, recordings and access actions, grouped into labelled cards of rows
+     (icon, title, one-line explanation). Destructive actions are kept apart and confirm in place. */
+  function thRow(act, icon, title, desc, cls) {
+    return '<button class="act-row' + (cls ? ' ' + cls : '') + '" data-act="' + act + '"><span class="act-ico" aria-hidden="true">' + icon + '</span>' +
+      '<span class="act-txt"><strong>' + esc(title) + '</strong>' + (desc ? '<span>' + esc(desc) + '</span>' : '') + '</span><span class="act-go" aria-hidden="true">›</span></button>';
+  }
+  function thConfirm(question, yesAct, yesLabel) {
+    return '<div class="act-confirm" role="group"><p>' + esc(question) + '</p><div class="row-actions">' +
+      '<button class="secondary danger" data-act="' + yesAct + '">' + esc(yesLabel) + '</button><button class="secondary" data-act="th-cancel">' + esc(T[lang].no) + '</button></div></div>';
+  }
+  function thActions(t) {
+    var data = (IN_HOST ? '' : thRow("export", "📊", t.exportCsv, t.dExportCsv) + thRow("local-backup", "💾", t.backupJson, t.dBackupJson)) +
+      thRow("local-restore", "📂", t.restoreJson, t.dRestoreJson) + '<input id="local-restore-in" type="file" accept=".json,application/json" hidden>';
+    var recs = TH.confirm === "clear" ? thConfirm(t.dClearRecsQ, "rec-clear-yes", t.clearRecsQ) : thRow("rec-clear", "🗑️", t.clearRecs, t.dClearRecs, "warn");
+    var access = thRow("pin-change", "🔑", t.pinChange, t.dPinChange) + thRow("th-lock", "🔒", t.lock, t.dLock);
+    var danger = TH.confirm === "local-wipe" ? thConfirm(t.wipeLocalQ, "local-wipe-yes", t.confirmDelete) : thRow("local-wipe", "⚠️", t.wipeLocal, t.dWipeLocal, "danger");
+    /* Two fixed columns on wide screens (data | recordings, access, danger), one column on phones. */
+    return '<div class="act-groups"><div class="act-col">' +
+      '<section class="act-card"><h3>' + esc(t.secThData) + '</h3>' + data + '<p class="act-note">' + esc(t.backupNote) + '</p></section></div><div class="act-col">' +
+      '<section class="act-card"><h3>' + esc(t.thRecs) + '</h3>' + recs + '</section>' +
+      '<section class="act-card"><h3>' + esc(t.secThAccess) + '</h3>' + access + '</section>' +
+      '<section class="act-card danger-zone"><h3>' + esc(t.secThDanger) + '</h3>' + danger + '</section>' +
+      '</div></div>';
   }
   function wipeLocalProfileData(pid) {
     var targetId = pid == null ? activeProfileId : String(pid);

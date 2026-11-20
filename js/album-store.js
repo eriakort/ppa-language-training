@@ -40,6 +40,17 @@ window.POG.albumStore = (function () {
     },
     put: function (item) { item.updatedAt = Date.now(); return run("readwrite", function (s) { return s.put(item); }); },
     remove: function (id) { return run("readwrite", function (s) { return s.delete(id); }); },
+    clear: function (profileId) {
+      if (!profileId) return run("readwrite", function (s) { return s.clear(); });
+      return run("readwrite", function (s) {
+        var req = s.getAll();
+        req.onsuccess = function () {
+          (req.result || []).filter(function (x) { return (x.profileId || "") === profileId; })
+            .forEach(function (x) { s.delete(x.id); });
+        };
+        return req;
+      });
+    },
     newId: function () { return "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   };
 })();

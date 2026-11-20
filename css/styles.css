@@ -902,3 +902,7 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
   .inst-board { grid-template-columns: 1fr; }
   .inst-tok { min-height: 72px; font-size: 18px; }
 }
+.account-danger-box { margin-top: 12px; padding: 14px 16px; border-radius: 14px; border: 2px solid var(--worse); background: var(--worse-soft); display: flex; flex-direction: column; gap: 10px; }
+.account-danger-btn { min-height: 52px; border-radius: 12px; border: 0; background: var(--worse); color: #fff; font-weight: 700; font-size: 18px; padding: 10px 16px; }
+.account-danger-btn:disabled { opacity: .45; }
+

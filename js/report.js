@@ -226,6 +226,16 @@
         vRows.push({ dom: "instructions", name: instApi.label(), n: instMatched.length, pct: instSc != null ? Math.round(instSc * 100) + "%" : "–", lv: String(instApi.level()) });
       }
     }
+    var pgApi = window.POG.pragmatics;
+    var pgSessions = (pgApi && pgApi.listSessions ? pgApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (pgApi && pgSessions.length) {
+      var pgMatched = [];
+      pgSessions.forEach(function (s) { pgMatched.push.apply(pgMatched, s.items || []); });
+      if (pgMatched.length) {
+        var pgSc = avg(pgMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "pragmatics", name: pgApi.label(), n: pgMatched.length, pct: pgSc != null ? Math.round(pgSc * 100) + "%" : "–", lv: String(pgApi.level()) });
+      }
+    }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
     var wbApi = window.POG.wordbank;

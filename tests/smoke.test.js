@@ -1261,7 +1261,33 @@ async function playThrough(page, solo) {
   const instSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_instructions_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(instSaved.length === 1 && instSaved[0].items.length === 3, "instructions: completed 3-instruction session saved locally");
 
-  await vr.click('[data-act="inst-back"]');
+  await vr.click('[data-act="inst-var-hub"]');
+  check(!!(await vr.$('[data-act="prag-home"]')), "variants hub: exposes Beyond literal words (Pragmatics) module");
+  await vr.click('[data-act="prag-home"]');
+  for (let item = 0; item < 3; item++) {
+    if (item === 0) {
+      await vr.click('[data-act="prag-hint"]');
+      check(!!(await vr.$(".hint")), "pragmatics: context clue reveals cleanly");
+      await vr.click('[data-act="prag-slow"]');
+    }
+    const optOrder = await vr.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-act="prag-pick"]:not([disabled])')).map((b) => b.getAttribute("data-i"))
+    );
+    // Test literal_trap dimming on item 0 before choosing intended meaning (0)
+    if (item === 0 && optOrder.includes("1")) {
+      await vr.click('[data-act="prag-pick"][data-i="1"]');
+      check(!!(await vr.$('.nudge[role="status"]')) && !!(await vr.$('[data-act="prag-pick"][data-i="1"][disabled]')),
+        "pragmatics: literal-trap selection shows nudge and dims option");
+    }
+    await vr.click('[data-act="prag-pick"][data-i="0"]');
+    check(!!(await vr.$(".var-feedback.good")) && !!(await vr.$('[data-act="prag-next"]')),
+      "pragmatics: item " + (item + 1) + " resolves cleanly with explanation feedback");
+    await vr.click('[data-act="prag-next"]');
+  }
+  const pgSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_pragmatics_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(pgSaved.length === 1 && pgSaved[0].items.length === 3, "pragmatics: completed 3-situation session saved locally");
+
+  await vr.click('[data-act="prag-back"]');
 
   // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, numbers quick picker, repair cues, and Communication Passport
   await vr.click('[data-act="board"]');
@@ -1359,15 +1385,31 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /PRACTICE ACTIVITY:/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /Everyday dialogues:/.test(briefTxtVal) && /Multi-step instruction following:/.test(briefTxtVal) && /Caregiver–practice concordance:/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
+  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /PRACTICE ACTIVITY:/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /Everyday dialogues:/.test(briefTxtVal) && /Multi-step instruction following:/.test(briefTxtVal) && /Non-literal & pragmatics:/.test(briefTxtVal) && /Caregiver–practice concordance:/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
     "clinical brief: generates structured plain-text visit brief and triggers copy");
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Everyday dialogues/.test(rpVar) && /Follow instructions/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers & dialogue & instructions: printable therapist summary lists all new modalities");
-  check(vr.errors.length === 0, "no page errors (all modalities, passport, brief): " + vr.errors.join("; "));
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Everyday dialogues/.test(rpVar) && /Follow instructions/.test(rpVar) && /Beyond literal words/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers & dialogue & instructions & pragmatics: printable therapist summary lists all new modalities");
+
+  // Complete Device-Local Profile Erase behind Therapist PIN
+  await vr.click('[data-act="therapist"]');
+  check(!!(await vr.$('[data-act="local-wipe"]')), "therapist area: exposes Complete Device-Local Profile Erase button");
+  await vr.click('[data-act="local-wipe"]');
+  check(!!(await vr.$('[data-act="local-wipe-yes"]')) && !!(await vr.$('[data-act="th-cancel"]')),
+    "therapist area: local wipe asks for inline two-step confirmation without browser dialogs");
+  await vr.click('[data-act="th-cancel"]');
+  check(!(await vr.$('[data-act="local-wipe-yes"]')), "therapist area: cancelling local wipe closes inline confirmation");
+  await vr.click('[data-act="local-wipe"]');
+  await vr.click('[data-act="local-wipe-yes"]');
+  await vr.waitForSelector("#pf-name", { timeout: 5000 });
+  const remainingProfileKeys = await vr.evaluate(() => Object.keys(localStorage).filter((k) => /^pog_(p_|profiles|active_profile_id)/.test(k)));
+  check(remainingProfileKeys.length === 0 && /erased|cancellati/i.test(await vr.textContent(".nudge")),
+    "therapist area: confirming local wipe erases all device-local profile keys and returns cleanly to onboarding");
+
+  check(vr.errors.length === 0, "no page errors (all modalities, passport, brief, local-wipe): " + vr.errors.join("; "));
   await browser12.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }

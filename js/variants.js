@@ -542,6 +542,11 @@
         '<strong>' + esc(window.POG.instructions.label()) + '</strong>' +
         '<span class="var-badge">' + esc(window.POG.instructions.lvTag()) + '</span>' +
         '<span>' + esc(window.POG.instructions.desc()) + '</span></button>' : '') +
+      (window.POG.pragmatics ? '<button class="modecard var-dcard" data-act="prag-home">' +
+        '<span class="ico" aria-hidden="true">🧠</span>' +
+        '<strong>' + esc(window.POG.pragmatics.label()) + '</strong>' +
+        '<span class="var-badge">' + esc(window.POG.pragmatics.lvTag()) + '</span>' +
+        '<span>' + esc(window.POG.pragmatics.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

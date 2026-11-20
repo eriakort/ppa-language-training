@@ -54,11 +54,11 @@
         functional: "Comunicazione nella vita quotidiana"
       },
       domSub: {
-        lexical: "Denominazione, parole da conservare, reti semantiche",
+        lexical: "Denominazione, parole da conservare, reti semantiche, senso figurato",
         syntax: "Ordine parole, morfologia, completamento, istruzioni",
         speech: "Ripetizione, sillabe, memoria fonologica, velocità",
         literacy: "Lettura quotidiana, ortografia e copia-richiamo",
-        functional: "Diario del familiare, descrizione scene, dialoghi, istruzioni"
+        functional: "Diario del familiare, descrizione scene, dialoghi, istruzioni, pragmatica"
       },
       trendUp: "In aumento",
       trendDown: "In calo",
@@ -85,6 +85,7 @@
       obsNumbers: "Numeri, orari e prezzi: {ft} su {tot} scelte al primo tentativo (inversioni cifre: {tr}, ordine grandezza: {mg}).",
       obsDialogue: "Dialoghi quotidiani: {ft} su {tot} scambi a due turni completati al primo tentativo.",
       obsInstructions: "Comprensione istruzioni a più passi: {ft} su {tot} seguite al primo colpo (errori d'ordine: {ord}, trappole clausole/attributi: {cl}).",
+      obsPragmatics: "Linguaggio figurato e contesto: {ft} su {tot} significati colti al primo colpo (trappole letterali: {lit}, scivoloni contestuali: {ctx}).",
       obsCareAligned: "Concordanza familiare/pratica: valutazione del familiare ({care}%) in linea con le prove mirate ({obj}%).",
       obsCareLower: "Concordanza familiare/pratica: il familiare segnala un funzionamento quotidiano più faticoso ({care}% vs {obj}%, −{abs} pt) — verificare il trasferimento nella vita reale.",
       obsCareHigher: "Concordanza familiare/pratica: il familiare rileva un buon adattamento quotidiano ({care}%) superiore di +{abs} pt rispetto alle prove ({obj}%) — strategie compensative efficaci.",
@@ -153,11 +154,11 @@
         functional: "Functional everyday communication"
       },
       domSub: {
-        lexical: "Naming, Word Bank retention, semantic links",
+        lexical: "Naming, Word Bank retention, semantic links, idioms",
         syntax: "Word order, inflection, cloze, instructions",
         speech: "Repetition, syllable span, speech timing",
         literacy: "Everyday reading, spelling & CART recall",
-        functional: "Caregiver log, scene concepts, dialogue, instructions"
+        functional: "Caregiver log, scene concepts, dialogue, instructions, pragmatics"
       },
       trendUp: "Higher",
       trendDown: "Lower",
@@ -184,6 +185,7 @@
       obsNumbers: "Functional numbers, times & prices: {ft} of {tot} clean first-try matches (transposition errors: {tr}, magnitude foils: {mg}).",
       obsDialogue: "Everyday dialogues: {ft} of {tot} two-turn exchanges handled cleanly on first pass.",
       obsInstructions: "Multi-step instruction following: {ft} of {tot} clean first passes (order slips: {ord}, clause/attribute traps: {cl}).",
+      obsPragmatics: "Non-literal & pragmatics: {ft} of {tot} intended meanings on first try (literal traps: {lit}, context slips: {ctx}).",
       obsCareAligned: "Caregiver–practice concordance: caregiver rating ({care}%) aligns with objective domain score ({obj}%).",
       obsCareLower: "Caregiver–practice concordance: caregiver rating ({care}%) runs {abs} pt below objective domain score ({obj}%) — review real-world transfer barriers.",
       obsCareHigher: "Caregiver–practice concordance: caregiver rating ({care}%) runs +{abs} pt above objective domain score ({obj}%) — compensatory strategies appear effective.",
@@ -256,7 +258,7 @@
 
   function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
     var out = [];
-    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions].forEach(function (list) {
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions, streams.pragmatics].forEach(function (list) {
       (list || []).forEach(function (s) {
         if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
         (s.items || []).forEach(function (it) {
@@ -284,6 +286,7 @@
     var numbers = window.POG.numbers && window.POG.numbers.listSessions ? window.POG.numbers.listSessions() : [];
     var dialogue = window.POG.dialogue && window.POG.dialogue.listSessions ? window.POG.dialogue.listSessions() : [];
     var instructions = window.POG.instructions && window.POG.instructions.listSessions ? window.POG.instructions.listSessions() : [];
+    var pragmatics = window.POG.pragmatics && window.POG.pragmatics.listSessions ? window.POG.pragmatics.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -302,6 +305,7 @@
       numbers: numbers,
       dialogue: dialogue,
       instructions: instructions,
+      pragmatics: pragmatics,
       carelog: carelog
     };
   }
@@ -312,7 +316,8 @@
       streams.sessions, streams.checkins, streams.variants, streams.functional,
       streams.wordbank, streams.writing, streams.discourse, streams.pacing,
       streams.verbs, streams.narrative, streams.grammar, streams.surface,
-      streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions
+      streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions,
+      streams.pragmatics
     ];
     lists.forEach(function (list) {
       (list || []).forEach(function (s) {
@@ -423,6 +428,14 @@
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) {
         buckets.syntax.push(clamp01(+s.accuracy));
+        buckets.functional.push(clamp01(+s.accuracy));
+      }
+    });
+
+    (streams.pragmatics || []).forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) {
+        buckets.lexical.push(clamp01(+s.accuracy));
         buckets.functional.push(clamp01(+s.accuracy));
       }
     });
@@ -652,6 +665,23 @@
             tot: ip.total,
             ord: ip.errors.order_error || 0,
             cl: (ip.errors.attribute_foil || 0) + (ip.errors.clause_trap || 0)
+          }));
+        }
+      }
+    }
+
+    /* 3l. Conversational pragmatics & non-literal language */
+    var pgMod = window.POG.pragmatics;
+    if (pgMod && pgMod.computePragmaticsProfile) {
+      var pgSlice = (streams.pragmatics || []).filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (pgSlice.length) {
+        var pp2 = pgMod.computePragmaticsProfile(pgSlice);
+        if (pp2.total > 0) {
+          obs.push(api.fill(t.obsPragmatics, {
+            ft: pp2.firstTry,
+            tot: pp2.total,
+            lit: pp2.errors.literal_trap || 0,
+            ctx: pp2.errors.context_slip || 0
           }));
         }
       }

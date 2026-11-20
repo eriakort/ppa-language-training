@@ -96,6 +96,35 @@ Deno.serve(async (req) => {
     });
   }
 
+  if (body.action === "execute_account_deletion") {
+    if (body.confirm !== true) {
+      return json({ error: "Explicit account deletion confirmation is required" }, 400);
+    }
+    const accountEmail = (user.email ?? "").trim().toLowerCase();
+    const suppliedEmail = typeof body.confirm_email === "string" ? body.confirm_email.trim().toLowerCase() : "";
+    if (accountEmail && suppliedEmail !== accountEmail) {
+      return json({ error: "Entered email does not match the signed-in account" }, 400);
+    }
+    const { data: prep, error: prepError } = await admin.rpc("prepare_account_deletion", {
+      p_user_id: user.id
+    });
+    if (prepError) {
+      return json({ error: prepError.message || "Resolve owned profiles and pending transfers before deleting your account" }, 409);
+    }
+    if (!prep || prep.ok !== true) {
+      return json({ error: "Could not complete transactional account deletion checks" }, 500);
+    }
+    const { error: deleteUserError } = await admin.auth.admin.deleteUser(user.id);
+    if (deleteUserError) {
+      return json({ error: "Memberships were revoked, but the authentication user could not be deleted. Contact support." }, 500);
+    }
+    return json({
+      deleted: true,
+      revoked_memberships: prep.revoked_memberships ?? 0,
+      note: "Cloud account deleted and shared memberships revoked. Device-local data and audio recordings are not erased remotely."
+    });
+  }
+
   if (body.action === "create_profile") {
     const displayName = typeof body.display_name === "string" ? body.display_name.trim() : "";
     if (!displayName || displayName.length > 80) return json({ error: "Name must be 1–80 characters" }, 400);

@@ -230,7 +230,7 @@
      Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
      therapist PIN ask for it again, then continue to where you were. */
   var UI_KEY = "pog_ui";
-  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, circumlocution: 1, numbers: 1, dialogue: 1, instructions: 1, passport: 1, pick: 1, "pick-ask": 1 };
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, circumlocution: 1, numbers: 1, dialogue: 1, instructions: 1, pragmatics: 1, passport: 1, pick: 1, "pick-ask": 1 };
   var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
   var UI_PIN = { "chk-results": 1, report: 1, progress: 1, carelog: 1, "wb-manage": 1, brief: 1 };
   function saveUi() {
@@ -1345,8 +1345,60 @@
       (TH.confirm === "clear"
         ? '<button class="secondary danger" data-act="rec-clear-yes">' + esc(t.clearRecsQ) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button>'
         : '<button class="secondary" data-act="rec-clear">' + esc(t.clearRecs) + '</button>') +
+      (TH.confirm === "local-wipe"
+        ? '<div class="confirm"><span>' + esc(t.wipeLocalQ) + '</span><button class="secondary danger" data-act="local-wipe-yes">' + esc(t.confirmDelete) + '</button><button class="secondary" data-act="th-cancel">' + esc(t.no) + '</button></div>'
+        : '<button class="secondary danger" data-act="local-wipe">' + esc(t.wipeLocal) + '</button>') +
       '<button class="secondary" data-act="pin-change">' + esc(t.pinChange) + '</button>' +
       '<button class="secondary" data-act="th-lock">' + esc(t.lock) + '</button></div></div>' + foot;
+  }
+  function wipeLocalProfileData(pid) {
+    var targetId = pid == null ? activeProfileId : String(pid);
+    var wasActive = !targetId || targetId === activeProfileId;
+    var clearedKeys = [];
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf("pog_") !== 0) continue;
+        if (targetId) {
+          var isProfileScoped = k.indexOf("pog_p_" + targetId + "_") === 0;
+          var isCloudScoped = k.indexOf("pog_cloud_") === 0 && k.slice(-targetId.length - 1) === "_" + targetId;
+          if (isProfileScoped || isCloudScoped) clearedKeys.push(k);
+        } else if (!/^pog_(profiles|active_profile_id|lang)$/.test(k) && k.indexOf("pog_p_") !== 0) {
+          clearedKeys.push(k);
+        }
+      }
+      clearedKeys.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+      if (targetId) {
+        var remaining = profileList().filter(function (x) { return x && x.id !== targetId; });
+        if (remaining.length) {
+          save("profiles", remaining);
+          if (wasActive) setActiveProfile(remaining[0].id);
+        } else {
+          try { localStorage.removeItem("pog_profiles"); } catch (e) {}
+          if (wasActive) {
+            activeProfileId = "";
+            try { localStorage.removeItem("pog_active_profile_id"); } catch (e) {}
+            try { window.dispatchEvent(new CustomEvent("pog:profile-change", { detail: { profileId: "" } })); } catch (e) {}
+          }
+        }
+      }
+    } catch (e) {}
+    if (wasActive) {
+      stopVoice();
+      if (S) micCancel();
+      S = null;
+      thLock();
+      unlockedAt = 0;
+      picked = null;
+      pickDraft = [];
+      try { sessionStorage.removeItem(UI_KEY); } catch (e) {}
+    }
+    var recClear = RECS && RECS.clear ? RECS.clear(targetId).catch(function () {}) : Promise.resolve();
+    var albStore = window.POG && window.POG.albumStore;
+    var albClear = albStore && albStore.clear ? albStore.clear(targetId).catch(function () {}) : Promise.resolve();
+    return Promise.all([recClear, albClear]).then(function () {
+      return { clearedKeys: clearedKeys.length, profileId: targetId };
+    });
   }
   function exportCsv() {
     var t = T[lang], sessions = load("sessions") || [];
@@ -1447,6 +1499,12 @@
     (load("instructions_sessions") || []).forEach(function (s) {
       (s.items || []).forEach(function (i) {
         lines.push([s.date, s.id, "instructions", s.who || "solo", i.kind || "sequence", i.lv, i.label || i.id, "", i.result, i.hintUsed ? 1 : 0, i.firstTry ? "first_try" : "assisted", i.errType || "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+      });
+    });
+    (load("pragmatics_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "pragmatics", s.who || "solo", i.kind || "idiom", i.lv, i.label || i.id, "", i.result, i.hintUsed ? 1 : 0, i.firstTry ? "first_try" : "assisted", i.errType || "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
           "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
       });
     });
@@ -2025,6 +2083,16 @@
       RECS.clear(activeProfileId).catch(function () {}).then(function () { TH.confirm = ""; TH.recs = null; flash = t.recsCleared; render(); });
       return;
     }
+    if (act === "local-wipe") { TH.confirm = "local-wipe"; render(); return; }
+    if (act === "local-wipe-yes") {
+      wipeLocalProfileData(activeProfileId).then(function () {
+        TH.confirm = "";
+        flash = t.wipeLocalDone;
+        screen = getProfile() ? "home" : "onboard";
+        render();
+      });
+      return;
+    }
     if (act === "export") { exportCsv(); render(); return; }
     if (act === "rec-on") { screen = "consent"; render(); return; }
     if (act === "consent-yes") {
@@ -2192,6 +2260,7 @@
     recordingAllowed: function (concurrent) { return recordingWanted() && (!concurrent || getSettings().recordConcurrent); },
     therapistUnlocked: function () { return !!TH.unlocked; }, therapistView: function () { screen = "therapist"; return viewTherapist(); }, lockTherapist: function () { thLock(); },
     settings: getSettings, games: function () { return GAMES.slice(); }, maxLevels: function () { return Object.assign({}, MAXLV); }, inHost: function () { return IN_HOST; },
+    wipeLocalProfileData: wipeLocalProfileData,
     history: function () { return load("history") || {}; }, sessions: function () { var s = load("sessions"); return Array.isArray(s) ? s : []; }
   };
   RECS.purge().catch(function () {});

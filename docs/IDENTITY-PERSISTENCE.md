@@ -241,3 +241,24 @@ transactionally immediately before deletion, handle any applicable legal
 retention obligations, revoke remaining memberships, and delete the Auth user
 only after all owned profiles have been resolved. Device-local data and
 IndexedDB recordings cannot be erased remotely and must be clearly disclosed.
+
+## Transactional account deletion execution
+
+Migration `supabase/migrations/202611200001_transactional_account_deletion.sql`
+implements the transactional account-closure gate:
+
+- Relaxes `learner_profiles.created_by` to nullable `on delete set null` so
+  users who transferred profile ownership to a caregiver are never blocked from
+  deleting their authentication account.
+- Locks all associated `learner_profiles` rows (`for update`) inside
+  `public.prepare_account_deletion(p_user_id)` (service-role only), expires any
+  overdue transfer invitations, rejects if any owned profiles or active
+  ownership transfers remain, revokes remaining non-owner memberships, clears
+  `created_by` references, and writes an anonymized audit record in
+  `public.account_deletion_audit`.
+- `profile-access` action `execute_account_deletion` requires explicit
+  confirmation plus matching account email, invokes
+  `prepare_account_deletion` before calling `admin.auth.admin.deleteUser`, and
+  discloses in both languages that device-local practice data and IndexedDB
+  recordings are never erased remotely.
+

@@ -55,10 +55,10 @@
       },
       domSub: {
         lexical: "Denominazione, scatto di parole, parole da conservare, reti semantiche, senso figurato",
-        syntax: "Ordine parole, morfologia, completamento, istruzioni",
+        syntax: "Ordine parole, morfologia, completamento, domande, istruzioni",
         speech: "Ripetizione, sillabe, accento e tono, velocità",
         literacy: "Lettura quotidiana, ortografia e copia-richiamo",
-        functional: "Diario del familiare, descrizione scene, dialoghi, istruzioni, pragmatica"
+        functional: "Diario del familiare, descrizione scene, dialoghi, domande, istruzioni, pragmatica"
       },
       trendUp: "In aumento",
       trendDown: "In calo",
@@ -88,6 +88,7 @@
       obsPragmatics: "Linguaggio figurato e contesto: {ft} su {tot} significati colti al primo colpo (trappole letterali: {lit}, scivoloni contestuali: {ctx}).",
       obsFluency: "Scatto di parole: media {avg} parole su {tot} prove ({indep}% senza gruppi/aiuti; gruppi usati: {cl}).",
       obsProsody: "Accento, tono e ritmo: {ft} su {tot} scelte al primo ascolto (accento {st}, enfasi {fc}, intonazione {ct}).",
+      obsQuestions: "Domande chiare: {ft} su {tot} al primo colpo (parole-domanda {wh}, ordine {bd}, chiarimenti {cl}).",
       obsCareAligned: "Concordanza familiare/pratica: valutazione del familiare ({care}%) in linea con le prove mirate ({obj}%).",
       obsCareLower: "Concordanza familiare/pratica: il familiare segnala un funzionamento quotidiano più faticoso ({care}% vs {obj}%, −{abs} pt) — verificare il trasferimento nella vita reale.",
       obsCareHigher: "Concordanza familiare/pratica: il familiare rileva un buon adattamento quotidiano ({care}%) superiore di +{abs} pt rispetto alle prove ({obj}%) — strategie compensative efficaci.",
@@ -106,10 +107,10 @@
       focusLabels: { mixed: "Equilibrato", nfv: "Variante non fluente", sv: "Variante semantica", lv: "Variante logopenica" },
       planItems: {
         lexical: "Lessico e semantica ({pct}%): dare spazio a Parole da conservare (SFA/PCA), Aggirare la parola e Reti semantiche.",
-        syntax: "Frasi e morfologia ({pct}%): allenare Costruzione frasi, Azioni e verbi (VNeST), Morfologia e Segui i passaggi.",
+        syntax: "Frasi e morfologia ({pct}%): allenare Costruzione frasi, Azioni e verbi (VNeST), Morfologia, Fare domande chiare e Segui i passaggi.",
         speech: "Ritmo e suoni ({pct}%): usare Allenatore ritmo, Accento e tono, Suoni e sillabe e Ripetizione.",
         literacy: "Lettura e scrittura ({pct}%): abbinare Scrivere per ricordare (CART) e Lettura parole difficili / quotidiana.",
-        functional: "Vita quotidiana ({pct}%): allenare Dialoghi quotidiani, Messaggi vocali, Numeri/orari e tabella Comunica."
+        functional: "Vita quotidiana ({pct}%): allenare Dialoghi quotidiani, Fare domande chiare, Messaggi vocali, Numeri/orari e tabella Comunica."
       },
       visitNoteLabel: "Domande o obiettivi per la prossima visita (solo su questo dispositivo)",
       visitNotePh: "Es.: chiedere strategie per la stanchezza serale o orari dei farmaci…",
@@ -157,10 +158,10 @@
       },
       domSub: {
         lexical: "Naming, word sprint, Word Bank retention, semantic links, idioms",
-        syntax: "Word order, inflection, cloze, instructions",
+        syntax: "Word order, inflection, cloze, questions, instructions",
         speech: "Repetition, syllable span, stress & tone, speech timing",
         literacy: "Everyday reading, spelling & CART recall",
-        functional: "Caregiver log, scene concepts, dialogue, instructions, pragmatics"
+        functional: "Caregiver log, scene concepts, dialogue, questions, instructions, pragmatics"
       },
       trendUp: "Higher",
       trendDown: "Lower",
@@ -190,6 +191,7 @@
       obsPragmatics: "Non-literal & pragmatics: {ft} of {tot} intended meanings on first try (literal traps: {lit}, context slips: {ctx}).",
       obsFluency: "Word-finding sprint: average {avg} words across {tot} prompts ({indep}% uncued; clusters used: {cl}).",
       obsProsody: "Word stress & intonation: {ft} of {tot} clean first passes (stress {st}, focus {fc}, contour {ct}).",
+      obsQuestions: "Asking clear questions: {ft} of {tot} clean first passes (wh-word {wh}, order {bd}, clarify {cl}).",
       obsCareAligned: "Caregiver–practice concordance: caregiver rating ({care}%) aligns with objective domain score ({obj}%).",
       obsCareLower: "Caregiver–practice concordance: caregiver rating ({care}%) runs {abs} pt below objective domain score ({obj}%) — review real-world transfer barriers.",
       obsCareHigher: "Caregiver–practice concordance: caregiver rating ({care}%) runs +{abs} pt above objective domain score ({obj}%) — compensatory strategies appear effective.",
@@ -208,10 +210,10 @@
       focusLabels: { mixed: "Balanced", nfv: "Non-fluent focus", sv: "Semantic focus", lv: "Logopenic focus" },
       planItems: {
         lexical: "Lexical & semantics ({pct}%): prioritise Word Bank (SFA/PCA), Word-finding bridges, and Semantic links.",
-        syntax: "Sentence & morphosyntax ({pct}%): practise Sentence building, Verbs (VNeST), Grammar cloze, and Follow instructions.",
+        syntax: "Sentence & morphosyntax ({pct}%): practise Sentence building, Verbs (VNeST), Grammar cloze, Asking clear questions, and Follow instructions.",
         speech: "Motor speech & span ({pct}%): focus on Speech pacing coach, Word stress & intonation, and Sound/syllable span.",
         literacy: "Reading & spelling ({pct}%): pair Write to keep (CART) with Surface & Everyday reading.",
-        functional: "Daily communication ({pct}%): practise Everyday dialogues, Spoken messages, Numbers & times, and Talk Board."
+        functional: "Daily communication ({pct}%): practise Everyday dialogues, Asking clear questions, Spoken messages, Numbers & times, and Talk Board."
       },
       visitNoteLabel: "Questions or goals for next clinic visit (device-local)",
       visitNotePh: "Example: ask about evening fatigue, pill schedule aids, or board vocabulary…",
@@ -262,7 +264,7 @@
 
   function collectTargetedLatencies(streams, fromMs, toMs, inclusiveEnd) {
     var out = [];
-    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions, streams.pragmatics, streams.fluency, streams.prosody].forEach(function (list) {
+    [streams.variants, streams.verbs, streams.grammar, streams.surface, streams.writing, streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions, streams.pragmatics, streams.fluency, streams.prosody, streams.questions].forEach(function (list) {
       (list || []).forEach(function (s) {
         if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
         (s.items || []).forEach(function (it) {
@@ -293,6 +295,7 @@
     var pragmatics = window.POG.pragmatics && window.POG.pragmatics.listSessions ? window.POG.pragmatics.listSessions() : [];
     var fluency = window.POG.fluency && window.POG.fluency.listSessions ? window.POG.fluency.listSessions() : [];
     var prosody = window.POG.prosody && window.POG.prosody.listSessions ? window.POG.prosody.listSessions() : [];
+    var questions = window.POG.questions && window.POG.questions.listSessions ? window.POG.questions.listSessions() : [];
     var carelog = window.POG.carelog && window.POG.carelog.list ? window.POG.carelog.list() : [];
     return {
       sessions: sessions,
@@ -314,6 +317,7 @@
       pragmatics: pragmatics,
       fluency: fluency,
       prosody: prosody,
+      questions: questions,
       carelog: carelog
     };
   }
@@ -325,7 +329,7 @@
       streams.wordbank, streams.writing, streams.discourse, streams.pacing,
       streams.verbs, streams.narrative, streams.grammar, streams.surface,
       streams.circumlocution, streams.numbers, streams.dialogue, streams.instructions,
-      streams.pragmatics, streams.fluency, streams.prosody
+      streams.pragmatics, streams.fluency, streams.prosody, streams.questions
     ];
     lists.forEach(function (list) {
       (list || []).forEach(function (s) {
@@ -456,6 +460,14 @@
     (streams.prosody || []).forEach(function (s) {
       if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
       if (s.accuracy != null && isFinite(+s.accuracy)) buckets.speech.push(clamp01(+s.accuracy));
+    });
+
+    (streams.questions || []).forEach(function (s) {
+      if (!inRange(s.date, fromMs, toMs, inclusiveEnd)) return;
+      if (s.accuracy != null && isFinite(+s.accuracy)) {
+        buckets.syntax.push(clamp01(+s.accuracy));
+        buckets.functional.push(clamp01(+s.accuracy));
+      }
     });
 
     streams.checkins.forEach(function (k) {
@@ -736,6 +748,25 @@
             st: fmtPr("stress"),
             fc: fmtPr("focus"),
             ct: fmtPr("contour")
+          }));
+        }
+      }
+    }
+
+    /* 3o. Functional question formulation & repair */
+    var qsMod = window.POG.questions;
+    if (qsMod && qsMod.computeQuestionsProfile) {
+      var qsSlice = (streams.questions || []).filter(function (s) { return inRange(s.date, curFrom, curTo, true); });
+      if (qsSlice.length) {
+        var qsp = qsMod.computeQuestionsProfile(qsSlice);
+        if (qsp.total > 0) {
+          var fmtQs = function (k) { var b = qsp.byKind && qsp.byKind[k]; return b && b.n ? b.ok + "/" + b.n : "0/0"; };
+          obs.push(api.fill(t.obsQuestions, {
+            ft: qsp.firstTry,
+            tot: qsp.total,
+            wh: fmtQs("wh"),
+            bd: fmtQs("build"),
+            cl: fmtQs("clarify")
           }));
         }
       }

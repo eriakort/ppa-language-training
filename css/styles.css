@@ -962,3 +962,9 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .pr-contour svg { width: 206px; height: 54px; }
 .pr-contour span { font-size: 15px; font-weight: 700; color: var(--ink); }
 
+/* ---------- targeted hub today-strip, asking clear questions & Talk Board recents ---------- */
+.var-today-strip { display: flex; justify-content: center; margin: 2px 0 6px; }
+.ques-wh-tag { display: inline-block; padding: 4px 12px; border-radius: 999px; background: var(--hl); border: 2px solid var(--accent); color: var(--accent); font-size: 15px; font-weight: 700; letter-spacing: .04em; }
+.aac-recents { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; width: 100%; }
+.aac-recent-btn { min-height: 40px; padding: 6px 12px; font-size: 15px; background: var(--surface); border-color: var(--line); }
+

@@ -230,7 +230,7 @@
      Patient mode is respected: locked screens are not reopened without the PIN, and screens behind the
      therapist PIN ask for it again, then continue to where you were. */
   var UI_KEY = "pog_ui";
-  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, circumlocution: 1, numbers: 1, dialogue: 1, instructions: 1, pragmatics: 1, fluency: 1, prosody: 1, passport: 1, pick: 1, "pick-ask": 1 };
+  var UI_FREE = { home: 1, board: 1, album: 1, checkin: 1, variants: 1, functional: 1, wordbank: 1, writing: 1, discourse: 1, pacing: 1, verbs: 1, narrative: 1, grammar: 1, surface: 1, circumlocution: 1, numbers: 1, dialogue: 1, instructions: 1, pragmatics: 1, fluency: 1, prosody: 1, questions: 1, passport: 1, pick: 1, "pick-ask": 1 };
   var UI_UNLOCKED = { settings: 1, scripts: 1, profiles: 1, therapist: 1, "aac-edit": 1, "alb-edit": 1, "alb-voices": 1, "alb-form": "alb-edit" };
   var UI_PIN = { "chk-results": 1, report: 1, progress: 1, carelog: 1, "wb-manage": 1, brief: 1 };
   function saveUi() {
@@ -1437,7 +1437,7 @@
     "surface_level", "surface_sessions", "circ_level", "circumlocution_sessions", "numbers_level", "numbers_sessions",
     "dialogue_level", "dialogue_sessions", "instructions_level", "instructions_sessions",
     "pragmatics_level", "pragmatics_sessions", "fluency_level", "fluency_sessions",
-    "prosody_level", "prosody_sessions",
+    "prosody_level", "prosody_sessions", "questions_level", "questions_sessions",
     "passport_card", "brief_visit_note"
   ];
   var BACKUP_ALLOWED = (function () {
@@ -1635,6 +1635,12 @@
     (load("prosody_sessions") || []).forEach(function (s) {
       (s.items || []).forEach(function (i) {
         lines.push([s.date, s.id, "prosody", s.who || "solo", i.kind || "stress", i.lv, i.label || i.id, "", i.result, i.hintUsed ? 1 : 0, i.firstTry ? "first_try" : "assisted", "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
+          "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
+      });
+    });
+    (load("questions_sessions") || []).forEach(function (s) {
+      (s.items || []).forEach(function (i) {
+        lines.push([s.date, s.id, "questions", s.who || "solo", i.kind || "wh", i.lv, i.label || i.id, "", i.result, i.hintUsed ? 1 : 0, i.firstTry ? "first_try" : "assisted", i.errType || "", i.ms == null ? "" : (i.ms / 1000).toFixed(1),
           "", "", "", "", "", "", "", "", "", "", ""].map(csvCell).join(","));
       });
     });

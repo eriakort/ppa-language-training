@@ -16,7 +16,8 @@
     it: {
       home: "Comunica", title: "Comunica",
       tabs: { need: "Essenziali", clinic: "Medico", shop: "Spesa e bar", mine: "Le mie frasi", people: "Persone", things: "Cose e luoghi" },
-      placeholder: "Tocca un'immagine per parlare.", repeat: "🔊 Ripeti", big: "⛶ Mostra grande", clear: "Cancella", closeBig: "Tocca per chiudere",
+      placeholder: "Tocca un'immagine per parlare.", repeat: "🔊 Ripeti", slow: "🐢 Piano", big: "⛶ Mostra grande", clear: "Cancella", closeBig: "Tocca per chiudere",
+      recentLabel: "Recenti:",
       slateBtn: "✏️ Scrivi parola", slatePh: "Scrivi qui una parola, cifra o orario...", slateSay: "🔊 Leggi", slateBig: "⛶ Mostra grande",
       choiceBtn: "⚖️ Scelta A / B", choiceTitle: "Proponi due scelte chiare", choiceA: "Scelta A", choiceB: "Scelta B", choiceShow: "⛶ Mostra A / B", choiceAsk: "Tocca la tua scelta",
       choicePresets: [["🍵 Tè", "☕ Caffè"], ["✅ Sì", "❌ No"], ["⏱️ Adesso", "🕒 Dopo"], ["🔥 Caldo", "❄️ Freddo"]],
@@ -33,7 +34,8 @@
     en: {
       home: "Talk", title: "Talk",
       tabs: { need: "Essentials", clinic: "At clinic", shop: "Shops & café", mine: "My phrases", people: "People", things: "Things and places" },
-      placeholder: "Tap a picture to speak.", repeat: "🔊 Repeat", big: "⛶ Show large", clear: "Clear", closeBig: "Tap to close",
+      placeholder: "Tap a picture to speak.", repeat: "🔊 Repeat", slow: "🐢 Slow", big: "⛶ Show large", clear: "Clear", closeBig: "Tap to close",
+      recentLabel: "Recent:",
       slateBtn: "✏️ Type keyword", slatePh: "Type a word, name, or time...", slateSay: "🔊 Speak", slateBig: "⛶ Show large",
       choiceBtn: "⚖️ Two choices", choiceTitle: "Offer two clear choices", choiceA: "Choice A", choiceB: "Choice B", choiceShow: "⛶ Show A / B", choiceAsk: "Tap your choice",
       choicePresets: [["🍵 Tea", "☕ Coffee"], ["✅ Yes", "❌ No"], ["⏱️ Now", "🕒 Later"], ["🔥 Hot", "❄️ Cold"]],
@@ -83,11 +85,30 @@
     return window.POG.album && window.POG.album.tiles ? window.POG.album.tiles(tab) : [];
   }
 
-  var tab = "need", msg = "", big = false, slateOpen = false, slateVal = "", choiceOpen = false, choiceShow = false, numOpen = false, chainMode = false, chain = [], chA = "", chB = "", shown = [];
+  var tab = "need", msg = "", big = false, slateOpen = false, slateVal = "", choiceOpen = false, choiceShow = false, numOpen = false, chainMode = false, chain = [], chA = "", chB = "", shown = [], recents = [];
   function stripEmoji(s) { return String(s || "").replace(/^[\u2600-\u27BF\uD83C-\uDBFF\uDC00-\uDFFF\s]+/, "").trim() || String(s || "").trim(); }
+  function speakSlow(text) {
+    if (!text) return;
+    try {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = api.lang() === "it" ? "it-IT" : "en-US";
+        u.rate = 0.76;
+        window.speechSynthesis.speak(u);
+        return;
+      }
+    } catch (e) {}
+    api.speak(text);
+  }
+  function pushRecent(clean) {
+    if (!clean) return;
+    recents = [clean].concat(recents.filter(function (x) { return x !== clean; })).slice(0, 3);
+  }
   function pushPhrasePart(text) {
     var clean = String(text || "").trim();
     if (!clean) return;
+    pushRecent(clean);
     if (chainMode) {
       if (chain.length < 6) chain.push(clean);
       msg = chain.join(" · ");
@@ -162,16 +183,22 @@
           : '<span class="note">' + esc(t.chainEmpty) + '</span>') +
         '</div>'
       : '';
+    var recentBar = recents.length
+      ? '<div class="aac-recents"><span class="note">' + esc(t.recentLabel) + '</span>' + recents.map(function (r, idx) {
+          return '<button type="button" class="tool aac-recent-btn" data-act="aac-recent" data-i="' + idx + '">' + esc(r) + '</button>';
+        }).join("") + '</div>'
+      : '';
     return api.header(false) + '<section class="card aac">' +
       '<div class="aac-bar"><p class="aac-msg' + (msg ? '' : ' empty') + '" aria-live="polite">' + esc(msg || t.placeholder) + '</p>' +
       '<div class="aac-tools"><button class="tool" data-act="aac-say"' + (msg ? '' : ' disabled') + '>' + esc(t.repeat) + '</button>' +
+      '<button class="tool" data-act="aac-slow"' + (msg ? '' : ' disabled') + '>' + esc(t.slow) + '</button>' +
       '<button class="tool" data-act="aac-big"' + (msg ? '' : ' disabled') + '>' + esc(t.big) + '</button>' +
       '<button class="tool" data-act="aac-clear"' + (msg || chain.length ? '' : ' disabled') + '>' + esc(t.clear) + '</button>' +
       '<button class="tool" data-act="aac-chain-toggle" aria-pressed="' + chainMode + '">' + esc(t.chainBtn) + '</button>' +
       '<button class="tool" data-act="aac-slate-toggle" aria-pressed="' + slateOpen + '">' + esc(t.slateBtn) + '</button>' +
       '<button class="tool" data-act="aac-choice-toggle" aria-pressed="' + choiceOpen + '">' + esc(t.choiceBtn) + '</button>' +
       '<button class="tool" data-act="aac-num-toggle" aria-pressed="' + numOpen + '">' + esc(t.numBtn) + '</button></div>' +
-      chainBar + repairBar + slateBox + choiceBox + numBox + '</div>' +
+      recentBar + chainBar + repairBar + slateBox + choiceBox + numBox + '</div>' +
       '<div class="aac-tabs" role="tablist">' + tabs + '</div>' + grid + flashHtml() +
       '<div class="row-actions">' +
       (window.POG.passport ? '<button class="secondary" data-act="passport">' + esc(window.POG.passport.shortLabel()) + '</button>' : '') +
@@ -198,7 +225,8 @@
     numberTokens: function () { return T().numTokens.slice(); },
     repairCues: function () { return T().repairCues.slice(); },
     isChainMode: function () { return chainMode; },
-    chainParts: function () { return chain.slice(); }
+    chainParts: function () { return chain.slice(); },
+    recentPhrases: function () { return recents.slice(); }
   };
 
   var ext = window.POG.ext;
@@ -215,6 +243,13 @@
     pushPhrasePart(x.text); api.render();
   };
   A["aac-say"] = function () { if (msg) api.speak(msg); };
+  A["aac-slow"] = function () { if (msg) speakSlow(msg); };
+  A["aac-recent"] = function (b) {
+    var txt = recents[+b.getAttribute("data-i")];
+    if (!txt) return;
+    pushPhrasePart(txt);
+    api.render();
+  };
   A["aac-clear"] = function () { msg = ""; slateVal = ""; chain = []; big = false; choiceShow = false; api.stopVoice(); api.render(); };
   A["aac-big"] = function () { if (msg) { big = true; api.render(); } };
   A["aac-big-close"] = function () { big = false; api.render(); };
@@ -268,6 +303,7 @@
     if (!raw) return;
     var spoken = stripEmoji(raw);
     msg = spoken || raw;
+    pushRecent(msg);
     api.speak(msg);
     api.render();
   };
@@ -330,11 +366,11 @@
     if (e.key === "Escape" && (big || choiceShow)) { big = false; choiceShow = false; api.render(); }
   });
   window.addEventListener("pog:languagechange", function () {
-    chA = ""; chB = "";
+    chA = ""; chB = ""; recents = [];
     if (api.screen() === "board" || api.screen() === "aac-edit") setTimeout(api.render, 0);
   });
   window.addEventListener("pog:profile-change", function () {
-    chainMode = false; chain = []; msg = ""; big = false; slateOpen = false; choiceOpen = false; numOpen = false;
+    chainMode = false; chain = []; recents = []; msg = ""; big = false; slateOpen = false; choiceOpen = false; numOpen = false;
   });
 
   if (api.screen() === "home") api.render();

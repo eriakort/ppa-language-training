@@ -256,6 +256,16 @@
         vRows.push({ dom: "prosody", name: prApi.label(), n: prMatched.length, pct: prSc != null ? Math.round(prSc * 100) + "%" : "–", lv: String(prApi.level()) });
       }
     }
+    var qsApi = window.POG.questions;
+    var qsSessions = (qsApi && qsApi.listSessions ? qsApi.listSessions() : []).filter(function (s) { return new Date(s.date) >= since; });
+    if (qsApi && qsSessions.length) {
+      var qsMatched = [];
+      qsSessions.forEach(function (s) { qsMatched.push.apply(qsMatched, s.items || []); });
+      if (qsMatched.length) {
+        var qsSc = avg(qsMatched.map(function (it) { return it.score; }));
+        vRows.push({ dom: "questions", name: qsApi.label(), n: qsMatched.length, pct: qsSc != null ? Math.round(qsSc * 100) + "%" : "–", lv: String(qsApi.level()) });
+      }
+    }
     var cgApi = window.POG.carelog;
     var cgEntries = (cgApi && cgApi.list ? cgApi.list() : []).filter(function (e) { return new Date(e.date) >= since; });
     var wbApi = window.POG.wordbank;

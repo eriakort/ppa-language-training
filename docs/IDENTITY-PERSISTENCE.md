@@ -262,3 +262,31 @@ implements the transactional account-closure gate:
   discloses in both languages that device-local practice data and IndexedDB
   recordings are never erased remotely.
 
+## Access codes and entitlement backend (Phase 1)
+
+Migration `supabase/migrations/202611210001_access_codes_and_entitlements.sql`
+and the `access-codes` Edge Function (`supabase/functions/access-codes/index.ts`)
+provide server-authoritative entitlement status and trackable access codes:
+
+- **`access_admins` / `ACCESS_ADMIN_EMAILS`**: Admin authorization is checked
+  server-side using `public.access_admins` (user UUID) or a comma-separated
+  `ACCESS_ADMIN_EMAILS` Edge Function secret (requiring a confirmed email).
+- **`access_codes`**: Supports `single` (`max_uses = 1`) and `group` (`max_uses > 1`
+  or `null` for uncapped) codes with `duration_days` (`1..3650`), optional
+  `redeem_by` / `fixed_expires_at`, `recipient_note`, and `revoked` state.
+- **`code_redemptions`**: Logs each redemption `(code_id, user_id, user_email,
+  redeemed_at, expires_at)` with `unique (code_id, user_id)` and cascades on
+  account deletion.
+- **`user_entitlements`**: Tracks server-computed `tier` (`'free' | 'full'`),
+  `source` (`'free' | 'code' | 'stripe'`), `active_until`, and `source_code_id`.
+- **Atomic RPCs (`SECURITY DEFINER`, `set search_path = pg_catalog, public`)**:
+  `redeem_access_code` locks the target `access_codes` row (`for update`) so
+  concurrent redemptions cannot exceed seat caps; `revoke_access_code_grant`
+  allows deactivating a code and optionally revoking active code-granted access.
+  Both functions are restricted to `service_role`.
+- **Offline grace cache**: `js/entitlements.js` exposes `window.POG.entitlements`
+  and caches the verified entitlement state per user under
+  `pog_entitlement_cache_<uid>` (never included in JSON profile backups) with a
+  7-day offline grace window. When `ENTITLEMENT_SIGNING_SECRET` is configured in
+  Supabase Edge Function secrets, the backend signs the `offline_lease` HMAC-SHA256
+  token with that secret instead of a per-instance runtime key.

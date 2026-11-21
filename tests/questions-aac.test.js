@@ -233,7 +233,8 @@ check(/ques_ask/.test(progSrc) && /questionsSessions/.test(progSrc) && /var qsAp
 
 const swSrc = read("sw.js");
 const idxSrc = read("index.html");
-check(/"pog-shell-v24"/.test(swSrc) && /"content\/questions\.js"/.test(swSrc) && /"js\/questions\.js"/.test(swSrc) &&
+const swVerMatch = swSrc.match(/var VERSION = "pog-shell-v(\d+)"/);
+check(!!swVerMatch && Number(swVerMatch[1]) >= 24 && /"content\/questions\.js"/.test(swSrc) && /"js\/questions\.js"/.test(swSrc) &&
   /content\/questions\.js/.test(idxSrc) && /js\/questions\.js/.test(idxSrc),
   "index.html and sw.js include content/questions.js and js/questions.js and bump cache version");
 

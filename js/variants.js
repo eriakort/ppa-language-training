@@ -87,7 +87,8 @@
       autoAdapt: "Adatta i livelli automaticamente",
       noTtsHint: "Suggerimento: ",
       filterLabel: "Filtra per area",
-      filters: { all: "Tutti", nfv: "Frasi e ritmo", sv: "Parole e significati", lv: "Suoni e memoria", daily: "Vita quotidiana" }
+      filters: { all: "Tutti", nfv: "Frasi e ritmo", sv: "Parole e significati", lv: "Suoni e memoria", daily: "Vita quotidiana" },
+      doneToday: "✓ Oggi"
     },
     en: {
       homeBtn: "Targeted PPA practice",
@@ -150,7 +151,8 @@
       autoAdapt: "Adjust levels automatically",
       noTtsHint: "Clue: ",
       filterLabel: "Filter by focus",
-      filters: { all: "All", nfv: "Grammar & speech", sv: "Words & meaning", lv: "Sounds & recall", daily: "Everyday life" }
+      filters: { all: "All", nfv: "Grammar & speech", sv: "Words & meaning", lv: "Sounds & recall", daily: "Everyday life" },
+      doneToday: "✓ Done today"
     }
   };
 
@@ -480,12 +482,31 @@
     dialogue: ["daily", "sv"],
     instructions: ["nfv", "daily"],
     pragmatics: ["sv", "daily"],
-    fluency: ["nfv", "sv", "lv"]
+    fluency: ["nfv", "sv", "lv"],
+    prosody: ["nfv", "lv", "daily"]
   };
   function cardVisible(id) {
     if (hubFilter === "all") return true;
     var g = CARD_GROUPS[id] || [];
     return g.indexOf(hubFilter) >= 0;
+  }
+  function localDayStr(d) {
+    var dt = d ? new Date(d) : new Date();
+    if (isNaN(dt.getTime())) return "";
+    return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+  }
+  function collectTodayDone() {
+    var today = localDayStr(new Date()), map = {};
+    listSessions().forEach(function (s) {
+      if (localDayStr(s.date) !== today) return;
+      (s.items || []).forEach(function (it) { if (it && it.game) map[it.game] = true; });
+    });
+    ["functional", "wordbank", "writing", "discourse", "pacing", "verbs", "narrative", "grammar", "surface", "circumlocution", "numbers", "dialogue", "instructions", "pragmatics", "fluency", "prosody"].forEach(function (k) {
+      var mod = window.POG[k];
+      var list = mod && mod.listSessions ? mod.listSessions() : [];
+      if (list.some(function (s) { return s && s.date && localDayStr(s.date) === today; })) map[k] = true;
+    });
+    return map;
   }
 
   /* ---------- Views ---------- */
@@ -505,12 +526,17 @@
         return '<button type="button" class="var-fbtn" data-act="var-filter" data-f="' + fk + '" aria-pressed="' + (hubFilter === fk) + '">' + esc(t.filters[fk]) + '</button>';
       }).join("") + '</div>';
 
+    var todayDone = collectTodayDone();
+    function cardBadges(id, baseTag) {
+      return '<span class="var-badges"><span class="var-badge">' + esc(baseTag) + '</span>' +
+        (todayDone[id] ? '<span class="var-badge ok">' + esc(t.doneToday) + '</span>' : '') + '</span>';
+    }
     var domainCards = filterBar + '<div class="var-grid">' + DOMAINS.filter(cardVisible).map(function (d) {
       var lv = lvs[d], icon = d === "sentence" ? "🧩" : d === "semantic" ? "🧠" : "🔊";
       return '<button class="modecard var-dcard" data-act="var-start" data-m="' + d + '">' +
         '<span class="ico" aria-hidden="true">' + icon + '</span>' +
         '<strong>' + esc(t.domains[d]) + '</strong>' +
-        '<span class="var-badge">' + esc(api.fill(t.lvTag, { n: lv, name: t.lvNames[lv - 1] })) + '</span>' +
+        cardBadges(d, api.fill(t.lvTag, { n: lv, name: t.lvNames[lv - 1] })) +
         '<span>' + esc(t.domainDesc[d]) + '</span></button>';
     }).join("") +
       (cardVisible("functional") && window.POG.functional ? '<button class="modecard var-dcard" data-act="func-home">' +
@@ -586,8 +612,13 @@
       (cardVisible("fluency") && window.POG.fluency ? '<button class="modecard var-dcard" data-act="flu-home">' +
         '<span class="ico" aria-hidden="true">⚡</span>' +
         '<strong>' + esc(window.POG.fluency.label()) + '</strong>' +
-        '<span class="var-badge">' + esc(window.POG.fluency.lvTag()) + '</span>' +
+        cardBadges("fluency", window.POG.fluency.lvTag()) +
         '<span>' + esc(window.POG.fluency.desc()) + '</span></button>' : '') +
+      (cardVisible("prosody") && window.POG.prosody ? '<button class="modecard var-dcard" data-act="pros-home">' +
+        '<span class="ico" aria-hidden="true">🎙️</span>' +
+        '<strong>' + esc(window.POG.prosody.label()) + '</strong>' +
+        cardBadges("prosody", window.POG.prosody.lvTag()) +
+        '<span>' + esc(window.POG.prosody.desc()) + '</span></button>' : '') +
       '</div>';
 
     var recentHtml = hist.length

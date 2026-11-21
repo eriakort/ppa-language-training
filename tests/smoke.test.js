@@ -1314,7 +1314,39 @@ async function playThrough(page, solo) {
   const flSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_fluency_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
   check(flSaved.length === 1 && flSaved[0].items.length === 2, "fluency: completed 2-prompt word-finding sprint saved locally");
 
-  await vr.click('[data-act="fl-back"]');
+  await vr.click('[data-act="fl-var-hub"]');
+  const fluDoneBadge = await vr.$eval('[data-act="flu-home"]', (el) => !!el.querySelector(".var-badge.ok"));
+  check(fluDoneBadge, "variants hub: displays Done-today badge on fluency card after finishing today");
+  check(!!(await vr.$('[data-act="pros-home"]')), "variants hub: displays Word stress & intonation card");
+  await vr.click('[data-act="pros-home"]');
+  for (let pi = 0; pi < 3; pi++) {
+    if (pi === 0) {
+      await vr.click('[data-act="pros-hint"]');
+      check(!!(await vr.$(".hint")), "prosody: visual clue hint reveals cue box cleanly");
+      await vr.click('[data-act="pros-slow"]');
+    }
+    const targetPick = await vr.evaluate(() => {
+      const instr = ((document.querySelector(".instr") || {}).textContent || "").trim();
+      const compactBody = ((document.querySelector(".card") || {}).textContent || "").replace(/\s+/g, "");
+      const items = (window.POG && window.POG.content && window.POG.content.PROSODY && window.POG.content.PROSODY.en) || [];
+      const match = items.find((it) => {
+        if (it.prompt !== instr) return false;
+        const lbl = (it.word || it.question || it.utterance || "").replace(/\s+/g, "");
+        return lbl && compactBody.indexOf(lbl) >= 0;
+      });
+      if (!match) return -1;
+      return match.kind === "stress" ? match.stressIdx : (match.kind === "focus" ? match.focusIdx : match.ans);
+    });
+    await vr.click('[data-act="pros-pick"][data-i="' + targetPick + '"]');
+    check(!!(await vr.$(".var-feedback.good")), "prosody item " + (pi + 1) + ": shows positive prosody feedback after picking right beat/focus/tone");
+    await vr.click('[data-act="pros-next"]');
+  }
+  const prosSaved = await vr.evaluate(() => { const k = Object.keys(localStorage).find((x) => x.endsWith("_prosody_sessions")); return JSON.parse(localStorage.getItem(k) || "[]"); });
+  check(prosSaved.length === 1 && prosSaved[0].items.length === 3, "prosody: completed 3-item stress & intonation drill saved locally");
+  await vr.click('[data-act="pros-var-hub"]');
+  const prosDoneBadge = await vr.$eval('[data-act="pros-home"]', (el) => !!el.querySelector(".var-badge.ok"));
+  check(prosDoneBadge, "variants hub: displays Done-today badge on prosody card after completion");
+  await vr.click('[data-act="var-back"]');
 
   // Verify Talk Board context quick-packs, live keyword slate, two-choice A/B overlay, numbers quick picker, repair cues, and Communication Passport
   await vr.click('[data-act="board"]');
@@ -1412,24 +1444,50 @@ async function playThrough(page, solo) {
     "clinical brief: switches comparison time window cleanly");
   await vr.click('[data-act="brief-copy"]');
   const briefTxtVal = await vr.inputValue("#brief-text");
-  check(/CLINICAL VISIT BRIEF/.test(briefTxtVal) && /PRACTICE ACTIVITY:/.test(briefTxtVal) && /SUGGESTED PRACTICE PLAN:/.test(briefTxtVal) && /QUESTIONS \/ GOALS FOR NEXT VISIT:/.test(briefTxtVal) && /Ask about large-print medication schedule card/.test(briefTxtVal) && /Word-finding bridges/.test(briefTxtVal) && /Functional numbers, times & prices/.test(briefTxtVal) && /Everyday dialogues:/.test(briefTxtVal) && /Multi-step instruction following:/.test(briefTxtVal) && /Non-literal & pragmatics:/.test(briefTxtVal) && /Word-finding sprint:/.test(briefTxtVal) && /Caregiver–practice concordance:/.test(briefTxtVal) && /written/i.test(briefTxtVal) && /pacing|Spoken message/i.test(briefTxtVal) && /VNeST/.test(briefTxtVal) && /Connected story retell/i.test(briefTxtVal) && /Morphosyntax & cloze/.test(briefTxtVal) && /Surface & irregular reading/.test(briefTxtVal) && /COMMUNICATION SUPPORTS \(PASSPORT\):/.test(briefTxtVal) && /Prefers written appointment times/.test(briefTxtVal),
-    "clinical brief: generates structured plain-text visit brief and triggers copy");
+  const briefChecks = [
+    /CLINICAL VISIT BRIEF/,
+    /PRACTICE ACTIVITY:/,
+    /SUGGESTED PRACTICE PLAN:/,
+    /QUESTIONS \/ GOALS FOR NEXT VISIT:/,
+    /Ask about large-print medication schedule card/,
+    /Word-finding bridges/,
+    /Functional numbers, times & prices/,
+    /Everyday dialogues:/,
+    /Multi-step instruction following:/,
+    /Non-literal & pragmatics:/,
+    /Word-finding sprint:/,
+    /Word stress & intonation:/,
+    /Caregiver–practice concordance:/,
+    /written/i,
+    /pacing|Spoken message/i,
+    /VNeST/,
+    /Connected story retell/i,
+    /Morphosyntax & cloze/,
+    /Surface & irregular reading/,
+    /COMMUNICATION SUPPORTS \(PASSPORT\):/,
+    /Prefers written appointment times/
+  ];
+  const briefMissing = briefChecks.filter((re) => !re.test(briefTxtVal)).map(String);
+  check(briefMissing.length === 0,
+    "clinical brief: generates structured plain-text visit brief and triggers copy" + (briefMissing.length ? " (missing: " + briefMissing.join(", ") + ")" : ""));
   await vr.click('[data-act="br-back"]');
 
   await vr.click('[data-act="report"]');
   const rpVar = await vr.textContent(".print-area");
-  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Everyday dialogues/.test(rpVar) && /Follow instructions/.test(rpVar) && /Beyond literal words/.test(rpVar) && /Word-finding sprint/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
-    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers & dialogue & instructions & pragmatics & fluency: printable therapist summary lists all new modalities");
+  check(/Targeted PPA practice/.test(rpVar) && /Sentence building/.test(rpVar) && /Everyday functional reading/.test(rpVar) && /Spoken messages/.test(rpVar) && /Speech pacing coach/.test(rpVar) && /Actions & verbs \(VNeST\)/.test(rpVar) && /Story & sequence retell/.test(rpVar) && /Grammar & word endings/.test(rpVar) && /Surface & irregular reading/.test(rpVar) && /Word-finding bridges/.test(rpVar) && /Numbers, times & prices/.test(rpVar) && /Everyday dialogues/.test(rpVar) && /Follow instructions/.test(rpVar) && /Beyond literal words/.test(rpVar) && /Word-finding sprint/.test(rpVar) && /Word stress & intonation/.test(rpVar) && /Word preservation & cue profile/.test(rpVar) && /Written expression & CART/.test(rpVar) && /Caregiver observations/.test(rpVar) && /Strategy helped/.test(rpVar),
+    "variants & carelog & wordbank & writing & discourse & pacing & verbs & narrative & grammar & surface & circumlocution & numbers & dialogue & instructions & pragmatics & fluency & prosody: printable therapist summary lists all new modalities");
 
   // Portable JSON profile backup export, Complete Device-Local Profile Erase, and Validated JSON Restore
   await vr.click('[data-act="therapist"]');
+  check((await vr.$$(".act-card")).length >= 4 && (await vr.$$(".act-row")).length >= 7 && !!(await vr.$(".danger-zone")),
+    "therapist area: renders grouped action cards, rows, and danger-zone wipe section");
   check(!!(await vr.$('[data-act="local-backup"]')) && !!(await vr.$('[data-act="local-restore"]')),
     "therapist area: exposes Export full backup (JSON) and Restore profile from JSON buttons");
   const [backupDl] = await Promise.all([vr.waitForEvent("download", { timeout: 5000 }), vr.click('[data-act="local-backup"]')]);
   const backupPath = await backupDl.path();
   const backupJson = fs.readFileSync(backupPath, "utf8");
   const backupDoc = JSON.parse(backupJson);
-  check(backupDoc.format === "pog-local-backup" && backupDoc.version === 1 && !("pin" in backupDoc.data) && Array.isArray(backupDoc.data.fluency_sessions) && backupDoc.data.passport_card.emergencyName === "Sarah (daughter)",
+  check(backupDoc.format === "pog-local-backup" && backupDoc.version === 1 && !("pin" in backupDoc.data) && Array.isArray(backupDoc.data.fluency_sessions) && Array.isArray(backupDoc.data.prosody_sessions) && backupDoc.data.passport_card.emergencyName === "Sarah (daughter)",
     "local backup: downloaded JSON carries all local modules & passport while excluding PIN");
 
   check(!!(await vr.$('[data-act="local-wipe"]')), "therapist area: exposes Complete Device-Local Profile Erase button");
@@ -1456,12 +1514,13 @@ async function playThrough(page, solo) {
     const active = localStorage.getItem("pog_active_profile_id");
     const cards = Array.from(document.querySelectorAll(".profile-card")).length;
     const fl = JSON.parse(localStorage.getItem("pog_p_" + active + "_fluency_sessions") || "[]");
+    const pros = JSON.parse(localStorage.getItem("pog_p_" + active + "_prosody_sessions") || "[]");
     const pp = JSON.parse(localStorage.getItem("pog_p_" + active + "_passport_card") || "null");
     const pin = localStorage.getItem("pog_p_" + active + "_pin");
-    return { cards, flLen: fl.length, ppName: pp && pp.emergencyName, pin };
+    return { cards, flLen: fl.length, prosLen: pros.length, ppName: pp && pp.emergencyName, pin };
   });
-  check(restoredState.cards === 2 && restoredState.flLen === 1 && restoredState.ppName === "Sarah (daughter)" && restoredState.pin === null,
-    "profiles restore: JSON backup creates a new local profile alongside Sam with fluency/passport restored and no PIN");
+  check(restoredState.cards === 2 && restoredState.flLen === 1 && restoredState.prosLen === 1 && restoredState.ppName === "Sarah (daughter)" && restoredState.pin === null,
+    "profiles restore: JSON backup creates a new local profile alongside Sam with fluency/prosody/passport restored and no PIN");
 
   check(vr.errors.length === 0, "no page errors (all modalities, passport, brief, local-wipe, backup/restore): " + vr.errors.join("; "));
   await browser12.close();

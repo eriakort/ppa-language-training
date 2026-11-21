@@ -293,9 +293,10 @@
     var t = T(), d = ensureDraft(), sc = computeScores(d.ratings);
     if (!sc) { api.flash(t.needRatings); api.render(); return; }
     var chosenTags = TAGS.filter(function (k) { return !!d.tags[k]; });
+    var entryDate = d.date && d.date !== todayIso() ? new Date(d.date + "T12:00:00") : new Date();
     var entry = {
       id: "cg" + Date.now().toString(36),
-      date: (d.date ? new Date(d.date + "T12:00:00") : new Date()).toISOString(),
+      date: entryDate.toISOString(),
       ratings: Object.assign({}, d.ratings),
       tags: chosenTags,
       note: String(d.note || "").trim().slice(0, 300),

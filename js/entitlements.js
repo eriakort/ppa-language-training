@@ -220,6 +220,11 @@
       state = defaultState();
       emitChange();
     } else if (d && d.signedIn) {
+      if (d.uid && state.uid !== d.uid) {
+        var cached = loadCache(d.uid);
+        state = cached ? Object.assign(defaultState(), cached) : Object.assign(defaultState(), { uid: d.uid });
+        emitChange();
+      }
       refresh();
     }
   });

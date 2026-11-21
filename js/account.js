@@ -17,7 +17,12 @@
       passwordShort: "La password deve contenere almeno 8 caratteri.",
       passwordMismatch: "Le password non coincidono.",
       terms: "L'account serve per l'accesso. I dati degli esercizi restano su questo dispositivo: la sincronizzazione cloud non è attiva.",
-      modeHint: "Puoi creare un account o accedere a uno esistente."
+      modeHint: "Puoi creare un account o accedere a uno esistente.",
+      planTitle: "Piano attuale",
+      planFree: "Piano gratuito (3 sessioni complete + esercizi base)",
+      planFull: "Accesso completo attivo",
+      planFullUntil: "Accesso completo attivo · fino al {date}",
+      planRedeem: "Inserisci codice di accesso"
     },
     en: {
       account: "Account", unavailable: "Online sign-in is not configured yet",
@@ -34,7 +39,12 @@
       passwordShort: "Password must be at least 8 characters.",
       passwordMismatch: "The passwords do not match.",
       terms: "The account is for sign-in. Exercise data stays on this device: cloud sync is not enabled.",
-      modeHint: "Create an account or sign in to an existing one."
+      modeHint: "Create an account or sign in to an existing one.",
+      planTitle: "Current plan",
+      planFree: "Free plan (3 daily sessions + core drills)",
+      planFull: "Full access active",
+      planFullUntil: "Full access active · until {date}",
+      planRedeem: "Enter access code"
     }
   };
   var lang = window.POG.getLang();
@@ -89,6 +99,17 @@
         html += '<form data-form="update"><label>' + T.password + '<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>' + T.confirm + '<input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label><button class="primary account-action" type="submit">' + T.update + '</button></form>';
       }
     }
+    var ent = window.POG && window.POG.entitlements ? window.POG.entitlements : null;
+    var est = ent && ent.status ? ent.status() : { tier: "free", activeUntil: null };
+    var isFull = !!(ent && ent.isFull && ent.isFull());
+    var until = "";
+    if (est.activeUntil) {
+      var ud = new Date(est.activeUntil);
+      if (!isNaN(ud.getTime())) until = ud.toLocaleDateString(lang === "it" ? "it-IT" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
+    }
+    var planLabel = isFull ? (until ? T.planFullUntil.replace("{date}", until) : T.planFull) : T.planFree;
+    html += '<div class="account-plan-box"><strong>' + escapeHtml(T.planTitle) + '</strong><span>' + escapeHtml(planLabel) + '</span>' +
+      '<button type="button" class="secondary account-action" data-action="redeem">' + escapeHtml(T.planRedeem) + '</button></div>';
     if (message) html += '<p class="account-message" role="status">' + escapeHtml(message) + '</p>';
     if (error) html += '<p class="account-error" role="alert">' + escapeHtml(error) + '</p>';
     html += '</div>';
@@ -107,6 +128,7 @@
     } catch (e) {}
     window.dispatchEvent(new CustomEvent("pog:authchange", { detail: {
       signedIn: !!session,
+      uid: session && session.user && session.user.id ? session.user.id : "",
       signedOut: localStorage.getItem("pog_account_signed_out") === "1"
     } }));
   }
@@ -157,6 +179,11 @@
       else if (a === "signin") mode = "signin";
       else if (a === "signup") mode = "signup";
       else if (a === "reset") mode = "reset";
+      else if (a === "redeem") {
+        hide();
+        if (window.POG && window.POG.paywall) window.POG.paywall.openModal({ reason: "manage" });
+        return;
+      }
       else if (a === "signout") {
         client.auth.signOut().then(function (r) {
           if (r.error) fail(r.error);
@@ -223,4 +250,6 @@
     if (launcher) launcher.textContent = T.account;
     if (panel && !panel.hidden) render();
   });
+  window.addEventListener("pog:open-account", function () { show(); });
+  window.addEventListener("pog:entitlementchange", function () { if (panel && !panel.hidden) render(); });
   })();

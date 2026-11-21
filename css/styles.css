@@ -968,3 +968,57 @@ td small, .report td small { display: block; font-size: 13px; color: var(--muted
 .aac-recents { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; width: 100%; }
 .aac-recent-btn { min-height: 40px; padding: 6px 12px; font-size: 15px; background: var(--surface); border-color: var(--line); }
 
+/* ---------- Free vs. Full Access paywall, plan banner & code redemption dialog ---------- */
+.pw-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px 14px; width: 100%; max-width: 560px; padding: 12px 16px; border-radius: 16px;
+  border: 2px solid var(--line); background: var(--soft); text-align: left; font-size: 17px; font-weight: 700;
+}
+.pw-banner.full { border-color: var(--good); background: var(--good-soft); color: var(--good); }
+.pw-banner.free { border-color: var(--accent); background: var(--hl); color: var(--ink); }
+.pw-inline-btn { min-height: 44px; padding: 8px 16px; font-size: 16px; flex: none; }
+.pw-pending-chip {
+  display: inline-block; margin-top: 4px; padding: 4px 10px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--accent); color: var(--accent); font-size: 15px; font-weight: 700;
+}
+.pw-panel[hidden] { display: none; }
+.pw-panel {
+  position: fixed; z-index: 35; inset: 0; display: grid; place-items: center;
+  padding: 16px; background: rgba(0,0,0,.58); overflow-y: auto; box-sizing: border-box;
+}
+.pw-card {
+  width: min(100%, 540px); max-height: min(92dvh, 800px); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 16px; padding: clamp(20px, 5vw, 32px);
+  border-radius: 22px; background: var(--surface); color: var(--ink);
+  box-shadow: 0 12px 40px rgba(0,0,0,.26); text-align: left; box-sizing: border-box;
+}
+.pw-card h2, .pw-card h3, .pw-card p { margin: 0; }
+.pw-card h2 { font-size: 27px; }
+.pw-card form { display: flex; flex-direction: column; gap: 12px; }
+.pw-card label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
+.pw-card input {
+  width: 100%; min-height: 58px; padding: 10px 14px; border: 2px solid var(--line);
+  border-radius: 12px; background: var(--bg); color: var(--ink); font: inherit;
+  font-size: 20px; letter-spacing: .06em; text-transform: uppercase;
+}
+.pw-box {
+  display: flex; flex-direction: column; gap: 10px; padding: 14px 16px;
+  border-radius: 16px; background: var(--soft); border: 1px solid var(--line);
+}
+.pw-box h3 { font-size: 16px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.pw-list { margin: 0; padding-left: 1.25em; display: flex; flex-direction: column; gap: 6px; font-size: 17px; }
+.var-badge.pw-lock { background: var(--almost-soft); color: var(--almost); border-color: var(--almost); }
+button.primary.pw-locked .pw-lock { margin-left: 8px; vertical-align: middle; }
+.modecard.pw-locked { opacity: .94; border-style: dashed; }
+.act-row.pw-locked .act-txt strong { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.account-plan-box {
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;
+  border-radius: 14px; background: var(--soft); border: 1px solid var(--line); text-align: left;
+}
+.account-plan-box strong { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.account-plan-box span { font-size: 17px; font-weight: 700; color: var(--ink); }
+@media (max-width: 520px) {
+  .pw-banner { flex-direction: column; align-items: stretch; text-align: center; }
+  .pw-card { border-radius: 18px; }
+}
+

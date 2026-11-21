@@ -252,11 +252,11 @@
     } else if (UI_UNLOCKED[s] && !locked) {
       target = typeof UI_UNLOCKED[s] === "string" ? UI_UNLOCKED[s] : s;
     }
-    if (target) {
+    if (target && (!window.POG.paywall || window.POG.paywall.allowScreen(target))) {
       /* Screens added by modules (board, album, check-in…) exist only once those scripts have loaded. */
       if (window.POG.ext.screens[target] || /^(home|pick|pick-ask|settings|scripts|profiles|therapist)$/.test(target)) screen = target;
       else { screen = "home"; deferredScreen = target; }
-    } else if (UI_PIN[s] && !locked && !u.remote) {
+    } else if (UI_PIN[s] && !locked && !u.remote && (!window.POG.paywall || window.POG.paywall.allowScreen(s))) {
       screen = "therapist"; TH.after = s;
     } else return false;
     restoreScrollY = +u.y || 0;
@@ -952,6 +952,7 @@
     });
     save("history", hist); save("settings", set);
     saveSession();
+    if (S.mode === "session" && window.POG.paywall) window.POG.paywall.recordDailySession();
     S.changes = changes; S.nextLevels = set.levels;
     screen = "summary"; render();
   }
@@ -1218,6 +1219,7 @@
       (pending
         ? '<button class="primary" data-act="place">' + esc(t.placeContinue) + '</button><button class="link" data-act="start">' + esc(t.startAnyway) + '</button>'
         : '<button class="primary" data-act="start">' + esc(t.start) + '</button>') +
+      (window.POG.paywall ? window.POG.paywall.homeBannerHtml(lang) : '') +
       homeExtras() +
       (locked
         ? '<div class="links"><button class="link" data-act="caregiver">' + esc(t.caregiver) + '</button></div>'
@@ -1343,8 +1345,10 @@
   /* Therapist area: data, recordings and access actions, grouped into labelled cards of rows
      (icon, title, one-line explanation). Destructive actions are kept apart and confirm in place. */
   function thRow(act, icon, title, desc, cls) {
-    return '<button class="act-row' + (cls ? ' ' + cls : '') + '" data-act="' + act + '"><span class="act-ico" aria-hidden="true">' + icon + '</span>' +
-      '<span class="act-txt"><strong>' + esc(title) + '</strong>' + (desc ? '<span>' + esc(desc) + '</span>' : '') + '</span><span class="act-go" aria-hidden="true">›</span></button>';
+    var pw = window.POG.paywall, locked = !!(pw && !pw.hasFullAccess() && pw.isPaidTherapistAct(act));
+    var fullCls = (cls ? cls + " " : "") + (locked ? "pw-locked" : "");
+    return '<button class="act-row' + (fullCls ? ' ' + fullCls : '') + '" data-act="' + act + '"><span class="act-ico" aria-hidden="true">' + icon + '</span>' +
+      '<span class="act-txt"><strong>' + esc(title) + (locked ? ' ' + pw.lockBadgeHtml(lang) : '') + '</strong>' + (desc ? '<span>' + esc(desc) + '</span>' : '') + '</span><span class="act-go" aria-hidden="true">›</span></button>';
   }
   function thConfirm(question, yesAct, yesLabel) {
     return '<div class="act-confirm" role="group"><p>' + esc(question) + '</p><div class="row-actions">' +
@@ -2127,6 +2131,8 @@
       return;
     }
     if (act === "caregiver") { screen = "settings"; render(); return; }
+    if (act === "pw-open") { if (window.POG.paywall) window.POG.paywall.openModal({ reason: "manage" }); return; }
+    if (window.POG.paywall && !window.POG.paywall.allowAction(act, b)) return;
     if (act === "unlock-cancel") { afterUnlock = null; screen = "home"; render(); return; }
     if (act === "relock") { unlockedAt = 0; screen = "home"; render(); return; }
     if (act === "unlock-try") {
@@ -2408,7 +2414,7 @@
   window.POG.appApi = {
     t: function () { return T[lang]; }, lang: function () { return lang; }, esc: esc, fill: fill,
     load: load, save: save, header: header, render: render,
-    go: function (s) { screen = s; render(); }, screen: function () { return screen; },
+    go: function (s) { if (s !== "home" && window.POG.paywall && !window.POG.paywall.guardScreen(s)) return; screen = s; render(); }, screen: function () { return screen; },
     flash: function (m) { flash = m; }, flashText: function () { return flash; },
     speak: speak, stopVoice: stopVoice, isLocked: isLocked,
     profileId: function () { return activeProfileId; }, getScripts: getScripts, getProfile: getProfile,
@@ -2426,7 +2432,10 @@
   if (!restoreActiveSession() && !restoreUi()) screen = getProfile() ? "home" : "onboard";
   (function finishRestore() {
     function go() {
-      if (deferredScreen && window.POG.ext.screens[deferredScreen]) { screen = deferredScreen; render(); }
+      if (deferredScreen && window.POG.ext.screens[deferredScreen]) {
+        if (!window.POG.paywall || window.POG.paywall.allowScreen(deferredScreen)) { screen = deferredScreen; render(); }
+        else { window.POG.paywall.guardScreen(deferredScreen); }
+      }
       deferredScreen = null;
       if (restoreScrollY) setTimeout(function () { window.scrollTo(0, restoreScrollY); restoreScrollY = 0; }, 60);
     }

@@ -534,102 +534,105 @@
     var todayStrip = todayCount
       ? '<p class="var-today-strip"><span class="var-badge ok">' + esc(api.fill(t.todaySummary, { n: todayCount })) + '</span></p>'
       : '';
-    function cardBadges(id, baseTag) {
+    var pw = window.POG.paywall, freeRestricted = !!(pw && !pw.hasFullAccess());
+    var lkCls = freeRestricted ? " pw-locked" : "";
+    function cardBadges(id, baseTag, paid) {
       return '<span class="var-badges"><span class="var-badge">' + esc(baseTag) + '</span>' +
-        (todayDone[id] ? '<span class="var-badge ok">' + esc(t.doneToday) + '</span>' : '') + '</span>';
+        (todayDone[id] ? '<span class="var-badge ok">' + esc(t.doneToday) + '</span>' : '') +
+        (paid && freeRestricted ? pw.lockBadgeHtml(api.lang()) : '') + '</span>';
     }
     var domainCards = todayStrip + filterBar + '<div class="var-grid">' + DOMAINS.filter(cardVisible).map(function (d) {
       var lv = lvs[d], icon = d === "sentence" ? "🧩" : d === "semantic" ? "🧠" : "🔊";
       return '<button class="modecard var-dcard" data-act="var-start" data-m="' + d + '">' +
         '<span class="ico" aria-hidden="true">' + icon + '</span>' +
         '<strong>' + esc(t.domains[d]) + '</strong>' +
-        cardBadges(d, api.fill(t.lvTag, { n: lv, name: t.lvNames[lv - 1] })) +
+        cardBadges(d, api.fill(t.lvTag, { n: lv, name: t.lvNames[lv - 1] }), false) +
         '<span>' + esc(t.domainDesc[d]) + '</span></button>';
     }).join("") +
-      (cardVisible("functional") && window.POG.functional ? '<button class="modecard var-dcard" data-act="func-home">' +
+      (cardVisible("functional") && window.POG.functional ? '<button class="modecard var-dcard' + lkCls + '" data-act="func-home">' +
         '<span class="ico" aria-hidden="true">📖</span>' +
         '<strong>' + esc(window.POG.functional.label()) + '</strong>' +
-        cardBadges("functional", window.POG.functional.lvTag()) +
+        cardBadges("functional", window.POG.functional.lvTag(), true) +
         '<span>' + esc(window.POG.functional.desc()) + '</span></button>' : '') +
-      (cardVisible("wordbank") && window.POG.wordbank ? '<button class="modecard var-dcard" data-act="wb-home">' +
+      (cardVisible("wordbank") && window.POG.wordbank ? '<button class="modecard var-dcard' + lkCls + '" data-act="wb-home">' +
         '<span class="ico" aria-hidden="true">🗂️</span>' +
         '<strong>' + esc(window.POG.wordbank.label()) + '</strong>' +
-        cardBadges("wordbank", window.POG.wordbank.badge()) +
+        cardBadges("wordbank", window.POG.wordbank.badge(), true) +
         '<span>' + esc(window.POG.wordbank.desc()) + '</span></button>' : '') +
-      (cardVisible("writing") && window.POG.writing ? '<button class="modecard var-dcard" data-act="wr-home">' +
+      (cardVisible("writing") && window.POG.writing ? '<button class="modecard var-dcard' + lkCls + '" data-act="wr-home">' +
         '<span class="ico" aria-hidden="true">✍️</span>' +
         '<strong>' + esc(window.POG.writing.label()) + '</strong>' +
-        cardBadges("writing", window.POG.writing.lvTag()) +
+        cardBadges("writing", window.POG.writing.lvTag(), true) +
         '<span>' + esc(window.POG.writing.desc()) + '</span></button>' : '') +
-      (cardVisible("discourse") && window.POG.discourse ? '<button class="modecard var-dcard" data-act="disc-home">' +
+      (cardVisible("discourse") && window.POG.discourse ? '<button class="modecard var-dcard' + lkCls + '" data-act="disc-home">' +
         '<span class="ico" aria-hidden="true">🎧</span>' +
         '<strong>' + esc(window.POG.discourse.label()) + '</strong>' +
-        cardBadges("discourse", window.POG.discourse.lvTag()) +
+        cardBadges("discourse", window.POG.discourse.lvTag(), true) +
         '<span>' + esc(window.POG.discourse.desc()) + '</span></button>' : '') +
-      (cardVisible("pacing") && window.POG.pacing ? '<button class="modecard var-dcard" data-act="pace-home">' +
+      (cardVisible("pacing") && window.POG.pacing ? '<button class="modecard var-dcard' + lkCls + '" data-act="pace-home">' +
         '<span class="ico" aria-hidden="true">🥁</span>' +
         '<strong>' + esc(window.POG.pacing.label()) + '</strong>' +
-        cardBadges("pacing", window.POG.pacing.lvTag()) +
+        cardBadges("pacing", window.POG.pacing.lvTag(), true) +
         '<span>' + esc(window.POG.pacing.desc()) + '</span></button>' : '') +
-      (cardVisible("verbs") && window.POG.verbs ? '<button class="modecard var-dcard" data-act="verbs-home">' +
+      (cardVisible("verbs") && window.POG.verbs ? '<button class="modecard var-dcard' + lkCls + '" data-act="verbs-home">' +
         '<span class="ico" aria-hidden="true">🤝</span>' +
         '<strong>' + esc(window.POG.verbs.label()) + '</strong>' +
-        cardBadges("verbs", window.POG.verbs.lvTag()) +
+        cardBadges("verbs", window.POG.verbs.lvTag(), true) +
         '<span>' + esc(window.POG.verbs.desc()) + '</span></button>' : '') +
-      (cardVisible("narrative") && window.POG.narrative ? '<button class="modecard var-dcard" data-act="narr-home">' +
+      (cardVisible("narrative") && window.POG.narrative ? '<button class="modecard var-dcard' + lkCls + '" data-act="narr-home">' +
         '<span class="ico" aria-hidden="true">📚</span>' +
         '<strong>' + esc(window.POG.narrative.label()) + '</strong>' +
-        cardBadges("narrative", window.POG.narrative.lvTag()) +
+        cardBadges("narrative", window.POG.narrative.lvTag(), true) +
         '<span>' + esc(window.POG.narrative.desc()) + '</span></button>' : '') +
-      (cardVisible("grammar") && window.POG.grammar ? '<button class="modecard var-dcard" data-act="gram-home">' +
+      (cardVisible("grammar") && window.POG.grammar ? '<button class="modecard var-dcard' + lkCls + '" data-act="gram-home">' +
         '<span class="ico" aria-hidden="true">⚖️</span>' +
         '<strong>' + esc(window.POG.grammar.label()) + '</strong>' +
-        cardBadges("grammar", window.POG.grammar.lvTag()) +
+        cardBadges("grammar", window.POG.grammar.lvTag(), true) +
         '<span>' + esc(window.POG.grammar.desc()) + '</span></button>' : '') +
-      (cardVisible("surface") && window.POG.surface ? '<button class="modecard var-dcard" data-act="surf-home">' +
+      (cardVisible("surface") && window.POG.surface ? '<button class="modecard var-dcard' + lkCls + '" data-act="surf-home">' +
         '<span class="ico" aria-hidden="true">🔍</span>' +
         '<strong>' + esc(window.POG.surface.label()) + '</strong>' +
-        cardBadges("surface", window.POG.surface.lvTag()) +
+        cardBadges("surface", window.POG.surface.lvTag(), true) +
         '<span>' + esc(window.POG.surface.desc()) + '</span></button>' : '') +
-      (cardVisible("circumlocution") && window.POG.circumlocution ? '<button class="modecard var-dcard" data-act="circ-home">' +
+      (cardVisible("circumlocution") && window.POG.circumlocution ? '<button class="modecard var-dcard' + lkCls + '" data-act="circ-home">' +
         '<span class="ico" aria-hidden="true">🌉</span>' +
         '<strong>' + esc(window.POG.circumlocution.label()) + '</strong>' +
-        cardBadges("circumlocution", window.POG.circumlocution.lvTag()) +
+        cardBadges("circumlocution", window.POG.circumlocution.lvTag(), true) +
         '<span>' + esc(window.POG.circumlocution.desc()) + '</span></button>' : '') +
-      (cardVisible("numbers") && window.POG.numbers ? '<button class="modecard var-dcard" data-act="num-home">' +
+      (cardVisible("numbers") && window.POG.numbers ? '<button class="modecard var-dcard' + lkCls + '" data-act="num-home">' +
         '<span class="ico" aria-hidden="true">🕒</span>' +
         '<strong>' + esc(window.POG.numbers.label()) + '</strong>' +
-        cardBadges("numbers", window.POG.numbers.lvTag()) +
+        cardBadges("numbers", window.POG.numbers.lvTag(), true) +
         '<span>' + esc(window.POG.numbers.desc()) + '</span></button>' : '') +
-      (cardVisible("dialogue") && window.POG.dialogue ? '<button class="modecard var-dcard" data-act="dg-home">' +
+      (cardVisible("dialogue") && window.POG.dialogue ? '<button class="modecard var-dcard' + lkCls + '" data-act="dg-home">' +
         '<span class="ico" aria-hidden="true">🗣️</span>' +
         '<strong>' + esc(window.POG.dialogue.label()) + '</strong>' +
-        cardBadges("dialogue", window.POG.dialogue.lvTag()) +
+        cardBadges("dialogue", window.POG.dialogue.lvTag(), true) +
         '<span>' + esc(window.POG.dialogue.desc()) + '</span></button>' : '') +
-      (cardVisible("instructions") && window.POG.instructions ? '<button class="modecard var-dcard" data-act="inst-home">' +
+      (cardVisible("instructions") && window.POG.instructions ? '<button class="modecard var-dcard' + lkCls + '" data-act="inst-home">' +
         '<span class="ico" aria-hidden="true">🧭</span>' +
         '<strong>' + esc(window.POG.instructions.label()) + '</strong>' +
-        cardBadges("instructions", window.POG.instructions.lvTag()) +
+        cardBadges("instructions", window.POG.instructions.lvTag(), true) +
         '<span>' + esc(window.POG.instructions.desc()) + '</span></button>' : '') +
-      (cardVisible("pragmatics") && window.POG.pragmatics ? '<button class="modecard var-dcard" data-act="prag-home">' +
+      (cardVisible("pragmatics") && window.POG.pragmatics ? '<button class="modecard var-dcard' + lkCls + '" data-act="prag-home">' +
         '<span class="ico" aria-hidden="true">🧠</span>' +
         '<strong>' + esc(window.POG.pragmatics.label()) + '</strong>' +
-        cardBadges("pragmatics", window.POG.pragmatics.lvTag()) +
+        cardBadges("pragmatics", window.POG.pragmatics.lvTag(), true) +
         '<span>' + esc(window.POG.pragmatics.desc()) + '</span></button>' : '') +
-      (cardVisible("fluency") && window.POG.fluency ? '<button class="modecard var-dcard" data-act="flu-home">' +
+      (cardVisible("fluency") && window.POG.fluency ? '<button class="modecard var-dcard' + lkCls + '" data-act="flu-home">' +
         '<span class="ico" aria-hidden="true">⚡</span>' +
         '<strong>' + esc(window.POG.fluency.label()) + '</strong>' +
-        cardBadges("fluency", window.POG.fluency.lvTag()) +
+        cardBadges("fluency", window.POG.fluency.lvTag(), true) +
         '<span>' + esc(window.POG.fluency.desc()) + '</span></button>' : '') +
-      (cardVisible("prosody") && window.POG.prosody ? '<button class="modecard var-dcard" data-act="pros-home">' +
+      (cardVisible("prosody") && window.POG.prosody ? '<button class="modecard var-dcard' + lkCls + '" data-act="pros-home">' +
         '<span class="ico" aria-hidden="true">🎙️</span>' +
         '<strong>' + esc(window.POG.prosody.label()) + '</strong>' +
-        cardBadges("prosody", window.POG.prosody.lvTag()) +
+        cardBadges("prosody", window.POG.prosody.lvTag(), true) +
         '<span>' + esc(window.POG.prosody.desc()) + '</span></button>' : '') +
-      (cardVisible("questions") && window.POG.questions ? '<button class="modecard var-dcard" data-act="ques-home">' +
+      (cardVisible("questions") && window.POG.questions ? '<button class="modecard var-dcard' + lkCls + '" data-act="ques-home">' +
         '<span class="ico" aria-hidden="true">❓</span>' +
         '<strong>' + esc(window.POG.questions.label()) + '</strong>' +
-        cardBadges("questions", window.POG.questions.lvTag()) +
+        cardBadges("questions", window.POG.questions.lvTag(), true) +
         '<span>' + esc(window.POG.questions.desc()) + '</span></button>' : '') +
       '</div>';
 
@@ -647,7 +650,8 @@
     return api.header(false) + '<section class="card">' +
       '<h1 class="instr">' + esc(t.hubTitle) + '</h1>' +
       '<p class="sub">' + esc(t.hubSub) + '</p>' +
-      '<button class="primary" data-act="var-start" data-m="guided">' + esc(t.startGuided) + '</button>' +
+      '<button class="primary' + lkCls + '" data-act="var-start" data-m="guided">' + esc(t.startGuided) +
+      (freeRestricted ? ' ' + pw.lockBadgeHtml(api.lang()) : '') + '</button>' +
       '<h2>' + esc(t.orOne) + '</h2>' +
       domainCards +
       focusSeg +
@@ -877,6 +881,7 @@
   };
 
   A["var-start"] = function (b) {
+    if (window.POG.paywall && !window.POG.paywall.allowAction("var-start", b)) return;
     startRun(b.getAttribute("data-m") || "guided");
   };
 

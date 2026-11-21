@@ -249,6 +249,23 @@ async function playThrough(page, solo) {
   await browser.close();
 
   /* Website version: browser speech recognition (simulated) + real recording from Chromium's fake microphone. */
+  const FULL_ACCESS_STUB = `window.supabase = { createClient: function () {
+    var user = { id: "u-full", email: "full@example.com", user_metadata: {} };
+    var q = function () { var o = { select: function () { return o; }, eq: function () { return o; }, in: function () { return o; }, order: function () { return o; }, limit: function () { return o; }, range: function () { return o; },
+      maybeSingle: function () { return Promise.resolve({ data: null, error: null }); }, single: function () { return Promise.resolve({ data: null, error: null }); },
+      then: function (r) { return Promise.resolve({ data: [], error: null }).then(r); } }; return o; };
+    return { auth: {
+        getSession: function () { return Promise.resolve({ data: { session: { user: user } } }); },
+        getUser: function () { return Promise.resolve({ data: { user: user } }); },
+        onAuthStateChange: function () { return { data: { subscription: { unsubscribe: function () {} } } }; },
+        signOut: function () { return Promise.resolve({ error: null }); }
+      }, from: q, rpc: function () { return Promise.resolve({ data: null, error: null }); },
+      functions: { invoke: function (fn) {
+        if (fn === "access-codes") return Promise.resolve({ data: { tier: "full", source: "code", active_until: new Date(Date.now() + 30 * 86400000).toISOString(), is_admin: false, redemptions: [{ id: "r1" }] }, error: null });
+        return Promise.resolve({ data: null, error: null });
+      } } };
+  } };`;
+  const fullHtml = html.replace(sdkInline, "<script>\n" + FULL_ACCESS_STUB + "</script>");
   const browser2 = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
   const MOCK_SR = `(function(){
     function SR(){ window.__sr = this; }
@@ -264,7 +281,7 @@ async function playThrough(page, solo) {
   w.on("pageerror", (e) => w.errors.push(e.message));
   await w.addInitScript(MOCK_SR);
   // https, like GitHub Pages: browsers only allow the microphone on secure pages
-  await w.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  await w.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + fullHtml + "</body></html>" }));
   await w.goto("https://app.test/");
   await w.fill("#pf-name", "Test"); await w.click('[data-act="onboard-skip"]');
   // reading aloud at level 2 (word-by-word highlighting)
@@ -423,7 +440,7 @@ async function playThrough(page, solo) {
   const browser4 = await chromium.launch({ args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] });
   const ctx4 = await browser4.newContext({ viewport: { width: 900, height: 1100 } });
   await ctx4.addInitScript(MOCK_SR);
-  await ctx4.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  await ctx4.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + fullHtml + "</body></html>" }));
   const ck = await ctx4.newPage();
   ck.errors = []; ck.on("pageerror", (e) => ck.errors.push(e.message));
   await ck.goto("https://app.test/");
@@ -622,7 +639,7 @@ async function playThrough(page, solo) {
   /* Progress and statistics: ability index, period comparison, trend, daily report, alerts. */
   const browser7 = await chromium.launch();
   const ctx7 = await browser7.newContext({ viewport: { width: 1000, height: 1200 } });
-  await ctx7.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  await ctx7.route("https://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + fullHtml + "</body></html>" }));
   const pr = await ctx7.newPage();
   pr.errors = []; pr.on("pageerror", (e) => pr.errors.push(e.message));
   await pr.goto("https://app.test/");
@@ -696,7 +713,10 @@ async function playThrough(page, solo) {
         onAuthStateChange: function (cb) { return { data: { subscription: { unsubscribe: function () {} } } }; },
         signOut: function () { return Promise.resolve({ error: null }); }
       }, from: q, rpc: function (name, args) { window.__rpc.push({ name: name, args: JSON.parse(JSON.stringify(args)) }); return Promise.resolve({ data: null, error: null }); },
-      functions: { invoke: function () { return Promise.resolve({ data: null, error: null }); } } };
+      functions: { invoke: function (fn) {
+        if (fn === "access-codes") return Promise.resolve({ data: { tier: "full", source: "code", active_until: new Date(Date.now() + 30 * 86400000).toISOString(), is_admin: false, redemptions: [{ id: "r1" }] }, error: null });
+        return Promise.resolve({ data: null, error: null });
+      } } };
   } };`;
   const browser8 = await chromium.launch();
   const cl = await open(browser8, false, CLOUD_STUB, { width: 1000, height: 1200 });
@@ -755,7 +775,7 @@ async function playThrough(page, solo) {
   /* A refresh keeps you where you were; a finished session or a new tab starts from home. */
   const browser10 = await chromium.launch();
   const ctx10 = await browser10.newContext({ viewport: { width: 900, height: 700 } });
-  await ctx10.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + html + "</body></html>" }));
+  await ctx10.route("http://app.test/", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + fullHtml + "</body></html>" }));
   const rf = await ctx10.newPage();
   rf.errors = []; rf.on("pageerror", (e) => rf.errors.push(e.message));
   await rf.goto("http://app.test/");
@@ -838,7 +858,7 @@ async function playThrough(page, solo) {
 
   /* Variant-targeted PPA exercises: nfvPPA sentence building, svPPA semantic links, lvPPA sounds/syllables/span. */
   const browser12 = await chromium.launch();
-  const vr = await open(browser12, false, null, { width: 900, height: 1000 });
+  const vr = await open(browser12, false, FULL_ACCESS_STUB, { width: 900, height: 1000 });
   await vr.fill("#pf-name", "Giulia"); await vr.click('[data-act="onboard-skip"]'); await vr.click('[data-act="home"]');
   check(!!(await vr.$('[data-act="var-home"]')), "variants: launcher appears on home screen");
   await vr.click('[data-act="var-home"]');
@@ -1560,6 +1580,141 @@ async function playThrough(page, solo) {
 
   check(vr.errors.length === 0, "no page errors (all modalities, passport, brief, local-wipe, backup/restore): " + vr.errors.join("; "));
   await browser12.close();
+
+  /* Phase 2 Paywall: Free-tier limits (3 daily sessions + 3 core drills + free AAC/album/passport),
+     lock indicators on paid modules & clinician analytics, sign-in handoff, and live access-code unlock. */
+  const PAYWALL_STUB = `(function () {
+    var subs = [], signedIn = false, activeTier = "free";
+    var user = { id: "u-trial", email: "trial@example.com", user_metadata: {} };
+    var future = new Date(Date.now() + 30 * 86400000).toISOString();
+    var q = function () { var o = { select: function () { return o; }, eq: function () { return o; }, in: function () { return o; }, order: function () { return o; }, limit: function () { return o; },
+      maybeSingle: function () { return Promise.resolve({ data: null, error: null }); }, single: function () { return Promise.resolve({ data: null, error: null }); },
+      then: function (r) { return Promise.resolve({ data: [], error: null }).then(r); } }; return o; };
+    window.supabase = { createClient: function () {
+      return { auth: {
+          getSession: function () { return Promise.resolve({ data: { session: signedIn ? { user: user } : null } }); },
+          getUser: function () { return Promise.resolve({ data: { user: signedIn ? user : null } }); },
+          signInWithPassword: function () { signedIn = true; var sess = { user: user }; subs.forEach(function (cb) { cb("SIGNED_IN", sess); }); return Promise.resolve({ data: { user: user, session: sess }, error: null }); },
+          onAuthStateChange: function (cb) { subs.push(cb); return { data: { subscription: { unsubscribe: function () {} } } }; },
+          signOut: function () { signedIn = false; subs.forEach(function (cb) { cb("SIGNED_OUT", null); }); return Promise.resolve({ error: null }); }
+        }, from: q, rpc: function () { return Promise.resolve({ data: null, error: null }); },
+        functions: { invoke: function (fn, opts) {
+          var b = (opts && opts.body) || {};
+          if (fn === "access-codes") {
+            if (b.action === "status") {
+              return Promise.resolve({ data: { tier: activeTier, source: activeTier === "full" ? "code" : "free", active_until: activeTier === "full" ? future : null, is_admin: false, redemptions: [] }, error: null });
+            }
+            if (b.action === "redeem") {
+              if (b.code === "POG-BAD1-2345") {
+                return Promise.resolve({ data: { error: "invalid_code" }, error: { message: "invalid_code" } });
+              }
+              activeTier = "full";
+              return Promise.resolve({ data: { ok: true, code: b.code, code_type: "single", tier: "full", active_until: future }, error: null });
+            }
+          }
+          return Promise.resolve({ data: null, error: null });
+        } } };
+    } };
+  })();`;
+  const browser13 = await chromium.launch();
+  const ctx13 = await browser13.newContext({ viewport: { width: 900, height: 1100 } });
+  const paywallHtml = html.replace(sdkInline, "<script>\n" + PAYWALL_STUB + "</script>");
+  await ctx13.addInitScript(FIXED_DAY);
+  await ctx13.route("http://app.test/*", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + paywallHtml + "</body></html>" }));
+  const pwPage = await ctx13.newPage();
+  pwPage.errors = []; pwPage.on("pageerror", (e) => pwPage.errors.push(e.message));
+  await pwPage.goto("http://app.test/?code=POG-TEST-1234");
+  await pwPage.fill("#pf-name", "Marco"); await pwPage.click('[data-act="onboard-skip"]'); await pwPage.click('[data-act="home"]');
+
+  check(!!(await pwPage.$(".pw-banner.free")) && /3 di 3/.test(await pwPage.textContent(".pw-banner.free")) && /POG-TEST-1234/.test(await pwPage.textContent(".pw-pending-chip")),
+    "paywall E2E: Home shows Free plan banner (3 of 3 left) and ?code= chip");
+  check((await pwPage.$$(".homebtn")).length === 2 && (await pwPage.$$(".util-sheet > button")).length === 7,
+    "paywall E2E: preserves .homebtn === 2 and .util-sheet > button === 7");
+
+  // Always-free daily safety tools remain accessible
+  await pwPage.click('[data-act="board"]'); check(!!(await pwPage.$(".aac-grid")), "paywall E2E: Talk Board is free");
+  await pwPage.click('[data-act="home"]'); await pwPage.click('[data-act="album"]'); check(!!(await pwPage.$(".card")), "paywall E2E: Personal Album is free");
+  await pwPage.click('[data-act="home"]'); await pwPage.click('[data-act="var-home"]');
+
+  // Core 3 targeted drills unlocked, guided + 17 specialized modules locked
+  check(!(await pwPage.$('[data-act="var-start"][data-m="sentence"].pw-locked')) && !!(await pwPage.$('[data-act="func-home"].pw-locked')) && !!(await pwPage.$('[data-act="var-start"][data-m="guided"].pw-locked')),
+    "paywall E2E: Targeted Hub marks guided run and specialized modules locked while keeping core 3 unlocked");
+  await pwPage.click('[data-act="var-start"][data-m="sentence"]');
+  check(!!(await pwPage.$('[data-act="var-scheck"]')), "paywall E2E: core Sentence Building drill opens cleanly on Free tier");
+  await pwPage.click('[data-act="var-stop"]');
+  await pwPage.click('[data-act="var-hub"]');
+  await pwPage.click('[data-act="func-home"]');
+  check(await pwPage.isVisible(".pw-panel"), "paywall E2E: clicking locked targeted module opens paywall modal instead");
+  await pwPage.click('[data-pw="close"]');
+
+  // Direct go() bypass to paid screen blocked cleanly
+  await pwPage.evaluate(() => window.POG.appApi.go("brief"));
+  check(await pwPage.isVisible(".pw-panel") && (await pwPage.evaluate(() => window.POG.appApi.screen())) === "home",
+    "paywall E2E: direct appApi.go('brief') blocked and redirected to Home with modal");
+  await pwPage.click('[data-pw="close"]');
+
+  // Therapist Area marks pro analytics locked while keeping device-local controls open
+  await pwPage.click('[data-act="therapist"]');
+  await pwPage.fill("#th-pin1", "1234"); await pwPage.fill("#th-pin2", "1234"); await pwPage.click('[data-act="pin-set"]');
+  await pwPage.waitForSelector('[data-act="brief"]');
+  check(!!(await pwPage.$('[data-act="brief"].pw-locked')) && !(await pwPage.$('[data-act="local-wipe"].pw-locked')),
+    "paywall E2E: Therapist Area locks Pro reports/exports and leaves device-local wipe open");
+  await pwPage.click('[data-act="brief"]');
+  check(await pwPage.isVisible(".pw-panel"), "paywall E2E: clicking locked Clinical Brief opens paywall modal");
+  await pwPage.click('[data-pw="close"]');
+  await pwPage.click('[data-act="home"]');
+
+  // Complete 3 daily sessions and verify 4th is blocked
+  for (let sIdx = 0; sIdx < 3; sIdx++) {
+    await startSession(pwPage);
+    await pwPage.click('[data-w="assist"]');
+    await pwPage.click('[data-r="good"]');
+    await pwPage.click('[data-act="stop"]');
+    await pwPage.click('[data-act="home"]');
+  }
+  check(/3 sessioni giornaliere completate/.test(await pwPage.textContent(".pw-banner.free")),
+    "paywall E2E: banner shows all 3 free daily sessions completed");
+  await pwPage.click('[data-act="start"]');
+  check(await pwPage.isVisible(".pw-panel") && /Sessioni gratuite completate/.test(await pwPage.textContent(".pw-card")),
+    "paywall E2E: 4th daily session opens trial-limit upgrade modal");
+
+  // Sign-in handoff -> Account plan card -> invalid code error -> valid code unlock
+  await pwPage.click('[data-pw="signin"]');
+  check(await pwPage.isVisible(".account-panel"), "paywall E2E: sign-in button hands off to Account dialog");
+  await pwPage.fill('.account-card input[name="email"]', "trial@example.com");
+  await pwPage.fill('.account-card input[name="password"]', "password123");
+  await pwPage.click('.account-card form[data-form="signin"] button[type="submit"]');
+  await pwPage.waitForSelector('.account-plan-box [data-action="redeem"]');
+  await pwPage.click('.account-plan-box [data-action="redeem"]');
+  await pwPage.waitForSelector('.pw-card form[data-pw-form="redeem"]');
+  check((await pwPage.inputValue('.pw-card input[name="code"]')) === "POG-TEST-1234",
+    "paywall E2E: redeemed modal pre-populates captured ?code= link parameter after sign-in");
+
+  await pwPage.fill('.pw-card input[name="code"]', "POG-BAD1-2345");
+  await pwPage.click('.pw-card form[data-pw-form="redeem"] button[type="submit"]');
+  await pwPage.waitForSelector('.pw-card .account-error');
+  check(/non trovato/i.test(await pwPage.textContent('.pw-card .account-error')),
+    "paywall E2E: invalid code surfaces localized error");
+
+  await pwPage.fill('.pw-card input[name="code"]', "POG-TEST-1234");
+  await pwPage.click('.pw-card form[data-pw-form="redeem"] button[type="submit"]');
+  await pwPage.waitForSelector('.pw-card .account-message[role="status"]');
+  check(/Accesso completo attivato/.test(await pwPage.textContent('.pw-card .account-message[role="status"]')),
+    "paywall E2E: valid access code shows localized unlock confirmation");
+  await pwPage.click('[data-pw="close"]');
+
+  check(!!(await pwPage.$(".pw-banner.full")), "paywall E2E: Home banner flips immediately to Full Access active");
+  await pwPage.click('[data-act="start"]');
+  check(!!(await pwPage.$('[data-act="pick-prev"]')) && !(await pwPage.isVisible(".pw-panel")),
+    "paywall E2E: 4th daily session opens cleanly once Full Access is active");
+  await pwPage.click('[data-act="home"]');
+  await pwPage.click('[data-act="var-home"]');
+  check(!(await pwPage.$('[data-act="func-home"].pw-locked')), "paywall E2E: Targeted Hub removes lock badges after unlock");
+  await pwPage.click('[data-act="func-home"]');
+  check(!!(await pwPage.$('[data-act="fn-opt"]')), "paywall E2E: Functional Reading opens cleanly after unlock");
+
+  check(pwPage.errors.length === 0, "no page errors (Phase 2 paywall & unlock E2E): " + pwPage.errors.join("; "));
+  await browser13.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");

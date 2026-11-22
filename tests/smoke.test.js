@@ -1716,6 +1716,189 @@ async function playThrough(page, solo) {
   check(pwPage.errors.length === 0, "no page errors (Phase 2 paywall & unlock E2E): " + pwPage.errors.join("; "));
   await browser13.close();
 
+  /* Phase 3 Admin Access-Code Generator & Usage Tracking E2E:
+     non-admin hidden, admin sees button in Account card, creates single/group/uncapped codes,
+     verifies escaped output + ?code= invite URL, inspects redemptions, filters list, and executes 2-step revoke. */
+  const ADMIN_STUB = `(function () {
+    var subs = [], signedIn = false, user = null;
+    var regularUser = { id: "u-regular", email: "user@example.com", user_metadata: {} };
+    var adminUser = { id: "u-admin", email: "eriakort8@gmail.com", user_metadata: {} };
+    var now = Date.now();
+    var future = new Date(now + 90 * 86400000).toISOString();
+    var codesDb = [
+      {
+        id: "seed-1",
+        code: "POG-CLINIC-01",
+        code_type: "group",
+        max_uses: 10,
+        used_count: 1,
+        duration_days: 60,
+        recipient_note: "Initial Pilot",
+        created_at: new Date(now - 86400000).toISOString(),
+        redeem_by: future,
+        fixed_expires_at: null,
+        revoked_at: null,
+        code_redemptions: [
+          { id: "r-1", user_id: "u-pat-1", user_email: "patient1@example.com", redeemed_at: new Date(now - 3600000).toISOString(), expires_at: future }
+        ]
+      }
+    ];
+    var q = function () { var o = { select: function () { return o; }, eq: function () { return o; }, in: function () { return o; }, order: function () { return o; }, limit: function () { return o; },
+      maybeSingle: function () { return Promise.resolve({ data: null, error: null }); }, single: function () { return Promise.resolve({ data: null, error: null }); },
+      then: function (r) { return Promise.resolve({ data: [], error: null }).then(r); } }; return o; };
+    window.supabase = { createClient: function () {
+      return { auth: {
+          getSession: function () { return Promise.resolve({ data: { session: signedIn ? { user: user } : null } }); },
+          getUser: function () { return Promise.resolve({ data: { user: signedIn ? user : null } }); },
+          signInWithPassword: function (creds) {
+            user = (creds && creds.email === "eriakort8@gmail.com") ? adminUser : regularUser;
+            signedIn = true;
+            var sess = { user: user };
+            subs.forEach(function (cb) { cb("SIGNED_IN", sess); });
+            return Promise.resolve({ data: { user: user, session: sess }, error: null });
+          },
+          onAuthStateChange: function (cb) { subs.push(cb); return { data: { subscription: { unsubscribe: function () {} } } }; },
+          signOut: function () { signedIn = false; user = null; subs.forEach(function (cb) { cb("SIGNED_OUT", null); }); return Promise.resolve({ error: null }); }
+        }, from: q, rpc: function () { return Promise.resolve({ data: null, error: null }); },
+        functions: { invoke: function (fn, opts) {
+          var b = (opts && opts.body) || {};
+          if (fn === "access-codes") {
+            var isAdm = !!(signedIn && user && user.id === adminUser.id);
+            if (b.action === "status") {
+              return Promise.resolve({ data: { tier: isAdm ? "full" : "free", source: isAdm ? "admin" : "free", active_until: isAdm ? future : null, is_admin: isAdm, redemptions: [] }, error: null });
+            }
+            if (!isAdm) return Promise.resolve({ data: { error: "Admin access required" }, error: { message: "Admin access required" } });
+            if (b.action === "admin_list") {
+              return Promise.resolve({ data: { ok: true, codes: codesDb.slice() }, error: null });
+            }
+            if (b.action === "admin_create") {
+              var n = b.custom_code ? 1 : (Number(b.count) || 1);
+              var created = [];
+              for (var i = 0; i < n; i++) {
+                var row = {
+                  id: "c-" + (codesDb.length + 1),
+                  code: b.custom_code || ("POG-GRP-" + (codesDb.length + 1)),
+                  code_type: b.code_type,
+                  max_uses: b.code_type === "single" ? 1 : (b.uncapped ? null : Number(b.max_uses)),
+                  used_count: 0,
+                  duration_days: Number(b.duration_days),
+                  recipient_note: b.recipient_note || "",
+                  created_at: new Date().toISOString(),
+                  redeem_by: b.redeem_by || null,
+                  fixed_expires_at: b.fixed_expires_at || null,
+                  revoked_at: null,
+                  code_redemptions: []
+                };
+                codesDb.unshift(row);
+                created.push(row);
+              }
+              return Promise.resolve({ data: { ok: true, codes: created }, error: null });
+            }
+            if (b.action === "admin_revoke") {
+              codesDb.forEach(function (c) {
+                if (c.id === b.code_id) c.revoked_at = new Date().toISOString();
+              });
+              return Promise.resolve({ data: { ok: true, code_id: b.code_id, revoked_active: b.revoke_active_grants ? 1 : 0 }, error: null });
+            }
+          }
+          return Promise.resolve({ data: null, error: null });
+        } } };
+    } };
+  })();`;
+  const browser14 = await chromium.launch();
+  const ctx14 = await browser14.newContext({ viewport: { width: 960, height: 1100 } });
+  const adminHtml = html.replace(sdkInline, "<script>\n" + ADMIN_STUB + "</script>");
+  await ctx14.addInitScript(FIXED_DAY);
+  await ctx14.route("http://app.test/*", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + adminHtml + "</body></html>" }));
+  const adPage = await ctx14.newPage();
+  adPage.errors = []; adPage.on("pageerror", (e) => adPage.errors.push(e.message));
+  await adPage.goto("http://app.test/");
+  await adPage.fill("#pf-name", "Elena"); await adPage.click('[data-act="onboard-skip"]'); await adPage.click('[data-act="home"]');
+
+  check((await adPage.$$(".homebtn")).length === 2 && (await adPage.$$(".util-sheet > button")).length === 7,
+    "admin E2E: preserves .homebtn === 2 and .util-sheet > button === 7");
+
+  // Non-admin user must NOT see Admin Access Codes trigger in Account dialog
+  await menuClick(adPage, ".account-launcher");
+  await adPage.fill('.account-card input[name="email"]', "user@example.com");
+  await adPage.fill('.account-card input[name="password"]', "password123");
+  await adPage.click('.account-card form[data-form="signin"] button[type="submit"]');
+  await adPage.waitForSelector('.account-card [data-action="signout"]');
+  check(!(await adPage.$('.account-card [data-action="admin-codes"]')),
+    "admin E2E: regular signed-in user never sees Admin Access Codes button");
+  await adPage.click('.account-card [data-action="signout"]');
+  await adPage.waitForSelector('[data-act="start"]');
+
+  // Admin user signs in and opens Admin Access Codes modal from Account plan box
+  await menuClick(adPage, ".account-launcher");
+  await adPage.fill('.account-card input[name="email"]', "eriakort8@gmail.com");
+  await adPage.fill('.account-card input[name="password"]', "adminpass123");
+  await adPage.click('.account-card form[data-form="signin"] button[type="submit"]');
+  await adPage.waitForSelector('.account-card [data-action="admin-codes"]');
+  await adPage.click('.account-card [data-action="admin-codes"]');
+  await adPage.waitForSelector('.adc-panel .adc-item');
+
+  check(await adPage.isVisible(".adc-panel") && !(await adPage.isVisible(".account-panel")),
+    "admin E2E: Admin Access Codes modal opens and Account panel closes cleanly");
+
+  // Create single-user custom code with XSS payload in recipient note
+  await adPage.click('[data-adc="preset-days"][data-days="90"]');
+  await adPage.fill('.adc-form-box input[name="custom_code"]', "CLINIC-ONE1");
+  await adPage.fill('.adc-form-box input[name="recipient_note"]', "Maria R. <xssimg>");
+  await adPage.click('.adc-form-box button[type="submit"]');
+  await adPage.waitForSelector(".adc-issued");
+  check(/CLINIC-ONE1/.test(await adPage.textContent(".adc-issued")) && /\?code=CLINIC-ONE1/.test(await adPage.textContent(".adc-issued")),
+    "admin E2E: newly created Single code and ?code= invite link appear in issued banner");
+  check(!(await adPage.$("xssimg")) && /Maria R\. <xssimg>/.test(await adPage.textContent(".adc-list")),
+    "admin E2E: recipient note is HTML-escaped with zero injected DOM tags");
+
+  // Create Group capped code & verify unlimited-seats disables max_uses
+  await adPage.click('[data-adc="set-type"][data-type="group"]');
+  await adPage.fill('.adc-form-box input[name="max_uses"]', "20");
+  await adPage.fill('.adc-form-box input[name="recipient_note"]', "Ospedale Milano");
+  await adPage.click('.adc-form-box button[type="submit"]');
+  await adPage.waitForFunction(() => document.querySelectorAll(".adc-item").length === 3);
+
+  await adPage.check('.adc-form-box input[name="uncapped"]');
+  check(await adPage.isDisabled('.adc-form-box input[name="max_uses"]'),
+    "admin E2E: checking Unlimited group seats disables numeric max_uses input");
+  await adPage.click('.adc-form-box button[type="submit"]');
+  await adPage.waitForFunction(() => document.querySelectorAll(".adc-item").length === 4);
+  check(/\/ ∞/.test(await adPage.textContent(".adc-list")),
+    "admin E2E: uncapped group code displays unlimited seat quota");
+
+  // Filter & Search
+  await adPage.fill('.adc-toolbar [data-adc-search="1"]', "Milano");
+  check((await adPage.$$(".adc-item")).length === 1 && /Ospedale Milano/.test(await adPage.textContent(".adc-list")),
+    "admin E2E: search filters code list by recipient note");
+  await adPage.fill('.adc-toolbar [data-adc-search="1"]', "");
+
+  // Inspect redemptions breakdown & execute 2-step revoke
+  const seedItem = '.adc-item[data-code-id="seed-1"]';
+  await adPage.click(seedItem + ' [data-adc="toggle-redemptions"]');
+  check(/patient1@example\.com/.test(await adPage.textContent(seedItem + " .adc-redemptions")),
+    "admin E2E: redemptions drawer renders redeemed user email and dates");
+  await adPage.click(seedItem + ' [data-adc="ask-revoke"]');
+  check(!!(await adPage.$(seedItem + ' [data-adc="revoke-soft"]')) && !!(await adPage.$(seedItem + ' [data-adc="revoke-hard"]')),
+    "admin E2E: revoke opens inline two-step confirmation with soft/hard grant options");
+  await adPage.click(seedItem + ' [data-adc="revoke-hard"]');
+  await adPage.waitForFunction(() => {
+    var el = document.querySelector('.adc-item[data-code-id="seed-1"] .adc-badge.bad');
+    return !!el;
+  });
+  check(/Disattivato/.test(await adPage.textContent(seedItem + " .adc-badge.bad")),
+    "admin E2E: hard revoke marks code Disattivato immediately");
+
+  // Switch language to English and press Escape to close
+  await adPage.evaluate(() => window.dispatchEvent(new CustomEvent("pog:languagechange", { detail: { lang: "en" } })));
+  check(/Access code manager/.test(await adPage.textContent(".adc-card")) && /Revoked/.test(await adPage.textContent(seedItem)),
+    "admin E2E: switching language updates modal to English immediately");
+  await adPage.keyboard.press("Escape");
+  check(!(await adPage.isVisible(".adc-panel")), "admin E2E: Escape closes admin access-codes dialog");
+
+  check(adPage.errors.length === 0, "no page errors (Phase 3 Admin Access-Code UI E2E): " + adPage.errors.join("; "));
+  await browser14.close();
+
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");
 })();

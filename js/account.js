@@ -22,7 +22,8 @@
       planFree: "Piano gratuito (3 sessioni complete + esercizi base)",
       planFull: "Accesso completo attivo",
       planFullUntil: "Accesso completo attivo · fino al {date}",
-      planRedeem: "Inserisci codice di accesso"
+      planRedeem: "Inserisci codice di accesso",
+      adminCodes: "Gestisci codici di accesso (Admin)"
     },
     en: {
       account: "Account", unavailable: "Online sign-in is not configured yet",
@@ -44,7 +45,8 @@
       planFree: "Free plan (3 daily sessions + core drills)",
       planFull: "Full access active",
       planFullUntil: "Full access active · until {date}",
-      planRedeem: "Enter access code"
+      planRedeem: "Enter access code",
+      adminCodes: "Manage access codes (Admin)"
     }
   };
   var lang = window.POG.getLang();
@@ -108,8 +110,11 @@
       if (!isNaN(ud.getTime())) until = ud.toLocaleDateString(lang === "it" ? "it-IT" : "en-GB", { day: "numeric", month: "short", year: "numeric" });
     }
     var planLabel = isFull ? (until ? T.planFullUntil.replace("{date}", until) : T.planFull) : T.planFree;
+    var showAdminCodes = !!(user && ent && ent.isAdmin && ent.isAdmin());
     html += '<div class="account-plan-box"><strong>' + escapeHtml(T.planTitle) + '</strong><span>' + escapeHtml(planLabel) + '</span>' +
-      '<button type="button" class="secondary account-action" data-action="redeem">' + escapeHtml(T.planRedeem) + '</button></div>';
+      '<button type="button" class="secondary account-action" data-action="redeem">' + escapeHtml(T.planRedeem) + '</button>' +
+      (showAdminCodes ? '<button type="button" class="primary account-action" data-action="admin-codes">' + escapeHtml(T.adminCodes) + '</button>' : '') +
+      '</div>';
     if (message) html += '<p class="account-message" role="status">' + escapeHtml(message) + '</p>';
     if (error) html += '<p class="account-error" role="alert">' + escapeHtml(error) + '</p>';
     html += '</div>';
@@ -182,6 +187,11 @@
       else if (a === "redeem") {
         hide();
         if (window.POG && window.POG.paywall) window.POG.paywall.openModal({ reason: "manage" });
+        return;
+      }
+      else if (a === "admin-codes") {
+        hide();
+        if (window.POG && window.POG.adminCodes) window.POG.adminCodes.openModal();
         return;
       }
       else if (a === "signout") {

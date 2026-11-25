@@ -6,6 +6,8 @@ const vm = require("vm");
 const root = path.resolve(__dirname, "..");
 const migrationSql = fs.readFileSync(path.join(root, "supabase/migrations/202611230001_stripe_billing.sql"), "utf8");
 const stripeFnTs = fs.readFileSync(path.join(root, "supabase/functions/stripe-billing/index.ts"), "utf8");
+const stripeDenoJson = JSON.parse(fs.readFileSync(path.join(root, "supabase/functions/stripe-billing/deno.json"), "utf8"));
+const accessDenoJson = JSON.parse(fs.readFileSync(path.join(root, "supabase/functions/access-codes/deno.json"), "utf8"));
 const accessCodesTs = fs.readFileSync(path.join(root, "supabase/functions/access-codes/index.ts"), "utf8");
 const configToml = fs.readFileSync(path.join(root, "supabase/config.toml"), "utf8");
 const entitlementsJs = fs.readFileSync(path.join(root, "js/entitlements.js"), "utf8");
@@ -27,6 +29,11 @@ function check(ok, label) {
 }
 
 /* 1. Static SQL, Edge Function & Secret Boundary Checks */
+check(
+  stripeDenoJson.imports && stripeDenoJson.imports["@supabase/supabase-js"] === "npm:@supabase/supabase-js@2.119.0" &&
+  accessDenoJson.imports && accessDenoJson.imports["@supabase/supabase-js"] === "npm:@supabase/supabase-js@2.119.0",
+  "access-codes and stripe-billing deno.json map @supabase/supabase-js to npm:@supabase/supabase-js@2.119.0"
+);
 check(
   migrationSql.includes("create table if not exists public.stripe_webhook_events") &&
   migrationSql.includes("enable row level security") &&

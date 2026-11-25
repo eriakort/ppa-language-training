@@ -64,7 +64,29 @@
       redeeming: "Verifica in corso…",
       redeemSuccess: "Accesso completo attivato fino al {date}.",
       patientNotice: "Chiedi a un familiare o a chi assiste di sbloccare l'accesso completo dalle impostazioni.",
-      stripeSoon: "Pagamento con carta in arrivo nella prossima fase — al momento è attivo lo sblocco tramite codice di accesso.",
+      subSectionTitle: "Abbonamento online con Stripe",
+      planMonthlyTitle: "Mensile",
+      planMonthlyDesc: "Accesso completo flessibile ogni mese",
+      planMonthlyBtn: "Abbonati · Mensile",
+      planYearlyTitle: "Annuale",
+      planYearlyDesc: "Un intero anno di accesso completo",
+      planYearlyBtn: "Abbonati · Annuale",
+      portalTitle: "Abbonamento e fatturazione",
+      portalDesc: "Gestisci rinnovo, metodo di pagamento o disdetta dal portale sicuro Stripe.",
+      portalBtn: "Gestisci abbonamento",
+      openingStripe: "Apertura pagamento sicuro Stripe…",
+      openingPortal: "Apertura portale abbonamento…",
+      refreshPlanBtn: "Aggiorna stato piano",
+      refreshDoneFull: "Accesso completo confermato e attivo.",
+      refreshDoneFree: "Stato aggiornato: piano gratuito attivo.",
+      checkoutSuccessFull: "Pagamento completato! L'accesso completo è ora attivo.",
+      checkoutSuccessWait: "Pagamento completato! Stiamo finalizzando l'attivazione sul tuo account; premi «Aggiorna stato piano» tra qualche secondo se non risulta ancora attivo.",
+      checkoutCanceled: "Pagamento annullato. Nessun addebito è stato effettuato.",
+      portalReturned: "Sei tornato dal portale di fatturazione Stripe.",
+      stripeNotReady: "Il pagamento online con carta non è ancora attivo su questo server. Puoi comunque sbloccare subito il piano completo con un codice di accesso.",
+      noCustomerPortal: "Nessun abbonamento Stripe collegato a questo account.",
+      stripeError: "Impossibile avviare la sessione Stripe. Riprova tra poco o usa un codice di accesso.",
+      orCodeTitle: "Hai ricevuto un codice di accesso?",
       close: "Chiudi",
       pendingDetected: "Codice rilevato dal link: {code}",
       err: {
@@ -88,9 +110,9 @@
       modalTitleManage: "Plan & access code",
       modalTitleLimit: "Free daily sessions used",
       modalTitleFeature: "Full access feature",
-      leadLimit: "You have completed your 3 free daily sessions. Activate full access with an access code to continue without limits.",
-      leadFeature: "“{name}” is part of Full Access. Enter an access code to unlock all exercises and tools.",
-      leadManage: "View your current plan or enter an access code shared with you.",
+      leadLimit: "You have completed your 3 free daily sessions. Subscribe or activate an access code to continue without limits.",
+      leadFeature: "“{name}” is part of Full Access. Subscribe or enter an access code to unlock all exercises and tools.",
+      leadManage: "Manage your subscription, subscribe online, or enter an access code shared with you.",
       leadFull: "Your account has active Full Access. Unlimited daily sessions, all targeted modules, and clinician reports are unlocked.",
       alwaysFree: "The Talk Board, Personal Album, and Communication Help Card always remain free.",
       benefitsTitle: "What Full Access includes",
@@ -99,7 +121,7 @@
         "All 20 targeted PPA exercise modules and guided mixed runs",
         "Clinical Visit Brief, progress trend charts, printable reports, and carer log"
       ],
-      signInHint: "Sign in to your account first so your access code stays linked to your account across devices.",
+      signInHint: "Sign in to your account first so your subscription or access code stays linked across devices.",
       signInBtn: "Sign in or create account",
       codeLabel: "Access code",
       codePlaceholder: "POG-XXXX-XXXX",
@@ -107,7 +129,29 @@
       redeeming: "Checking code…",
       redeemSuccess: "Full access activated until {date}.",
       patientNotice: "Ask a family member or carer to unlock Full Access from settings.",
-      stripeSoon: "Online card checkout is coming soon — for now you can unlock full access with an access code.",
+      subSectionTitle: "Subscribe online with Stripe",
+      planMonthlyTitle: "Monthly",
+      planMonthlyDesc: "Flexible monthly Full Access subscription",
+      planMonthlyBtn: "Subscribe Monthly",
+      planYearlyTitle: "Yearly",
+      planYearlyDesc: "One full year of unlimited practice",
+      planYearlyBtn: "Subscribe Yearly",
+      portalTitle: "Subscription & billing",
+      portalDesc: "Update your card, view invoices, or cancel anytime in the Stripe Customer Portal.",
+      portalBtn: "Manage subscription",
+      openingStripe: "Opening secure Stripe checkout…",
+      openingPortal: "Opening billing portal…",
+      refreshPlanBtn: "Refresh plan status",
+      refreshDoneFull: "Full access confirmed and active.",
+      refreshDoneFree: "Status refreshed: Free plan active.",
+      checkoutSuccessFull: "Payment completed! Full Access is now active on your account.",
+      checkoutSuccessWait: "Payment received! Confirming your Full Access activation now — press Refresh plan status in a moment if needed.",
+      checkoutCanceled: "Checkout canceled. No charge was made.",
+      portalReturned: "Returned from the Stripe billing portal.",
+      stripeNotReady: "Online card checkout is not enabled on this server yet. You can unlock Full Access right away with an access code.",
+      noCustomerPortal: "No Stripe subscription is linked to this account yet.",
+      stripeError: "Could not start Stripe billing. Please try again shortly or use an access code.",
+      orCodeTitle: "Have an access code?",
       close: "Close",
       pendingDetected: "Code ready from your link: {code}",
       err: {
@@ -239,7 +283,10 @@
 
   /* ---------- Paywall & Code Redemption Modal ---------- */
   var panel = null;
-  var modalState = { open: false, reason: "manage", featureLabel: "", msg: "", err: "", busy: false, codeDraft: "" };
+  var modalState = {
+    open: false, reason: "manage", featureLabel: "", msg: "", err: "",
+    busy: false, busyKind: "", busyPlan: "", codeDraft: "", billingInfo: null
+  };
 
   function isPatientLocked() {
     return !!(window.POG && window.POG.appApi && window.POG.appApi.isLocked && window.POG.appApi.isLocked());
@@ -262,6 +309,12 @@
       else if (act === "signin") {
         closeModal();
         window.dispatchEvent(new CustomEvent("pog:open-account"));
+      } else if (act === "checkout") {
+        startCheckout(btn.getAttribute("data-plan") || "monthly");
+      } else if (act === "portal") {
+        startPortal();
+      } else if (act === "refresh") {
+        refreshPlanFromModal();
       }
     });
     panel.addEventListener("submit", function (ev) {
@@ -296,10 +349,13 @@
     modalState.err = "";
     modalState.msg = "";
     modalState.busy = true;
+    modalState.busyKind = "redeem";
+    modalState.busyPlan = "";
     renderModal();
     try {
       var res = await e.redeemCode(raw);
       modalState.busy = false;
+      modalState.busyKind = "";
       modalState.codeDraft = "";
       var until = fmtDate((res && (res.active_until || res.expires_at)) || (e.status && e.status().activeUntil));
       modalState.msg = until ? fill(T().redeemSuccess, { date: until }) : T().leadFull;
@@ -309,7 +365,97 @@
       }
     } catch (err) {
       modalState.busy = false;
+      modalState.busyKind = "";
       modalState.err = mapError(err);
+      renderModal();
+    }
+  }
+
+  async function startCheckout(plan) {
+    var e = entApi();
+    if (!e || !e.createCheckoutSession || modalState.busy) return;
+    var p = plan === "yearly" ? "yearly" : "monthly";
+    modalState.err = "";
+    modalState.msg = "";
+    modalState.busy = true;
+    modalState.busyKind = "checkout";
+    modalState.busyPlan = p;
+    renderModal();
+    try {
+      var res = await e.createCheckoutSession(p);
+      if (!res || typeof res.url !== "string" || res.url.indexOf("https://checkout.stripe.com/") !== 0) {
+        var uErr = new Error("invalid_redirect_url");
+        uErr.code = "invalid_redirect_url";
+        throw uErr;
+      }
+      modalState.msg = T().openingStripe;
+      modalState.busy = false;
+      modalState.busyKind = "";
+      modalState.busyPlan = "";
+      renderModal();
+      if (window.location && typeof window.location.assign === "function") {
+        window.location.assign(res.url);
+      }
+    } catch (err) {
+      modalState.busy = false;
+      modalState.busyKind = "";
+      modalState.busyPlan = "";
+      var code = err && err.code ? String(err.code) : "";
+      modalState.err = code === "stripe_not_configured" ? T().stripeNotReady : T().stripeError;
+      renderModal();
+    }
+  }
+
+  async function startPortal() {
+    var e = entApi();
+    if (!e || !e.createPortalSession || modalState.busy) return;
+    modalState.err = "";
+    modalState.msg = "";
+    modalState.busy = true;
+    modalState.busyKind = "portal";
+    modalState.busyPlan = "";
+    renderModal();
+    try {
+      var res = await e.createPortalSession();
+      if (!res || typeof res.url !== "string" || res.url.indexOf("https://billing.stripe.com/") !== 0) {
+        var uErr = new Error("invalid_redirect_url");
+        uErr.code = "invalid_redirect_url";
+        throw uErr;
+      }
+      modalState.msg = T().openingPortal;
+      modalState.busy = false;
+      modalState.busyKind = "";
+      renderModal();
+      if (window.location && typeof window.location.assign === "function") {
+        window.location.assign(res.url);
+      }
+    } catch (err) {
+      modalState.busy = false;
+      modalState.busyKind = "";
+      var code = err && err.code ? String(err.code) : "";
+      modalState.err = code === "no_stripe_customer" ? T().noCustomerPortal
+        : code === "stripe_not_configured" ? T().stripeNotReady
+        : T().stripeError;
+      renderModal();
+    }
+  }
+
+  async function refreshPlanFromModal() {
+    var e = entApi();
+    if (!e || !e.refresh || modalState.busy) return;
+    modalState.busy = true;
+    modalState.busyKind = "refresh";
+    modalState.err = "";
+    renderModal();
+    try {
+      await e.refresh();
+      modalState.busy = false;
+      modalState.busyKind = "";
+      modalState.msg = hasFullAccess() ? T().refreshDoneFull : T().refreshDoneFree;
+      renderModal();
+    } catch (err) {
+      modalState.busy = false;
+      modalState.busyKind = "";
       renderModal();
     }
   }
@@ -318,10 +464,12 @@
     if (!panel) return;
     var t = T();
     var e = entApi();
-    var st = e && e.status ? e.status() : { uid: "", tier: "free", activeUntil: null };
+    var st = e && e.status ? e.status() : { uid: "", tier: "free", activeUntil: null, hasStripeCustomer: false };
     var full = hasFullAccess();
     var signedIn = !!st.uid;
     var pending = modalState.codeDraft || (e && e.pendingCode ? e.pendingCode() : "");
+    var bi = modalState.billingInfo;
+    var hasPortal = !!(st.hasStripeCustomer || (bi && bi.has_portal) || st.source === "stripe");
 
     var title = full ? t.modalTitleManage
       : modalState.reason === "limit" ? t.modalTitleLimit
@@ -345,12 +493,47 @@
         (pending ? '<p class="pw-pending-chip">' + esc(fill(t.pendingDetected, { code: pending })) + '</p>' : '') +
         '<button type="button" class="primary account-action" data-pw="signin">' + esc(t.signInBtn) + '</button>';
     } else {
-      bodyHtml = '<form data-pw-form="redeem">' +
-        '<label>' + esc(t.codeLabel) +
-        '<input name="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32" placeholder="' + esc(t.codePlaceholder) + '" value="' + esc(pending) + '" required>' +
-        '</label>' +
-        '<button type="submit" class="primary account-action"' + (modalState.busy ? ' disabled' : '') + '>' +
-        esc(modalState.busy ? t.redeeming : t.redeemBtn) + '</button></form>';
+      var dis = modalState.busy ? ' disabled' : '';
+      var stripeHtml = "";
+      if (hasPortal) {
+        stripeHtml += '<div class="pw-box pw-stripe-box">' +
+          '<h3>' + esc(t.portalTitle) + '</h3>' +
+          '<p class="account-note">' + esc(t.portalDesc) + '</p>' +
+          '<button type="button" class="primary account-action" data-pw="portal"' + dis + '>' +
+          esc(modalState.busy && modalState.busyKind === "portal" ? t.openingPortal : t.portalBtn) + '</button>' +
+          '</div>';
+      }
+      if (!full) {
+        var mBusy = modalState.busy && modalState.busyKind === "checkout" && modalState.busyPlan === "monthly";
+        var yBusy = modalState.busy && modalState.busyKind === "checkout" && modalState.busyPlan === "yearly";
+        stripeHtml += '<div class="pw-box pw-stripe-box">' +
+          '<h3>' + esc(t.subSectionTitle) + '</h3>' +
+          '<div class="pw-plans">' +
+            '<div class="pw-plan">' +
+              '<strong>' + esc(t.planMonthlyTitle) + '</strong>' +
+              '<span>' + esc(t.planMonthlyDesc) + '</span>' +
+              '<button type="button" class="primary pw-plan-btn" data-pw="checkout" data-plan="monthly"' + dis + '>' +
+              esc(mBusy ? t.openingStripe : t.planMonthlyBtn) + '</button>' +
+            '</div>' +
+            '<div class="pw-plan">' +
+              '<strong>' + esc(t.planYearlyTitle) + '</strong>' +
+              '<span>' + esc(t.planYearlyDesc) + '</span>' +
+              '<button type="button" class="primary pw-plan-btn" data-pw="checkout" data-plan="yearly"' + dis + '>' +
+              esc(yBusy ? t.openingStripe : t.planYearlyBtn) + '</button>' +
+            '</div>' +
+          '</div>' +
+          (bi && bi.ok && !bi.stripe_enabled ? '<p class="account-note">' + esc(t.stripeNotReady) + '</p>' : '') +
+          '</div>';
+      }
+      bodyHtml = stripeHtml +
+        '<form class="pw-code-form" data-pw-form="redeem">' +
+          '<label>' + esc(t.codeLabel) +
+          '<input name="code" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="32" placeholder="' + esc(t.codePlaceholder) + '" value="' + esc(pending) + '" required>' +
+          '</label>' +
+          '<button type="submit" class="secondary account-action"' + dis + '>' +
+          esc(modalState.busy && modalState.busyKind === "redeem" ? t.redeeming : t.redeemBtn) + '</button>' +
+        '</form>' +
+        '<button type="button" class="link pw-refresh-btn" data-pw="refresh"' + dis + '>' + esc(t.refreshPlanBtn) + '</button>';
     }
 
     var html = '<div class="pw-card">' +
@@ -364,10 +547,22 @@
       bodyHtml +
       (modalState.msg ? '<p class="account-message" role="status">' + esc(modalState.msg) + '</p>' : '') +
       (modalState.err ? '<p class="account-error" role="alert">' + esc(modalState.err) + '</p>' : '') +
-      '<p class="account-note">' + esc(t.stripeSoon) + '</p>' +
       '</div>';
 
     panel.innerHTML = html;
+  }
+
+  function applyPendingCheckoutNotice() {
+    var e = entApi();
+    if (!e || !e.checkoutStatus || isPatientLocked()) return "";
+    var ret = e.checkoutStatus();
+    if (!ret) return "";
+    e.clearCheckoutStatus();
+    var t = T();
+    if (ret === "success") return hasFullAccess() ? t.checkoutSuccessFull : t.checkoutSuccessWait;
+    if (ret === "cancel") return t.checkoutCanceled;
+    if (ret === "portal") return t.portalReturned;
+    return "";
   }
 
   function openModal(opts) {
@@ -376,13 +571,22 @@
     modalState.open = true;
     modalState.reason = opts.reason || "manage";
     modalState.featureLabel = opts.featureLabel || "";
-    modalState.msg = "";
+    modalState.msg = opts.msg || applyPendingCheckoutNotice() || "";
     modalState.err = "";
     modalState.busy = false;
+    modalState.busyKind = "";
+    modalState.busyPlan = "";
     renderModal();
     panel.hidden = false;
-    var focusEl = panel.querySelector("input,button[data-pw='signin'],button.account-close");
+    var focusEl = panel.querySelector("input,button[data-pw='checkout'],button[data-pw='portal'],button[data-pw='signin'],button.account-close");
     if (focusEl) focusEl.focus();
+    var e = entApi();
+    if (e && e.checkBillingAvailability && e.status && e.status().uid && !isPatientLocked()) {
+      e.checkBillingAvailability().then(function (info) {
+        modalState.billingInfo = info;
+        if (panel && !panel.hidden) renderModal();
+      }).catch(function () {});
+    }
   }
 
   function closeModal() {
@@ -394,7 +598,19 @@
     if (ev.key === "Escape" && panel && !panel.hidden) closeModal();
   });
 
+  function maybeShowCheckoutReturnModal() {
+    var e = entApi();
+    if (!e || !e.checkoutStatus || isPatientLocked()) return;
+    var ret = e.checkoutStatus();
+    if (!ret) return;
+    var st = e.status ? e.status() : {};
+    if (ret === "cancel" || st.uid) {
+      openModal({ reason: "manage" });
+    }
+  }
+
   function refreshAppUi() {
+    maybeShowCheckoutReturnModal();
     if (panel && !panel.hidden) renderModal();
     var appApi = window.POG && window.POG.appApi;
     if (!appApi) return;
@@ -408,6 +624,7 @@
 
   window.addEventListener("pog:entitlementchange", refreshAppUi);
   window.addEventListener("pog:authchange", function () {
+    maybeShowCheckoutReturnModal();
     if (panel && !panel.hidden) renderModal();
   });
   window.addEventListener("pog:languagechange", function () {

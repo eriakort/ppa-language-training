@@ -1,25 +1,27 @@
 /*
- * Phase 3 Admin Access-Code Generator & Usage Tracking UI.
+ * Phase 3 Admin Panel: Access-Code Generator, Usage Tracking & User/Admin Management.
  *
  * Lets designated admins (verified server-side by the `access-codes` Edge
  * Function via `access_admins` / `ACCESS_ADMIN_EMAILS`) create single-user or
- * group access codes, generate shareable `?code=` invite links, inspect per-code
- * redemption logs, and revoke codes with or without revoking active grants.
+ * group access codes, track redemptions, and manage normal users and admins
+ * (invite users, promote/demote DB admins, grant/revoke Full Access).
  *
  * Security notes:
  * - Client admin check only toggles UI affordances; server enforces admin auth.
  * - Zero hardcoded secrets or service-role keys.
- * - All dynamic values (codes, emails, notes, errors) are HTML-escaped.
+ * - All dynamic values (codes, emails, notes, names, errors) are HTML-escaped.
  * - Zero native browser dialogs (`alert`, `confirm`, `prompt`).
- * - Clears in-memory code/email list immediately when signed out.
+ * - Clears in-memory code/user lists immediately when signed out.
  */
 (function () {
   "use strict";
 
   var copy = {
     it: {
-      title: "Gestione codici di accesso",
-      subtitle: "Crea codici singoli o di gruppo e controlla utilizzi e scadenze.",
+      title: "Pannello Admin",
+      subtitle: "Gestisci codici di accesso, utilizzi, utenti normali e amministratori.",
+      tabCodes: "Codici di accesso",
+      tabUsers: "Utenti e Admin",
       close: "Chiudi",
       refresh: "Aggiorna elenco",
       refreshing: "Aggiornamento…",
@@ -81,21 +83,71 @@
       revokeSoft: "Blocca solo nuovi utilizzi",
       revokeHard: "Disattiva codice e revoca accessi attivi",
       cancel: "Annulla",
+      confirm: "Conferma",
+      saving: "Salvataggio…",
       revoking: "Disattivazione…",
       revokedOkSoft: "Codice disattivato: non accetterà nuovi utilizzi.",
       revokedOkHard: "Codice disattivato e accessi collegati revocati ({count}).",
+      uStatTotal: "Utenti totali",
+      uStatFull: "Accesso completo",
+      uStatAdmins: "Amministratori",
+      inviteTitle: "Invita un nuovo utente via email",
+      inviteEmailLabel: "Email utente",
+      inviteEmailPlaceholder: "persona@esempio.it",
+      inviteDaysLabel: "Accesso completo iniziale (giorni, 0 = gratuito)",
+      inviteBtn: "Invia invito",
+      inviting: "Invio invito…",
+      invitedOk: "Invito inviato a {email}.",
+      invitedFullOk: "Invito inviato a {email} con {days} giorni di accesso completo.",
+      usersListTitle: "Utenti registrati e ruoli",
+      userSearchPlaceholder: "Cerca per email, nome o nota…",
+      uFilterAll: "Tutti",
+      uFilterAdmins: "Admin",
+      uFilterFull: "Accesso completo",
+      uFilterFree: "Piano gratuito",
+      emptyUsers: "Nessun utente trovato con questi filtri.",
+      roleRootAdmin: "Admin principale (env)",
+      roleDbAdmin: "Admin",
+      roleUser: "Utente normale",
+      badgeYou: "Account attuale",
+      badgeUnconfirmed: "Email non confermata",
+      planFullUntil: "Completo fino al {date} ({source})",
+      planFreeLabel: "Piano gratuito",
+      grantFullBtn: "Attiva accesso completo",
+      setFreeBtn: "Passa a gratuito",
+      makeAdminBtn: "Promuovi ad Admin",
+      removeAdminBtn: "Rimuovi ruolo Admin",
+      grantTitle: "Durata accesso completo per {email} (giorni):",
+      setFreeTitle: "Riportare {email} al piano gratuito?",
+      promoteTitle: "Promuovere {email} ad amministratore?",
+      promoteNoteLabel: "Nota ruolo (opzionale)",
+      demoteTitle: "Rimuovere i privilegi Admin DB per {email}?",
+      demoteEnvHint: "Nota: questo account è anche nella variabile ACCESS_ADMIN_EMAILS di Supabase e manterrà l'accesso finché resta configurato lì.",
+      confirmRequiredHint: "L'account deve confermare l'email prima di diventare Admin.",
+      grantOk: "Accesso completo attivato per {email} ({days} giorni).",
+      setFreeOk: "{email} riportato al piano gratuito.",
+      promoteOk: "{email} è ora amministratore.",
+      demoteOk: "Ruolo Admin DB rimosso per {email}.",
+      demoteOkEnvWarn: "Ruolo DB rimosso per {email}, ma l'email è ancora in ACCESS_ADMIN_EMAILS su Supabase.",
       errInvalidDuration: "Inserisci una durata valida compresa tra 1 e 3650 giorni.",
       errInvalidMaxUses: "Per un codice di gruppo inserisci tra 2 e 10000 utilizzi (oppure scegli senza limite).",
       errInvalidCustom: "Il codice personalizzato deve avere 6–32 caratteri (solo A–Z, 0–9 e '-').",
       errInvalidCount: "Puoi generare da 1 a 50 codici per volta.",
       errInvalidDate: "Le date opzionali devono essere nel futuro.",
+      errInvalidEmail: "Inserisci un indirizzo email valido.",
+      errInvalidInviteDays: "Inserisci tra 0 e 3650 giorni iniziali.",
+      errSelfDemote: "Non puoi rimuovere il ruolo Admin dal tuo account attuale.",
+      errEmailUnconfirmed: "L'utente deve confermare la propria email prima di diventare Admin.",
+      errUserNotFound: "Utente non trovato su Supabase.",
       errForbidden: "Permessi amministratore non presenti su questo account.",
       errDuplicate: "Questo codice esiste già. Scegli un altro codice personalizzato.",
       errGeneric: "Operazione non riuscita. Riprova tra poco."
     },
     en: {
-      title: "Access code manager",
-      subtitle: "Create single-user or group access codes and track redemptions.",
+      title: "Admin panel",
+      subtitle: "Manage access codes, redemptions, normal users, and administrators.",
+      tabCodes: "Access codes",
+      tabUsers: "Users & Admins",
       close: "Close",
       refresh: "Refresh list",
       refreshing: "Refreshing…",
@@ -157,14 +209,62 @@
       revokeSoft: "Stop new redemptions only",
       revokeHard: "Revoke code & active grants",
       cancel: "Cancel",
+      confirm: "Confirm",
+      saving: "Saving…",
       revoking: "Revoking…",
       revokedOkSoft: "Code deactivated: new redemptions are blocked.",
       revokedOkHard: "Code deactivated and linked active grants revoked ({count}).",
+      uStatTotal: "Total users",
+      uStatFull: "Full access",
+      uStatAdmins: "Admins",
+      inviteTitle: "Invite a new user by email",
+      inviteEmailLabel: "User email",
+      inviteEmailPlaceholder: "person@example.com",
+      inviteDaysLabel: "Initial full access (days, 0 = free)",
+      inviteBtn: "Send invite",
+      inviting: "Sending invite…",
+      invitedOk: "Invitation sent to {email}.",
+      invitedFullOk: "Invitation sent to {email} with {days} days of Full Access.",
+      usersListTitle: "Registered users & roles",
+      userSearchPlaceholder: "Search by email, name, or note…",
+      uFilterAll: "All",
+      uFilterAdmins: "Admins",
+      uFilterFull: "Full Access",
+      uFilterFree: "Free plan",
+      emptyUsers: "No users match this filter.",
+      roleRootAdmin: "Root Admin (env)",
+      roleDbAdmin: "Admin",
+      roleUser: "Standard user",
+      badgeYou: "Current account",
+      badgeUnconfirmed: "Email unconfirmed",
+      planFullUntil: "Full until {date} ({source})",
+      planFreeLabel: "Free plan",
+      grantFullBtn: "Grant Full Access",
+      setFreeBtn: "Set to Free",
+      makeAdminBtn: "Make Admin",
+      removeAdminBtn: "Remove Admin",
+      grantTitle: "Full access duration for {email} (days):",
+      setFreeTitle: "Switch {email} back to the Free plan?",
+      promoteTitle: "Promote {email} to administrator?",
+      promoteNoteLabel: "Role note (optional)",
+      demoteTitle: "Remove DB admin privileges for {email}?",
+      demoteEnvHint: "Note: this email is also set in Supabase ACCESS_ADMIN_EMAILS and remains an admin until removed there.",
+      confirmRequiredHint: "User must confirm their email before being promoted to Admin.",
+      grantOk: "Full Access granted to {email} ({days} days).",
+      setFreeOk: "{email} moved back to the Free plan.",
+      promoteOk: "{email} is now an administrator.",
+      demoteOk: "DB admin role removed for {email}.",
+      demoteOkEnvWarn: "DB admin row removed for {email}, though they remain listed in Supabase ACCESS_ADMIN_EMAILS.",
       errInvalidDuration: "Enter a duration between 1 and 3650 days.",
       errInvalidMaxUses: "Group codes require 2 to 10000 seats (or choose Unlimited seats).",
       errInvalidCustom: "Custom code must be 6–32 characters using A–Z, 0–9 and '-'.",
       errInvalidCount: "Batch count must be between 1 and 50.",
       errInvalidDate: "Optional deadline/expiry dates must be in the future.",
+      errInvalidEmail: "Enter a valid email address.",
+      errInvalidInviteDays: "Initial days must be between 0 and 3650.",
+      errSelfDemote: "You cannot remove Admin privileges from your own current account.",
+      errEmailUnconfirmed: "The user must confirm their email address before becoming an Admin.",
+      errUserNotFound: "User account not found in Supabase.",
       errForbidden: "Admin permissions are not enabled on this account.",
       errDuplicate: "That access code already exists. Choose a different custom code.",
       errGeneric: "Could not complete request. Please try again."
@@ -174,6 +274,9 @@
   var lang = (window.POG && window.POG.getLang && window.POG.getLang() === "en") ? "en" : "it";
   var T = copy[lang];
   var panel = null;
+  var mainTab = "codes";
+
+  /* Codes state */
   var codes = [];
   var issued = [];
   var loadingList = false;
@@ -183,6 +286,16 @@
   var expandedIds = {};
   var filterMode = "all";
   var searchQuery = "";
+
+  /* Users & Admins state */
+  var users = [];
+  var loadingUsers = false;
+  var invitingUser = false;
+  var userFilterMode = "all";
+  var userSearchQuery = "";
+  var userAction = null; /* { kind: "grant"|"free"|"promote"|"demote", userId, email, days, note } */
+  var userActionBusy = false;
+
   var statusMsg = "";
   var errorMsg = "";
 
@@ -198,6 +311,11 @@
     recipient_note: ""
   };
 
+  var inviteState = {
+    email: "",
+    grant_days: "30"
+  };
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
@@ -211,6 +329,12 @@
   function isAdmin() {
     var e = ent();
     return !!(e && e.isAdmin && e.isAdmin());
+  }
+
+  function currentUid() {
+    var e = ent();
+    var st = e && e.status ? e.status() : null;
+    return (st && st.uid) ? String(st.uid) : "";
   }
 
   function formatDate(iso, withTime) {
@@ -252,6 +376,9 @@
 
   function localizeError(err) {
     var raw = String((err && (err.message || err.error || err.code)) || "").toLowerCase();
+    if (/cannot_demote_self/.test(raw)) return T.errSelfDemote;
+    if (/email_not_confirmed/.test(raw)) return T.errEmailUnconfirmed;
+    if (/user_not_found/.test(raw)) return T.errUserNotFound;
     if (/admin/.test(raw) || /403/.test(raw) || /forbidden/.test(raw)) return T.errForbidden;
     if (/already exists/.test(raw) || /duplicate/.test(raw) || /409/.test(raw)) return T.errDuplicate;
     if (/custom_code/.test(raw)) return T.errInvalidCustom;
@@ -310,6 +437,42 @@
     return { total: total, active: active, uses: uses };
   }
 
+  function userIsFull(u, nowMs) {
+    if (!u || u.tier !== "full") return false;
+    if (!u.active_until) return false;
+    var exp = Date.parse(u.active_until);
+    return isFinite(exp) && exp > (nowMs == null ? Date.now() : nowMs);
+  }
+
+  function filteredUsers() {
+    var q = userSearchQuery.trim().toLowerCase();
+    var now = Date.now();
+    return users.filter(function (u) {
+      var full = userIsFull(u, now);
+      var adm = !!(u.is_admin || u.is_db_admin || u.is_env_admin);
+      if (userFilterMode === "admins" && !adm) return false;
+      if (userFilterMode === "full" && !full) return false;
+      if (userFilterMode === "free" && full) return false;
+      if (q) {
+        var hay = (String(u.email || "") + " " + String(u.display_name || "") + " " + String(u.admin_note || "")).toLowerCase();
+        if (hay.indexOf(q) < 0) return false;
+      }
+      return true;
+    });
+  }
+
+  function computeUserStats() {
+    var now = Date.now();
+    var total = users.length;
+    var full = 0;
+    var admins = 0;
+    for (var i = 0; i < users.length; i++) {
+      if (userIsFull(users[i], now)) full++;
+      if (users[i].is_admin || users[i].is_db_admin || users[i].is_env_admin) admins++;
+    }
+    return { total: total, full: full, admins: admins };
+  }
+
   async function copyText(val, feedbackKind) {
     var ok = false;
     try {
@@ -358,6 +521,30 @@
       return codes;
     } catch (e) {
       loadingList = false;
+      var unwrapped = await extractError(e);
+      errorMsg = localizeError(unwrapped);
+      render();
+      return [];
+    }
+  }
+
+  async function refreshUsers() {
+    if (!isAdmin() || !ent() || !ent().adminListUsers) {
+      users = [];
+      render();
+      return [];
+    }
+    loadingUsers = true;
+    errorMsg = "";
+    render();
+    try {
+      var list = await ent().adminListUsers("");
+      users = Array.isArray(list) ? list : [];
+      loadingUsers = false;
+      render();
+      return users;
+    } catch (e) {
+      loadingUsers = false;
       var unwrapped = await extractError(e);
       errorMsg = localizeError(unwrapped);
       render();
@@ -463,6 +650,85 @@
     }
   }
 
+  async function handleInviteUser() {
+    if (!isAdmin() || !ent() || !ent().adminInviteUser || invitingUser) return;
+    errorMsg = "";
+    statusMsg = "";
+    var email = String(inviteState.email || "").trim().toLowerCase();
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errorMsg = T.errInvalidEmail;
+      render();
+      return;
+    }
+    var days = inviteState.grant_days === "" ? 0 : Number(inviteState.grant_days);
+    if (!Number.isInteger(days) || days < 0 || days > 3650) {
+      errorMsg = T.errInvalidInviteDays;
+      render();
+      return;
+    }
+    invitingUser = true;
+    render();
+    try {
+      await ent().adminInviteUser({ email: email, grant_days: days });
+      invitingUser = false;
+      inviteState.email = "";
+      statusMsg = days > 0
+        ? T.invitedFullOk.replace("{email}", email).replace("{days}", String(days))
+        : T.invitedOk.replace("{email}", email);
+      await refreshUsers();
+    } catch (e) {
+      invitingUser = false;
+      var unwrapped = await extractError(e);
+      errorMsg = localizeError(unwrapped);
+      render();
+    }
+  }
+
+  async function handleCommitUserAction() {
+    if (!isAdmin() || !userAction || userActionBusy) return;
+    var act = userAction;
+    errorMsg = "";
+    statusMsg = "";
+    if (act.kind === "grant") {
+      var dur = Number(act.days);
+      if (!Number.isInteger(dur) || dur < 1 || dur > 3650) {
+        errorMsg = T.errInvalidDuration;
+        render();
+        return;
+      }
+    }
+    userActionBusy = true;
+    render();
+    try {
+      if (act.kind === "grant" && ent().adminSetUserEntitlement) {
+        await ent().adminSetUserEntitlement(act.userId, "full", Number(act.days));
+        statusMsg = T.grantOk.replace("{email}", act.email).replace("{days}", String(act.days));
+      } else if (act.kind === "free" && ent().adminSetUserEntitlement) {
+        await ent().adminSetUserEntitlement(act.userId, "free");
+        statusMsg = T.setFreeOk.replace("{email}", act.email);
+      } else if (act.kind === "promote" && ent().adminSetUserRole) {
+        await ent().adminSetUserRole(act.userId, true, act.note || "");
+        statusMsg = T.promoteOk.replace("{email}", act.email);
+      } else if (act.kind === "demote" && ent().adminSetUserRole) {
+        var r = await ent().adminSetUserRole(act.userId, false);
+        statusMsg = (r && r.env_admin_protected)
+          ? T.demoteOkEnvWarn.replace("{email}", act.email)
+          : T.demoteOk.replace("{email}", act.email);
+      }
+      userActionBusy = false;
+      userAction = null;
+      await refreshUsers();
+      if (act.userId === currentUid() && ent() && ent().refresh) {
+        ent().refresh();
+      }
+    } catch (e) {
+      userActionBusy = false;
+      var unwrapped = await extractError(e);
+      errorMsg = localizeError(unwrapped);
+      render();
+    }
+  }
+
   function renderCodeItem(c, now) {
     var st = classifyCode(c, now);
     var statusBadgeClass = st === "active" ? "ok" : (st === "revoked" ? "bad" : "warn");
@@ -541,28 +807,75 @@
     return html;
   }
 
-  function render() {
-    if (!panel) return;
-    var adminOk = isAdmin();
-    var html = '<div class="adc-card">' +
-      '<div class="account-head">' +
-      '<div><h2 id="adc-title">' + esc(T.title) + '</h2><p class="account-note">' + esc(T.subtitle) + '</p></div>' +
-      '<div class="adc-head-btns">' +
-      (adminOk ? '<button type="button" class="secondary adc-btn" data-adc="refresh"' + (loadingList ? " disabled" : "") + '>' + esc(loadingList ? T.refreshing : T.refresh) + '</button>' : '') +
-      '<button type="button" class="account-close" data-adc="close" aria-label="' + esc(T.close) + '">×</button>' +
-      '</div></div>';
+  function renderUserItem(u, now) {
+    var uid = String(u.user_id || "");
+    var isSelf = uid !== "" && uid === currentUid();
+    var full = userIsFull(u, now);
+    var isDbAdm = !!u.is_db_admin;
+    var isEnvAdm = !!u.is_env_admin;
+    var roleText = isEnvAdm ? T.roleRootAdmin : (isDbAdm ? T.roleDbAdmin : T.roleUser);
+    var roleClass = (isEnvAdm || isDbAdm) ? "ok" : "";
+    var planText = full
+      ? T.planFullUntil.replace("{date}", formatDate(u.active_until, false)).replace("{source}", String(u.source || "code"))
+      : T.planFreeLabel;
+    var showAct = userAction && userAction.userId === uid;
 
-    if (!adminOk) {
-      html += '<p class="account-error" role="alert">' + esc(T.adminRequired) + '</p></div>';
-      panel.innerHTML = html;
-      return;
+    var html = '<article class="adc-item adc-user-item" data-user-id="' + esc(uid) + '">';
+    html += '<div class="adc-item-top">' +
+      '<div class="adc-code-wrap"><strong>' + esc(u.email || ("user:" + uid.slice(0, 8))) + '</strong>' +
+      (u.display_name ? '<span class="adc-hint">(' + esc(u.display_name) + ')</span>' : '') +
+      '<span class="adc-badge ' + roleClass + '">' + esc(roleText) + '</span>' +
+      (isSelf ? '<span class="adc-badge type">' + esc(T.badgeYou) + '</span>' : '') +
+      (!u.email_confirmed ? '<span class="adc-badge warn">' + esc(T.badgeUnconfirmed) + '</span>' : '') +
+      '</div>' +
+      '<span class="adc-badge ' + (full ? "ok" : "") + '">' + esc(planText) + '</span>' +
+      '</div>';
+
+    if (u.admin_note) {
+      html += '<p class="adc-note">' + esc(u.admin_note) + '</p>';
     }
 
-    if (statusMsg) html += '<p class="account-message" role="status">' + esc(statusMsg) + '</p>';
-    if (errorMsg) html += '<p class="account-error" role="alert">' + esc(errorMsg) + '</p>';
+    html += '<div class="adc-actions">' +
+      '<button type="button" class="secondary adc-btn" data-adc="u-ask-grant" data-id="' + esc(uid) + '" data-email="' + esc(u.email || "") + '">' + esc(T.grantFullBtn) + '</button>' +
+      (full ? '<button type="button" class="secondary adc-btn warn" data-adc="u-ask-free" data-id="' + esc(uid) + '" data-email="' + esc(u.email || "") + '">' + esc(T.setFreeBtn) + '</button>' : '') +
+      (!isDbAdm
+        ? '<button type="button" class="secondary adc-btn" data-adc="u-ask-promote" data-id="' + esc(uid) + '" data-email="' + esc(u.email || "") + '"' + (!u.email_confirmed ? " disabled" : "") + '>' + esc(T.makeAdminBtn) + '</button>'
+        : '<button type="button" class="secondary adc-btn warn" data-adc="u-ask-demote" data-id="' + esc(uid) + '" data-email="' + esc(u.email || "") + '"' + (isSelf ? " disabled" : "") + '>' + esc(T.removeAdminBtn) + '</button>') +
+      '</div>';
 
+    if (!u.email_confirmed && !isDbAdm) {
+      html += '<span class="adc-hint">' + esc(T.confirmRequiredHint) + '</span>';
+    }
+
+    if (showAct) {
+      var dangerBox = userAction.kind === "free" || userAction.kind === "demote";
+      html += '<div class="' + (dangerBox ? "adc-revoke-confirm" : "adc-inline-box") + '">';
+      if (userAction.kind === "grant") {
+        html += '<label>' + esc(T.grantTitle.replace("{email}", userAction.email)) +
+          '<input type="number" name="u_grant_days" min="1" max="3650" value="' + esc(userAction.days) + '"></label>';
+      } else if (userAction.kind === "free") {
+        html += '<p><strong>' + esc(T.setFreeTitle.replace("{email}", userAction.email)) + '</strong></p>';
+      } else if (userAction.kind === "promote") {
+        html += '<p><strong>' + esc(T.promoteTitle.replace("{email}", userAction.email)) + '</strong></p>' +
+          '<label>' + esc(T.promoteNoteLabel) +
+          '<input type="text" name="u_promote_note" maxlength="200" value="' + esc(userAction.note || "") + '"></label>';
+      } else if (userAction.kind === "demote") {
+        html += '<p><strong>' + esc(T.demoteTitle.replace("{email}", userAction.email)) + '</strong></p>';
+        if (isEnvAdm) html += '<span class="adc-hint">' + esc(T.demoteEnvHint) + '</span>';
+      }
+      html += '<div class="adc-actions">' +
+        '<button type="button" class="' + (dangerBox ? "account-danger-btn" : "primary") + ' adc-btn" data-adc="u-confirm"' + (userActionBusy ? " disabled" : "") + '>' + esc(userActionBusy ? T.saving : T.confirm) + '</button>' +
+        '<button type="button" class="secondary adc-btn" data-adc="u-cancel">' + esc(T.cancel) + '</button>' +
+        '</div></div>';
+    }
+
+    html += '</article>';
+    return html;
+  }
+
+  function renderCodesTab() {
     var stats = computeStats();
-    html += '<div class="adc-stats">' +
+    var html = '<div class="adc-stats">' +
       '<div class="adc-stat"><span>' + esc(T.statTotal) + '</span><strong>' + esc(String(stats.total)) + '</strong></div>' +
       '<div class="adc-stat"><span>' + esc(T.statActive) + '</span><strong>' + esc(String(stats.active)) + '</strong></div>' +
       '<div class="adc-stat"><span>' + esc(T.statUses) + '</span><strong>' + esc(String(stats.uses)) + '</strong></div>' +
@@ -658,7 +971,88 @@
       }
       html += '</div>';
     }
-    html += '</div></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function renderUsersTab() {
+    var stats = computeUserStats();
+    var html = '<div class="adc-stats">' +
+      '<div class="adc-stat"><span>' + esc(T.uStatTotal) + '</span><strong>' + esc(String(stats.total)) + '</strong></div>' +
+      '<div class="adc-stat"><span>' + esc(T.uStatFull) + '</span><strong>' + esc(String(stats.full)) + '</strong></div>' +
+      '<div class="adc-stat"><span>' + esc(T.uStatAdmins) + '</span><strong>' + esc(String(stats.admins)) + '</strong></div>' +
+      '</div>';
+
+    html += '<form class="adc-form-box" data-adc-form="invite">' +
+      '<h3>' + esc(T.inviteTitle) + '</h3>' +
+      '<div class="adc-grid">' +
+      '<label>' + esc(T.inviteEmailLabel) +
+      '<input type="email" name="invite_email" maxlength="254" value="' + esc(inviteState.email) + '" placeholder="' + esc(T.inviteEmailPlaceholder) + '" required></label>' +
+      '<label>' + esc(T.inviteDaysLabel) +
+      '<input type="number" name="invite_days" min="0" max="3650" value="' + esc(inviteState.grant_days) + '"></label>' +
+      '</div>' +
+      '<button type="submit" class="primary account-action"' + (invitingUser ? " disabled" : "") + '>' + esc(invitingUser ? T.inviting : T.inviteBtn) + '</button>' +
+      '</form>';
+
+    html += '<div class="adc-list-box"><h3>' + esc(T.usersListTitle) + '</h3>' +
+      '<div class="adc-toolbar">' +
+      '<div class="adc-tabs" role="tablist">' +
+      [
+        ["all", T.uFilterAll],
+        ["admins", T.uFilterAdmins],
+        ["full", T.uFilterFull],
+        ["free", T.uFilterFree]
+      ].map(function (tab) {
+        var on = userFilterMode === tab[0];
+        return '<button type="button" role="tab" aria-selected="' + (on ? "true" : "false") + '" class="secondary adc-tab' + (on ? " active" : "") + '" data-adc="u-filter" data-filter="' + tab[0] + '">' + esc(tab[1]) + '</button>';
+      }).join("") +
+      '</div>' +
+      '<input type="search" class="adc-search" data-adc-user-search="1" value="' + esc(userSearchQuery) + '" placeholder="' + esc(T.userSearchPlaceholder) + '">' +
+      '</div>';
+
+    var list = filteredUsers();
+    var now = Date.now();
+    if (!list.length) {
+      html += '<p class="account-note">' + esc(T.emptyUsers) + '</p>';
+    } else {
+      html += '<div class="adc-list">';
+      for (var i = 0; i < list.length; i++) {
+        html += renderUserItem(list[i], now);
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function render() {
+    if (!panel) return;
+    var adminOk = isAdmin();
+    var busyRefresh = mainTab === "users" ? loadingUsers : loadingList;
+    var html = '<div class="adc-card">' +
+      '<div class="account-head">' +
+      '<div><h2 id="adc-title">' + esc(T.title) + '</h2><p class="account-note">' + esc(T.subtitle) + '</p></div>' +
+      '<div class="adc-head-btns">' +
+      (adminOk ? '<button type="button" class="secondary adc-btn" data-adc="refresh"' + (busyRefresh ? " disabled" : "") + '>' + esc(busyRefresh ? T.refreshing : T.refresh) + '</button>' : '') +
+      '<button type="button" class="account-close" data-adc="close" aria-label="' + esc(T.close) + '">×</button>' +
+      '</div></div>';
+
+    if (!adminOk) {
+      html += '<p class="account-error" role="alert">' + esc(T.adminRequired) + '</p></div>';
+      panel.innerHTML = html;
+      return;
+    }
+
+    html += '<div class="adc-main-tabs" role="tablist">' +
+      '<button type="button" role="tab" aria-selected="' + (mainTab === "codes" ? "true" : "false") + '" class="secondary adc-tab' + (mainTab === "codes" ? " active" : "") + '" data-adc="main-tab" data-tab="codes">' + esc(T.tabCodes) + '</button>' +
+      '<button type="button" role="tab" aria-selected="' + (mainTab === "users" ? "true" : "false") + '" class="secondary adc-tab' + (mainTab === "users" ? " active" : "") + '" data-adc="main-tab" data-tab="users">' + esc(T.tabUsers) + '</button>' +
+      '</div>';
+
+    if (statusMsg) html += '<p class="account-message" role="status">' + esc(statusMsg) + '</p>';
+    if (errorMsg) html += '<p class="account-error" role="alert">' + esc(errorMsg) + '</p>';
+
+    html += mainTab === "users" ? renderUsersTab() : renderCodesTab();
+    html += '</div>';
     panel.innerHTML = html;
   }
 
@@ -683,6 +1077,10 @@
       }
       return;
     }
+    if (target.name === "invite_email") { inviteState.email = target.value; return; }
+    if (target.name === "invite_days") { inviteState.grant_days = target.value; return; }
+    if (target.name === "u_grant_days" && userAction) { userAction.days = target.value; return; }
+    if (target.name === "u_promote_note" && userAction) { userAction.note = target.value; return; }
     if (target.name in formState) {
       formState[target.name] = target.value;
     }
@@ -695,7 +1093,20 @@
       if (!btn) return;
       var act = btn.getAttribute("data-adc");
       if (act === "close") { closeModal(); return; }
-      if (act === "refresh") { refreshList(); return; }
+      if (act === "main-tab") {
+        mainTab = btn.getAttribute("data-tab") === "users" ? "users" : "codes";
+        errorMsg = "";
+        statusMsg = "";
+        render();
+        if (mainTab === "users") refreshUsers();
+        else refreshList();
+        return;
+      }
+      if (act === "refresh") {
+        if (mainTab === "users") refreshUsers();
+        else refreshList();
+        return;
+      }
       if (act === "set-type") {
         formState.code_type = btn.getAttribute("data-type") === "group" ? "group" : "single";
         errorMsg = "";
@@ -707,47 +1118,42 @@
         render();
         return;
       }
-      if (act === "copy-code") {
-        copyText(btn.getAttribute("data-code") || "", "code");
-        return;
-      }
-      if (act === "copy-link") {
-        copyText(inviteUrl(btn.getAttribute("data-code") || ""), "link");
-        return;
-      }
-      if (act === "filter") {
-        filterMode = btn.getAttribute("data-filter") || "all";
-        render();
-        return;
-      }
+      if (act === "copy-code") { copyText(btn.getAttribute("data-code") || "", "code"); return; }
+      if (act === "copy-link") { copyText(inviteUrl(btn.getAttribute("data-code") || ""), "link"); return; }
+      if (act === "filter") { filterMode = btn.getAttribute("data-filter") || "all"; render(); return; }
       if (act === "toggle-redemptions") {
         var cid = btn.getAttribute("data-id");
-        if (cid) {
-          expandedIds[cid] = !expandedIds[cid];
-          render();
-        }
+        if (cid) { expandedIds[cid] = !expandedIds[cid]; render(); }
         return;
       }
       if (act === "ask-revoke") {
         confirmRevokeId = btn.getAttribute("data-id") || "";
-        errorMsg = "";
-        statusMsg = "";
-        render();
-        return;
+        errorMsg = ""; statusMsg = ""; render(); return;
       }
-      if (act === "revoke-cancel") {
-        confirmRevokeId = "";
-        render();
-        return;
+      if (act === "revoke-cancel") { confirmRevokeId = ""; render(); return; }
+      if (act === "revoke-soft") { handleRevoke(btn.getAttribute("data-id") || "", false); return; }
+      if (act === "revoke-hard") { handleRevoke(btn.getAttribute("data-id") || "", true); return; }
+
+      /* User & Admin tab actions */
+      if (act === "u-filter") { userFilterMode = btn.getAttribute("data-filter") || "all"; render(); return; }
+      if (act === "u-ask-grant") {
+        userAction = { kind: "grant", userId: btn.getAttribute("data-id") || "", email: btn.getAttribute("data-email") || "", days: "30" };
+        errorMsg = ""; statusMsg = ""; render(); return;
       }
-      if (act === "revoke-soft") {
-        handleRevoke(btn.getAttribute("data-id") || "", false);
-        return;
+      if (act === "u-ask-free") {
+        userAction = { kind: "free", userId: btn.getAttribute("data-id") || "", email: btn.getAttribute("data-email") || "" };
+        errorMsg = ""; statusMsg = ""; render(); return;
       }
-      if (act === "revoke-hard") {
-        handleRevoke(btn.getAttribute("data-id") || "", true);
-        return;
+      if (act === "u-ask-promote") {
+        userAction = { kind: "promote", userId: btn.getAttribute("data-id") || "", email: btn.getAttribute("data-email") || "", note: "" };
+        errorMsg = ""; statusMsg = ""; render(); return;
       }
+      if (act === "u-ask-demote") {
+        userAction = { kind: "demote", userId: btn.getAttribute("data-id") || "", email: btn.getAttribute("data-email") || "" };
+        errorMsg = ""; statusMsg = ""; render(); return;
+      }
+      if (act === "u-cancel") { userAction = null; render(); return; }
+      if (act === "u-confirm") { handleCommitUserAction(); return; }
     });
 
     panel.addEventListener("input", function (ev) {
@@ -756,24 +1162,26 @@
         searchQuery = target.value || "";
         render();
         var sRef = panel && panel.querySelector('[data-adc-search="1"]');
-        if (sRef) {
-          sRef.focus();
-          try { sRef.setSelectionRange(sRef.value.length, sRef.value.length); } catch (e) {}
-        }
+        if (sRef) { sRef.focus(); try { sRef.setSelectionRange(sRef.value.length, sRef.value.length); } catch (e) {} }
+        return;
+      }
+      if (target && target.getAttribute("data-adc-user-search") === "1") {
+        userSearchQuery = target.value || "";
+        render();
+        var uRef = panel && panel.querySelector('[data-adc-user-search="1"]');
+        if (uRef) { uRef.focus(); try { uRef.setSelectionRange(uRef.value.length, uRef.value.length); } catch (e) {} }
         return;
       }
       syncInput(target);
     });
 
-    panel.addEventListener("change", function (ev) {
-      syncInput(ev.target);
-    });
+    panel.addEventListener("change", function (ev) { syncInput(ev.target); });
 
     panel.addEventListener("submit", function (ev) {
-      var form = ev.target.closest('form[data-adc-form="create"]');
-      if (!form) return;
-      ev.preventDefault();
-      handleCreate();
+      var cForm = ev.target.closest('form[data-adc-form="create"]');
+      if (cForm) { ev.preventDefault(); handleCreate(); return; }
+      var iForm = ev.target.closest('form[data-adc-form="invite"]');
+      if (iForm) { ev.preventDefault(); handleInviteUser(); return; }
     });
   }
 
@@ -795,11 +1203,15 @@
     statusMsg = "";
     errorMsg = "";
     confirmRevokeId = "";
+    userAction = null;
     panel.hidden = false;
     render();
     var first = panel.querySelector("button,input");
     if (first) first.focus();
-    if (isAdmin()) refreshList();
+    if (isAdmin()) {
+      if (mainTab === "users") refreshUsers();
+      else refreshList();
+    }
   }
 
   function closeModal() {
@@ -821,8 +1233,10 @@
     if (d && d.signedOut) {
       codes = [];
       issued = [];
+      users = [];
       expandedIds = {};
       confirmRevokeId = "";
+      userAction = null;
       statusMsg = "";
       errorMsg = "";
       closeModal();
@@ -834,7 +1248,9 @@
     if (!isAdmin()) {
       codes = [];
       issued = [];
+      users = [];
       confirmRevokeId = "";
+      userAction = null;
       if (panel && panel.hidden) panel.innerHTML = "";
     }
     if (panel && !panel.hidden) render();
@@ -849,6 +1265,7 @@
     isOpen: function () { return !!(panel && !panel.hidden); },
     inviteUrl: inviteUrl,
     refreshList: refreshList,
+    refreshUsers: refreshUsers,
     classifyCode: classifyCode
   };
 })();

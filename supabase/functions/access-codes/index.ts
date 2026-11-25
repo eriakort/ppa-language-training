@@ -61,6 +61,13 @@ function parseOptionalFutureIso(raw: unknown): { ok: true; value: string | null 
   return { ok: true, value: new Date(ms).toISOString() };
 }
 
+function getEnvAdmins(): string[] {
+  return (Deno.env.get("ACCESS_ADMIN_EMAILS") ?? "")
+    .split(",")
+    .map((x) => x.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 async function isAdminUser(admin: ReturnType<typeof createClient>, user: { id: string; email?: string; email_confirmed_at?: string }): Promise<boolean> {
   const { data: row } = await admin
     .from("access_admins")
@@ -69,10 +76,7 @@ async function isAdminUser(admin: ReturnType<typeof createClient>, user: { id: s
     .maybeSingle();
   if (row) return true;
 
-  const envList = (Deno.env.get("ACCESS_ADMIN_EMAILS") ?? "")
-    .split(",")
-    .map((x) => x.trim().toLowerCase())
-    .filter(Boolean);
+  const envList = getEnvAdmins();
   if (envList.length && user.email && user.email_confirmed_at) {
     return envList.includes(user.email.trim().toLowerCase());
   }
@@ -117,7 +121,7 @@ Deno.serve(async (req) => {
   if (body.action === "status") {
     const [{ data: ent }, { data: redemptions }, adminFlag] = await Promise.all([
       admin.from("user_entitlements")
-        .select("tier,source,active_until,updated_at")
+        .select("tier,source,active_until,stripe_customer_id,stripe_subscription_status,updated_at")
         .eq("user_id", user.id)
         .maybeSingle(),
       admin.from("code_redemptions")
@@ -150,6 +154,8 @@ Deno.serve(async (req) => {
       active_until: activeUntil,
       server_now: new Date(nowMs).toISOString(),
       is_admin: adminFlag,
+      has_stripe_customer: Boolean(ent?.stripe_customer_id),
+      stripe_subscription_status: ent?.stripe_subscription_status ?? null,
       redemptions: redemptions ?? [],
       offline_lease: offlineLease,
     });
@@ -289,6 +295,146 @@ Deno.serve(async (req) => {
       return json({ error: error.message?.includes("code_not_found") ? "Code not found" : "Could not revoke code" }, 404);
     }
     return json(data);
+  }
+
+  /* ---------- Admin-only normal user & admin role management ---------- */
+  if (body.action === "admin_users_list") {
+    const search = typeof body.search === "string" ? body.search.trim().slice(0, 120) : "";
+    const { data: rows, error: listErr } = await admin.rpc("admin_list_users", {
+      p_search: search || null,
+      p_limit: 200,
+    });
+    if (listErr) return json({ error: "Could not load users" }, 500);
+
+    const envList = getEnvAdmins();
+    const nowMs = Date.now();
+    const users = (Array.isArray(rows) ? rows : []).map((r: Record<string, unknown>) => {
+      const email = String(r.email ?? "").trim();
+      const confirmed = Boolean(r.email_confirmed);
+      const isEnvAdmin = Boolean(confirmed && email && envList.includes(email.toLowerCase()));
+      const isDbAdmin = Boolean(r.is_db_admin);
+      const activeMs = r.active_until ? Date.parse(String(r.active_until)) : 0;
+      const isFull = Boolean(r.tier === "full" && Number.isFinite(activeMs) && activeMs > nowMs);
+      return {
+        user_id: r.user_id,
+        email,
+        display_name: String(r.display_name ?? ""),
+        email_confirmed: confirmed,
+        created_at: r.created_at ?? null,
+        last_sign_in_at: r.last_sign_in_at ?? null,
+        tier: isFull ? "full" : "free",
+        source: isFull ? String(r.source ?? "free") : "free",
+        active_until: r.active_until ?? null,
+        is_db_admin: isDbAdmin,
+        is_env_admin: isEnvAdmin,
+        is_admin: isDbAdmin || isEnvAdmin,
+        admin_note: String(r.admin_note ?? ""),
+        admin_since: r.admin_since ?? null,
+      };
+    });
+    return json({ ok: true, users, server_now: new Date(nowMs).toISOString() });
+  }
+
+  if (body.action === "admin_set_role") {
+    const targetId = typeof body.user_id === "string" ? body.user_id.trim() : "";
+    const targetEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (targetId && !/^[0-9a-f-]{36}$/i.test(targetId)) {
+      return json({ error: "Invalid user_id" }, 400);
+    }
+    if (!targetId && (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail))) {
+      return json({ error: "Valid user_id or email is required" }, 400);
+    }
+    if (typeof body.is_admin !== "boolean") {
+      return json({ error: "is_admin boolean is required" }, 400);
+    }
+    if (!body.is_admin && targetId === user.id) {
+      return json({ error: "cannot_demote_self" }, 400);
+    }
+    const note = typeof body.note === "string" ? body.note.trim().slice(0, 200) : "";
+
+    const { data, error: roleErr } = await admin.rpc("admin_set_user_role", {
+      p_target_user_id: targetId || null,
+      p_email: targetId ? null : targetEmail,
+      p_is_admin: body.is_admin,
+      p_note: note,
+      p_actor_id: user.id,
+    });
+    if (roleErr) {
+      const m = roleErr.message || "";
+      if (m.includes("user_not_found")) return json({ error: "user_not_found" }, 404);
+      if (m.includes("cannot_demote_self")) return json({ error: "cannot_demote_self" }, 400);
+      if (m.includes("email_not_confirmed")) return json({ error: "email_not_confirmed" }, 400);
+      return json({ error: "Could not update admin role" }, 400);
+    }
+
+    const updatedEmail = String((data && data.email) || targetEmail || "").toLowerCase();
+    const envProtected = !body.is_admin && updatedEmail !== "" && getEnvAdmins().includes(updatedEmail);
+    return json({ ...(data || {}), env_admin_protected: envProtected });
+  }
+
+  if (body.action === "admin_set_entitlement") {
+    const targetId = typeof body.user_id === "string" ? body.user_id.trim() : "";
+    const targetEmail = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (targetId && !/^[0-9a-f-]{36}$/i.test(targetId)) {
+      return json({ error: "Invalid user_id" }, 400);
+    }
+    if (!targetId && (!targetEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail))) {
+      return json({ error: "Valid user_id or email is required" }, 400);
+    }
+    const tier = body.tier === "full" ? "full" : (body.tier === "free" ? "free" : "");
+    if (!tier) return json({ error: "tier must be 'free' or 'full'" }, 400);
+
+    const days = body.duration_days == null ? 30 : Number(body.duration_days);
+    if (tier === "full" && (!Number.isInteger(days) || days < 1 || days > 3650)) {
+      return json({ error: "duration_days must be an integer between 1 and 3650" }, 400);
+    }
+
+    const { data, error: entErr } = await admin.rpc("admin_set_user_entitlement", {
+      p_target_user_id: targetId || null,
+      p_email: targetId ? null : targetEmail,
+      p_tier: tier,
+      p_duration_days: days,
+    });
+    if (entErr) {
+      const m = entErr.message || "";
+      if (m.includes("user_not_found")) return json({ error: "user_not_found" }, 404);
+      return json({ error: "Could not update user plan" }, 400);
+    }
+    return json(data);
+  }
+
+  if (body.action === "admin_invite_user") {
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return json({ error: "Valid email address is required" }, 400);
+    }
+    const grantDays = body.grant_days == null || body.grant_days === "" ? 0 : Number(body.grant_days);
+    if (!Number.isInteger(grantDays) || grantDays < 0 || grantDays > 3650) {
+      return json({ error: "grant_days must be 0..3650" }, 400);
+    }
+
+    const { data: inv, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: allowedOrigin,
+    });
+    if (invErr || !inv?.user?.id) {
+      return json({ error: invErr?.message || "Could not send invitation" }, 400);
+    }
+
+    if (grantDays > 0) {
+      await admin.rpc("admin_set_user_entitlement", {
+        p_target_user_id: inv.user.id,
+        p_email: null,
+        p_tier: "full",
+        p_duration_days: grantDays,
+      });
+    }
+
+    return json({
+      ok: true,
+      user_id: inv.user.id,
+      email,
+      grant_days: grantDays,
+    }, 201);
   }
 
   return json({ error: "Unknown action" }, 400);

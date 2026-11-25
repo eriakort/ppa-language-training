@@ -22,8 +22,11 @@
       planFree: "Piano gratuito (3 sessioni complete + esercizi base)",
       planFull: "Accesso completo attivo",
       planFullUntil: "Accesso completo attivo · fino al {date}",
-      planRedeem: "Inserisci codice di accesso",
-      adminCodes: "Gestisci codici di accesso (Admin)"
+      planRedeem: "Abbonati o inserisci codice",
+      planManagePortal: "Gestisci abbonamento Stripe",
+      portalOpening: "Apertura portale Stripe…",
+      portalUnavailable: "Il portale Stripe non è ancora disponibile su questo account.",
+      adminCodes: "Pannello Admin (Codici e Utenti)"
     },
     en: {
       account: "Account", unavailable: "Online sign-in is not configured yet",
@@ -45,8 +48,11 @@
       planFree: "Free plan (3 daily sessions + core drills)",
       planFull: "Full access active",
       planFullUntil: "Full access active · until {date}",
-      planRedeem: "Enter access code",
-      adminCodes: "Manage access codes (Admin)"
+      planRedeem: "Subscribe or enter access code",
+      planManagePortal: "Manage Stripe subscription",
+      portalOpening: "Opening Stripe billing portal…",
+      portalUnavailable: "Stripe billing portal is not available for this account yet.",
+      adminCodes: "Admin panel (Codes & Users)"
     }
   };
   var lang = window.POG.getLang();
@@ -111,8 +117,10 @@
     }
     var planLabel = isFull ? (until ? T.planFullUntil.replace("{date}", until) : T.planFull) : T.planFree;
     var showAdminCodes = !!(user && ent && ent.isAdmin && ent.isAdmin());
+    var showStripePortal = !!(user && ent && est.hasStripeCustomer && ent.createPortalSession);
     html += '<div class="account-plan-box"><strong>' + escapeHtml(T.planTitle) + '</strong><span>' + escapeHtml(planLabel) + '</span>' +
       '<button type="button" class="secondary account-action" data-action="redeem">' + escapeHtml(T.planRedeem) + '</button>' +
+      (showStripePortal ? '<button type="button" class="secondary account-action" data-action="stripe-portal">' + escapeHtml(T.planManagePortal) + '</button>' : '') +
       (showAdminCodes ? '<button type="button" class="primary account-action" data-action="admin-codes">' + escapeHtml(T.adminCodes) + '</button>' : '') +
       '</div>';
     if (message) html += '<p class="account-message" role="status">' + escapeHtml(message) + '</p>';
@@ -187,6 +195,31 @@
       else if (a === "redeem") {
         hide();
         if (window.POG && window.POG.paywall) window.POG.paywall.openModal({ reason: "manage" });
+        return;
+      }
+      else if (a === "stripe-portal") {
+        var entApi = window.POG && window.POG.entitlements ? window.POG.entitlements : null;
+        if (!entApi || !entApi.createPortalSession) {
+          error = T.portalUnavailable;
+          render();
+          return;
+        }
+        message = T.portalOpening;
+        render();
+        entApi.createPortalSession().then(function (res) {
+          if (res && typeof res.url === "string" && res.url.indexOf("https://billing.stripe.com/") === 0) {
+            if (window.location && typeof window.location.assign === "function") {
+              window.location.assign(res.url);
+            }
+          } else {
+            throw new Error(T.portalUnavailable);
+          }
+        }).catch(function (err) {
+          message = "";
+          var code = err && err.code ? String(err.code) : "";
+          error = (code === "no_stripe_customer" || code === "stripe_not_configured") ? T.portalUnavailable : T.error;
+          render();
+        });
         return;
       }
       else if (a === "admin-codes") {

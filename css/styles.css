@@ -1017,8 +1017,20 @@ button.primary.pw-locked .pw-lock { margin-left: 8px; vertical-align: middle; }
 }
 .account-plan-box strong { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .account-plan-box span { font-size: 17px; font-weight: 700; color: var(--ink); }
+.pw-plans {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+}
+.pw-plan {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px;
+  border-radius: 14px; background: var(--surface); border: 1px solid var(--line);
+}
+.pw-plan strong { font-size: 18px; color: var(--ink); }
+.pw-plan span { font-size: 15px; color: var(--muted); flex: 1; }
+.pw-plan-btn { min-height: 48px; width: 100%; font-size: 16px; }
+.pw-refresh-btn { align-self: flex-start; min-height: 40px; padding: 4px 0; font-size: 15px; }
 @media (max-width: 520px) {
   .pw-banner { flex-direction: column; align-items: stretch; text-align: center; }
+  .pw-plans { grid-template-columns: 1fr; }
   .pw-card { border-radius: 18px; }
 }
 
@@ -1066,12 +1078,21 @@ button.primary.pw-locked .pw-lock { margin-left: 8px; vertical-align: middle; }
   flex-direction: row; align-items: center; gap: 10px; min-height: 48px; padding-top: 22px;
 }
 .adc-form-box input[type="text"],
+.adc-form-box input[type="email"],
 .adc-form-box input[type="number"],
 .adc-form-box input[type="date"],
+.adc-inline-box input[type="text"],
+.adc-inline-box input[type="number"],
 .adc-search {
   width: 100%; min-height: 48px; padding: 8px 12px; border: 2px solid var(--line);
   border-radius: 10px; background: var(--bg); color: var(--ink); font: inherit; font-size: 17px; box-sizing: border-box;
 }
+.adc-main-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.adc-inline-box {
+  display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  border-radius: 12px; background: var(--soft); border: 1px solid var(--accent);
+}
+.adc-inline-box label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: 15px; }
 .adc-form-box input[name="custom_code"] { text-transform: uppercase; letter-spacing: .05em; }
 .adc-form-box input:disabled { opacity: .55; }
 .adc-hint { font-size: 13px; font-weight: 400; color: var(--muted); }

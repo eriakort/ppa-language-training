@@ -290,3 +290,53 @@ provide server-authoritative entitlement status and trackable access codes:
   7-day offline grace window. When `ENTITLEMENT_SIGNING_SECRET` is configured in
   Supabase Edge Function secrets, the backend signs the `offline_lease` HMAC-SHA256
   token with that secret instead of a per-instance runtime key.
+
+## User & Admin Management (App GUI + Supabase SQL)
+
+Migration `supabase/migrations/202611220001_admin_user_management.sql` and
+Edge Function actions `admin_users_list`, `admin_set_role`,
+`admin_set_entitlement`, and `admin_invite_user` allow managing both normal users
+and admin users either from the in-app **Admin panel -> Users & Admins** tab or
+directly from the Supabase SQL Editor:
+
+- **List all users, roles, and plans in SQL**:
+  `select * from public.admin_list_users(null, 200);`
+- **Promote or demote an admin by email in SQL** (user must have a confirmed email):
+  `select public.admin_set_user_role(null, 'colleague@example.com', true, 'Clinic lead', null);`
+  `select public.admin_set_user_role(null, 'colleague@example.com', false, '', null);`
+- **Grant or revoke Full Access directly in SQL** (`source = 'admin'` vs `'free'`):
+  `select public.admin_set_user_entitlement(null, 'patient@example.com', 'full', 90);`
+  `select public.admin_set_user_entitlement(null, 'patient@example.com', 'free', 0);`
+- Self-demotion in the GUI is blocked server-side (`cannot_demote_self`), and
+  root admin emails listed in `ACCESS_ADMIN_EMAILS` remain protected until
+  updated in Supabase Edge Function secrets.
+
+## Stripe checkout, Customer Portal & verified webhooks (Phase 4)
+
+Migration `supabase/migrations/202611230001_stripe_billing.sql` and the
+`stripe-billing` Edge Function (`supabase/functions/stripe-billing/index.ts`)
+connect online Stripe subscriptions without altering access-code or admin grants:
+
+- **Authenticated Checkout & Portal (`stripe-billing`)**:
+  - `billing_config`: reports whether Stripe keys and monthly/yearly price IDs
+    are configured and whether the signed-in user has a linked Stripe customer.
+  - `create_checkout`: accepts `'monthly' | 'yearly'`, resolves the price ID
+    server-side from `STRIPE_PRICE_MONTHLY` / `STRIPE_PRICE_YEARLY`, binds
+    `client_reference_id` and subscription metadata to the authenticated `user.id`,
+    and returns a validated `https://checkout.stripe.com/` session URL.
+  - `create_portal`: opens a Stripe Customer Portal session only for the
+    signed-in user's stored `stripe_customer_id`, returning a validated
+    `https://billing.stripe.com/` URL.
+- **Verified Idempotent Webhooks (`POST /webhook` or `stripe-signature`)**:
+  - Verifies the Stripe webhook `stripe-signature` header using HMAC-SHA256
+    constant-time comparison and a 300-second replay tolerance against
+    `STRIPE_WEBHOOK_SECRET`.
+  - Records processed event IDs in `public.stripe_webhook_events` (RLS enabled,
+    revoked from browser roles) and applies atomic entitlement transitions via
+    `public.sync_stripe_entitlement(...)` (`service_role` only, `SECURITY DEFINER`,
+    `set search_path = pg_catalog, public`), preserving existing non-Stripe grants
+    if a webhook reports cancellation or expiry.
+- **Required Stripe Edge Function secrets**: `STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY` (plus
+  `APP_SITE_URL`). Until configured, Checkout reports `stripe_not_configured`
+  gracefully while access codes continue working immediately.

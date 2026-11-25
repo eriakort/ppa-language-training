@@ -10,3 +10,7 @@ verify_jwt = false
 
 [functions.access-codes]
 verify_jwt = false
+
+# User routes verify Bearer JWT explicitly; webhook route verifies Stripe-Signature HMAC.
+[functions.stripe-billing]
+verify_jwt = false

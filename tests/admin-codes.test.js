@@ -39,7 +39,32 @@ check(
     !adminJs.includes("window.prompt"),
   "admin-codes.js has zero secrets, eval, or native browser dialogs"
 );
-check(adminJs.includes("esc(") && stylesCss.includes(".adc-panel") && stylesCss.includes(".adc-item"), "admin-codes.js HTML-escapes dynamic fields and styles.css defines .adc-* classes");
+const migration2 = fs.readFileSync(path.join(root, "supabase/migrations/202611220001_admin_user_management.sql"), "utf8");
+const edgeFn = fs.readFileSync(path.join(root, "supabase/functions/access-codes/index.ts"), "utf8");
+
+check(
+  adminJs.includes("esc(") && stylesCss.includes(".adc-panel") && stylesCss.includes(".adc-item"),
+  "admin-codes.js HTML-escapes dynamic fields and styles.css defines .adc-* classes"
+);
+check(
+  migration2.includes("admin_list_users") &&
+    migration2.includes("admin_set_user_role") &&
+    migration2.includes("admin_set_user_entitlement") &&
+    migration2.includes("cannot_demote_self") &&
+    migration2.includes("email_not_confirmed") &&
+    migration2.includes("grant execute on function public.admin_list_users(text, integer) to service_role") &&
+    migration2.includes("grant execute on function public.admin_set_user_role(uuid, text, boolean, text, uuid) to service_role") &&
+    migration2.includes("grant execute on function public.admin_set_user_entitlement(uuid, text, text, integer) to service_role"),
+  "user & admin SQL RPCs harden search_path, block self-demotion/unconfirmed admins, and restrict execution to service_role"
+);
+check(
+  edgeFn.includes("admin_users_list") &&
+    edgeFn.includes("admin_set_role") &&
+    edgeFn.includes("admin_set_entitlement") &&
+    edgeFn.includes("admin_invite_user") &&
+    edgeFn.includes("inviteUserByEmail"),
+  "access-codes Edge Function exposes server-verified user & admin management actions"
+);
 
 /* 2. Dynamic behavioral VM tests for window.POG.adminCodes */
 function makeElement(tag) {
@@ -70,6 +95,37 @@ async function runBehavioralTests() {
   let revokeCalls = [];
   let refreshEntitlementCalls = 0;
   let copyValue = "";
+  let userRoleCalls = [];
+  let userEntCalls = [];
+  let inviteUserCalls = [];
+  let mockUsers = [
+    {
+      user_id: "adm-self",
+      email: "admin@example.com",
+      display_name: "Admin Self",
+      email_confirmed: true,
+      tier: "full",
+      source: "admin",
+      active_until: new Date(Date.now() + 60 * 86400000).toISOString(),
+      is_db_admin: true,
+      is_env_admin: true,
+      is_admin: true,
+      admin_note: "Owner"
+    },
+    {
+      user_id: "usr-normal",
+      email: "patient@example.com",
+      display_name: "Patient <svg/onload=alert(1)>",
+      email_confirmed: true,
+      tier: "free",
+      source: "free",
+      active_until: null,
+      is_db_admin: false,
+      is_env_admin: false,
+      is_admin: false,
+      admin_note: ""
+    }
+  ];
 
   const now = Date.now();
   let mockCodes = [
@@ -150,6 +206,7 @@ async function runBehavioralTests() {
       POG: {
         getLang: () => lang,
         entitlements: {
+          status: () => ({ uid: "adm-self" }),
           isAdmin: () => isAdminFlag,
           refresh: async () => { refreshEntitlementCalls++; },
           adminList: async () => {
@@ -177,6 +234,45 @@ async function runBehavioralTests() {
             const target = mockCodes.find((c) => c.id === id);
             if (target) target.revoked_at = new Date().toISOString();
             return { ok: true, code_id: id, revoked_active: revokeActiveGrants ? 2 : 0 };
+          },
+          adminListUsers: async () => mockUsers.map((u) => Object.assign({}, u)),
+          adminSetUserRole: async (userId, makeAdmin, note) => {
+            userRoleCalls.push({ userId, makeAdmin, note });
+            const target = mockUsers.find((u) => u.user_id === userId);
+            if (target) {
+              target.is_db_admin = !!makeAdmin;
+              target.is_admin = !!makeAdmin || !!target.is_env_admin;
+              if (makeAdmin && note) target.admin_note = note;
+              if (!makeAdmin) target.admin_note = "";
+            }
+            return { ok: true, user_id: userId, is_db_admin: !!makeAdmin, env_admin_protected: false };
+          },
+          adminSetUserEntitlement: async (userId, tier, days) => {
+            userEntCalls.push({ userId, tier, days });
+            const target = mockUsers.find((u) => u.user_id === userId);
+            if (target) {
+              target.tier = tier;
+              target.source = tier === "full" ? "admin" : "free";
+              target.active_until = tier === "full" ? new Date(Date.now() + Number(days) * 86400000).toISOString() : null;
+            }
+            return { ok: true, user_id: userId, tier };
+          },
+          adminInviteUser: async (opts) => {
+            inviteUserCalls.push(opts);
+            mockUsers.push({
+              user_id: "usr-inv-" + inviteUserCalls.length,
+              email: opts.email,
+              display_name: "",
+              email_confirmed: false,
+              tier: opts.grant_days > 0 ? "full" : "free",
+              source: opts.grant_days > 0 ? "admin" : "free",
+              active_until: opts.grant_days > 0 ? new Date(Date.now() + opts.grant_days * 86400000).toISOString() : null,
+              is_db_admin: false,
+              is_env_admin: false,
+              is_admin: false,
+              admin_note: ""
+            });
+            return { ok: true, email: opts.email, grant_days: opts.grant_days };
           }
         }
       }
@@ -321,12 +417,53 @@ async function runBehavioralTests() {
   // 2j. Language switch IT -> EN
   lang = "en";
   sandbox.window.dispatchEvent({ type: "pog:languagechange", detail: { lang: "en" } });
-  check(/Access code manager/.test(panel.innerHTML) && /Redemptions/.test(panel.innerHTML),
+  check(/Admin panel/.test(panel.innerHTML) && /Redemptions/.test(panel.innerHTML),
     "language switch updates admin panel copy to English immediately");
 
-  // 2k. Sign-out clears in-memory codes & emails and closes dialog
+  // 2k. Users & Admins management tab
+  fireClick({ "data-adc": "main-tab", "data-tab": "users" });
+  await new Promise((r) => setTimeout(r, 15));
+  check(panel.innerHTML.includes("patient@example.com") && panel.innerHTML.includes("Patient &lt;svg/onload=alert(1)&gt;"),
+    "users tab loads accounts and HTML-escapes display names");
+
+  const submitInvite = () => {
+    const form = { tagName: "FORM" };
+    const wrap = { closest(sel) { return sel.includes('invite') ? form : null; } };
+    (panel._listeners.submit || []).forEach((fn) => fn({ target: wrap, preventDefault() {} }));
+  };
+  fireInput("invite_email", "newdoc@clinic.org");
+  fireInput("invite_days", "60");
+  submitInvite();
+  await new Promise((r) => setTimeout(r, 15));
+  check(
+    inviteUserCalls.length === 1 && inviteUserCalls[0].email === "newdoc@clinic.org" && inviteUserCalls[0].grant_days === 60 &&
+      panel.innerHTML.includes("newdoc@clinic.org"),
+    "inviting user sends invite payload with initial Full Access days and refreshes users list"
+  );
+
+  fireClick({ "data-adc": "u-ask-grant", "data-id": "usr-normal", "data-email": "patient@example.com" });
+  fireInput("u_grant_days", "90");
+  fireClick({ "data-adc": "u-confirm" });
+  await new Promise((r) => setTimeout(r, 15));
+  check(userEntCalls.length === 1 && userEntCalls[0].tier === "full" && userEntCalls[0].days === 90,
+    "granting Full Access to normal user sends adminSetUserEntitlement('full', 90)");
+
+  fireClick({ "data-adc": "u-ask-promote", "data-id": "usr-normal", "data-email": "patient@example.com" });
+  fireInput("u_promote_note", "Clinic coordinator");
+  fireClick({ "data-adc": "u-confirm" });
+  await new Promise((r) => setTimeout(r, 15));
+  check(userRoleCalls.length === 1 && userRoleCalls[0].userId === "usr-normal" && userRoleCalls[0].makeAdmin === true && userRoleCalls[0].note === "Clinic coordinator",
+    "promoting confirmed normal user to Admin sends role change and note");
+
+  fireClick({ "data-adc": "u-ask-demote", "data-id": "usr-normal", "data-email": "patient@example.com" });
+  fireClick({ "data-adc": "u-confirm" });
+  await new Promise((r) => setTimeout(r, 15));
+  check(userRoleCalls.length === 2 && userRoleCalls[1].makeAdmin === false,
+    "removing DB Admin role calls adminSetUserRole(id, false)");
+
+  // 2l. Sign-out clears in-memory codes, users & emails and closes dialog
   sandbox.window.dispatchEvent({ type: "pog:authchange", detail: { signedOut: true } });
-  check(panel.hidden === true && !panel.innerHTML.includes("patient+"),
+  check(panel.hidden === true && !panel.innerHTML.includes("patient@example.com"),
     "sign-out closes admin dialog and clears rendered sensitive emails/codes");
 
   if (failures) process.exit(1);

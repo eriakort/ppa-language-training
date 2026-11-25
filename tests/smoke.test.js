@@ -1743,6 +1743,10 @@ async function playThrough(page, solo) {
         ]
       }
     ];
+    var usersDb = [
+      { user_id: "u-admin", email: "eriakort8@gmail.com", display_name: "Admin", email_confirmed: true, tier: "full", source: "admin", active_until: future, is_db_admin: true, is_env_admin: true, is_admin: true, admin_note: "Owner" },
+      { user_id: "u-regular", email: "user@example.com", display_name: "Patient One", email_confirmed: true, tier: "free", source: "free", active_until: null, is_db_admin: false, is_env_admin: false, is_admin: false, admin_note: "" }
+    ];
     var q = function () { var o = { select: function () { return o; }, eq: function () { return o; }, in: function () { return o; }, order: function () { return o; }, limit: function () { return o; },
       maybeSingle: function () { return Promise.resolve({ data: null, error: null }); }, single: function () { return Promise.resolve({ data: null, error: null }); },
       then: function (r) { return Promise.resolve({ data: [], error: null }).then(r); } }; return o; };
@@ -1799,6 +1803,45 @@ async function playThrough(page, solo) {
                 if (c.id === b.code_id) c.revoked_at = new Date().toISOString();
               });
               return Promise.resolve({ data: { ok: true, code_id: b.code_id, revoked_active: b.revoke_active_grants ? 1 : 0 }, error: null });
+            }
+            if (b.action === "admin_users_list") {
+              return Promise.resolve({ data: { ok: true, users: usersDb.map(function (u) { return Object.assign({}, u); }) }, error: null });
+            }
+            if (b.action === "admin_set_entitlement") {
+              usersDb.forEach(function (u) {
+                if (u.user_id === b.user_id) {
+                  u.tier = b.tier;
+                  u.source = b.tier === "full" ? "admin" : "free";
+                  u.active_until = b.tier === "full" ? new Date(Date.now() + Number(b.duration_days || 30) * 86400000).toISOString() : null;
+                }
+              });
+              return Promise.resolve({ data: { ok: true, user_id: b.user_id, tier: b.tier }, error: null });
+            }
+            if (b.action === "admin_set_role") {
+              usersDb.forEach(function (u) {
+                if (u.user_id === b.user_id) {
+                  u.is_db_admin = !!b.is_admin;
+                  u.is_admin = !!b.is_admin || !!u.is_env_admin;
+                  u.admin_note = b.is_admin ? (b.note || "") : "";
+                }
+              });
+              return Promise.resolve({ data: { ok: true, user_id: b.user_id, is_db_admin: !!b.is_admin, env_admin_protected: false }, error: null });
+            }
+            if (b.action === "admin_invite_user") {
+              usersDb.push({
+                user_id: "u-inv-" + usersDb.length,
+                email: b.email,
+                display_name: "",
+                email_confirmed: false,
+                tier: b.grant_days > 0 ? "full" : "free",
+                source: b.grant_days > 0 ? "admin" : "free",
+                active_until: b.grant_days > 0 ? new Date(Date.now() + b.grant_days * 86400000).toISOString() : null,
+                is_db_admin: false,
+                is_env_admin: false,
+                is_admin: false,
+                admin_note: ""
+              });
+              return Promise.resolve({ data: { ok: true, email: b.email }, error: null });
             }
           }
           return Promise.resolve({ data: null, error: null });
@@ -1889,15 +1932,172 @@ async function playThrough(page, solo) {
   check(/Disattivato/.test(await adPage.textContent(seedItem + " .adc-badge.bad")),
     "admin E2E: hard revoke marks code Disattivato immediately");
 
-  // Switch language to English and press Escape to close
+  // Switch language to English, verify Users & Admins tab flows, and press Escape to close
   await adPage.evaluate(() => window.dispatchEvent(new CustomEvent("pog:languagechange", { detail: { lang: "en" } })));
-  check(/Access code manager/.test(await adPage.textContent(".adc-card")) && /Revoked/.test(await adPage.textContent(seedItem)),
+  check(/Admin panel/.test(await adPage.textContent(".adc-card")) && /Revoked/.test(await adPage.textContent(seedItem)),
     "admin E2E: switching language updates modal to English immediately");
-  await adPage.keyboard.press("Escape");
-  check(!(await adPage.isVisible(".adc-panel")), "admin E2E: Escape closes admin access-codes dialog");
 
-  check(adPage.errors.length === 0, "no page errors (Phase 3 Admin Access-Code UI E2E): " + adPage.errors.join("; "));
+  await adPage.click('[data-adc="main-tab"][data-tab="users"]');
+  await adPage.waitForSelector('.adc-user-item[data-user-id="u-regular"]');
+  check(await adPage.isDisabled('.adc-user-item[data-user-id="u-admin"] [data-adc="u-ask-demote"]'),
+    "admin E2E: current signed-in admin cannot demote themselves");
+
+  await adPage.fill('.adc-form-box[data-adc-form="invite"] input[name="invite_email"]', "clinic.member@example.com");
+  await adPage.fill('.adc-form-box[data-adc-form="invite"] input[name="invite_days"]', "45");
+  await adPage.click('.adc-form-box[data-adc-form="invite"] button[type="submit"]');
+  await adPage.waitForFunction(() => document.querySelectorAll(".adc-user-item").length === 3);
+
+  const regRow = '.adc-user-item[data-user-id="u-regular"]';
+  await adPage.click(regRow + ' [data-adc="u-ask-grant"]');
+  await adPage.fill(regRow + ' input[name="u_grant_days"]', "90");
+  await adPage.click(regRow + ' [data-adc="u-confirm"]');
+  await adPage.waitForFunction(() => /Full until/.test(document.querySelector('.adc-user-item[data-user-id="u-regular"]').textContent));
+
+  await adPage.click(regRow + ' [data-adc="u-ask-promote"]');
+  await adPage.fill(regRow + ' input[name="u_promote_note"]', "Lead clinician");
+  await adPage.click(regRow + ' [data-adc="u-confirm"]');
+  await adPage.waitForFunction(() => !!document.querySelector('.adc-user-item[data-user-id="u-regular"] [data-adc="u-ask-demote"]'));
+  check(/Lead clinician/.test(await adPage.textContent(regRow)),
+    "admin E2E: normal user granted Full Access and promoted to DB Admin with note");
+
+  await adPage.click(regRow + ' [data-adc="u-ask-demote"]');
+  await adPage.click(regRow + ' [data-adc="u-confirm"]');
+  await adPage.waitForFunction(() => !!document.querySelector('.adc-user-item[data-user-id="u-regular"] [data-adc="u-ask-promote"]'));
+  await adPage.click(regRow + ' [data-adc="u-ask-free"]');
+  await adPage.click(regRow + ' [data-adc="u-confirm"]');
+  await adPage.waitForFunction(() => /Free plan/.test(document.querySelector('.adc-user-item[data-user-id="u-regular"]').textContent));
+  check(/Standard user/.test(await adPage.textContent(regRow)),
+    "admin E2E: DB Admin demoted and reverted to Free plan cleanly");
+
+  await adPage.keyboard.press("Escape");
+  check(!(await adPage.isVisible(".adc-panel")), "admin E2E: Escape closes admin panel dialog");
+
+  check(adPage.errors.length === 0, "no page errors (Phase 3 Admin Access-Code & Users UI E2E): " + adPage.errors.join("; "));
   await browser14.close();
+
+  /* Phase 4 Stripe Checkout, Customer Portal & Return Flow E2E */
+  const STRIPE_STUB = `(function () {
+    var subs = [], signedIn = true;
+    var user = { id: "u-stripe", email: "stripe@example.com", user_metadata: {} };
+    var future = new Date(Date.now() + 30 * 86400000).toISOString();
+    var q = function () { var o = { select: function () { return o; }, eq: function () { return o; }, in: function () { return o; }, order: function () { return o; }, limit: function () { return o; },
+      maybeSingle: function () { return Promise.resolve({ data: null, error: null }); }, single: function () { return Promise.resolve({ data: null, error: null }); },
+      then: function (r) { return Promise.resolve({ data: [], error: null }).then(r); } }; return o; };
+    window.supabase = { createClient: function () {
+      return { auth: {
+          getSession: function () { return Promise.resolve({ data: { session: signedIn ? { user: user } : null } }); },
+          getUser: function () { return Promise.resolve({ data: { user: signedIn ? user : null } }); },
+          onAuthStateChange: function (cb) { subs.push(cb); return { data: { subscription: { unsubscribe: function () {} } } }; },
+          signOut: function () { signedIn = false; subs.forEach(function (cb) { cb("SIGNED_OUT", null); }); return Promise.resolve({ error: null }); }
+        }, from: q, rpc: function () { return Promise.resolve({ data: null, error: null }); },
+        functions: { invoke: function (fn, opts) {
+          var b = (opts && opts.body) || {};
+          var paidMode = localStorage.getItem("__test_stripe_paid") === "1";
+          var readyMode = localStorage.getItem("__test_stripe_ready") === "1";
+          if (fn === "access-codes" && b.action === "status") {
+            return Promise.resolve({
+              data: {
+                tier: paidMode ? "full" : "free",
+                source: paidMode ? "stripe" : "free",
+                active_until: paidMode ? future : null,
+                is_admin: false,
+                has_stripe_customer: paidMode,
+                stripe_subscription_status: paidMode ? "active" : null,
+                redemptions: []
+              },
+              error: null
+            });
+          }
+          if (fn === "stripe-billing") {
+            if (b.action === "billing_config") {
+              return Promise.resolve({
+                data: { ok: true, stripe_enabled: readyMode, plans: { monthly: readyMode, yearly: readyMode }, has_portal: paidMode, subscription_status: paidMode ? "active" : null },
+                error: null
+              });
+            }
+            if (b.action === "create_checkout") {
+              if (!readyMode) {
+                return Promise.resolve({ data: { error: "stripe_not_configured", code: "stripe_not_configured" }, error: { message: "stripe_not_configured" } });
+              }
+              return Promise.resolve({ data: { ok: true, url: "https://checkout.stripe.com/c/pay/cs_test_" + b.plan, plan: b.plan }, error: null });
+            }
+            if (b.action === "create_portal") {
+              return Promise.resolve({ data: { ok: true, url: "https://billing.stripe.com/p/session/bps_test_e2e" }, error: null });
+            }
+          }
+          return Promise.resolve({ data: null, error: null });
+        } } };
+    } };
+  })();`;
+  const browser15 = await chromium.launch();
+  const ctx15 = await browser15.newContext({ viewport: { width: 920, height: 1100 } });
+  const stripeHtml = html.replace(sdkInline, "<script>\n" + STRIPE_STUB + "</script>");
+  const stripeRedirects = [];
+  await ctx15.addInitScript(FIXED_DAY);
+  await ctx15.route("http://app.test/**", (r) => r.fulfill({ contentType: "text/html", body: "<!doctype html><html><head><meta charset=\"utf-8\"></head><body>" + stripeHtml + "</body></html>" }));
+  await ctx15.route("https://checkout.stripe.com/**", (r) => {
+    stripeRedirects.push(r.request().url());
+    return r.fulfill({ contentType: "text/html", body: "<!doctype html><html><body><h1>Mock Stripe Checkout</h1></body></html>" });
+  });
+  await ctx15.route("https://billing.stripe.com/**", (r) => {
+    stripeRedirects.push(r.request().url());
+    return r.fulfill({ contentType: "text/html", body: "<!doctype html><html><body><h1>Mock Stripe Billing Portal</h1></body></html>" });
+  });
+
+  const sbPage = await ctx15.newPage();
+  sbPage.errors = []; sbPage.on("pageerror", (e) => sbPage.errors.push(e.message));
+  await sbPage.goto("http://app.test/");
+  await sbPage.fill("#pf-name", "Giulio"); await sbPage.click('[data-act="onboard-skip"]'); await sbPage.click('[data-act="home"]');
+
+  check((await sbPage.$$(".homebtn")).length === 2 && (await sbPage.$$(".util-sheet > button")).length === 7,
+    "stripe E2E: preserves .homebtn === 2 and .util-sheet > button === 7");
+
+  // Open upgrade modal from Home free banner
+  await sbPage.click('[data-act="pw-open"]');
+  await sbPage.waitForSelector('[data-pw="checkout"][data-plan="monthly"]');
+  check(!!(await sbPage.$('[data-pw="checkout"][data-plan="yearly"]')) && !!(await sbPage.$('form[data-pw-form="redeem"]')),
+    "stripe E2E: upgrade modal shows Monthly & Yearly Stripe plans alongside access code form");
+
+  // Unconfigured Stripe graceful fallback
+  await sbPage.click('[data-pw="checkout"][data-plan="yearly"]');
+  await sbPage.waitForSelector('.pw-card .account-error');
+  check(/pagamento online con carta non è ancora attivo/i.test(await sbPage.textContent('.pw-card .account-error')),
+    "stripe E2E: displays localized notice cleanly when Stripe keys are not yet configured");
+
+  // Live Stripe enabled -> Monthly click redirects cleanly to https://checkout.stripe.com/...
+  await sbPage.evaluate(() => localStorage.setItem("__test_stripe_ready", "1"));
+  await Promise.all([
+    sbPage.waitForURL("https://checkout.stripe.com/**"),
+    sbPage.click('[data-pw="checkout"][data-plan="monthly"]')
+  ]);
+  check(stripeRedirects[0] === "https://checkout.stripe.com/c/pay/cs_test_monthly",
+    "stripe E2E: Monthly checkout validates and redirects to Stripe Checkout URL");
+
+  // Webhook completes & user returns to ?checkout=success&session_id=...
+  await sbPage.goto("http://app.test/");
+  await sbPage.evaluate(() => localStorage.setItem("__test_stripe_paid", "1"));
+  await sbPage.goto("http://app.test/?checkout=success&session_id=cs_test_monthly");
+  await sbPage.waitForSelector('.pw-panel .account-message[role="status"]');
+  check(
+    /Pagamento completato! L'accesso completo è ora attivo/.test(await sbPage.textContent('.pw-panel .account-message[role="status"]')) &&
+    !sbPage.url().includes("checkout="),
+    "stripe E2E: ?checkout=success cleans query params and shows active Full Access notice"
+  );
+  await sbPage.click('[data-pw="close"]');
+  check(!!(await sbPage.$(".pw-banner.full")), "stripe E2E: Home banner switches to Full Access active");
+
+  // Account dialog shows Manage Stripe subscription -> opens billing.stripe.com portal
+  await menuClick(sbPage, ".account-launcher");
+  await sbPage.waitForSelector('.account-plan-box [data-action="stripe-portal"]');
+  await Promise.all([
+    sbPage.waitForURL("https://billing.stripe.com/**"),
+    sbPage.click('.account-plan-box [data-action="stripe-portal"]')
+  ]);
+  check(stripeRedirects[1] === "https://billing.stripe.com/p/session/bps_test_e2e",
+    "stripe E2E: Account Manage subscription redirects cleanly to Stripe Customer Portal");
+
+  check(sbPage.errors.length === 0, "no page errors (Phase 4 Stripe Billing E2E): " + sbPage.errors.join("; "));
+  await browser15.close();
 
   if (failures) { console.error(failures + " check(s) failed."); process.exit(1); }
   console.log("All browser checks passed.");

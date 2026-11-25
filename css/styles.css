@@ -1028,6 +1028,7 @@ button.primary.pw-locked .pw-lock { margin-left: 8px; vertical-align: middle; }
 .pw-plan span { font-size: 15px; color: var(--muted); flex: 1; }
 .pw-plan-btn { min-height: 48px; width: 100%; font-size: 16px; }
 .pw-refresh-btn { align-self: flex-start; min-height: 40px; padding: 4px 0; font-size: 15px; }
+.pw-ext-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
 @media (max-width: 520px) {
   .pw-banner { flex-direction: column; align-items: stretch; text-align: center; }
   .pw-plans { grid-template-columns: 1fr; }

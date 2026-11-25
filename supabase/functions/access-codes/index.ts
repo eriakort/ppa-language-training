@@ -5,8 +5,10 @@
 // Optional configuration: ACCESS_ADMIN_EMAILS (comma-separated lowercase emails), ENTITLEMENT_SIGNING_SECRET.
 import { createClient } from "@supabase/supabase-js";
 
+const normalizedSiteOrigin = (Deno.env.get("APP_SITE_URL") ?? "").trim().replace(/^["']|["']$/g, "").trim().replace(/\/+$/, "");
+
 const cors = {
-  "Access-Control-Allow-Origin": Deno.env.get("APP_SITE_URL") ?? "null",
+  "Access-Control-Allow-Origin": normalizedSiteOrigin || "null",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Vary": "Origin",
@@ -88,7 +90,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const origin = req.headers.get("origin");
-  const allowedOrigin = Deno.env.get("APP_SITE_URL");
+  const allowedOrigin = normalizedSiteOrigin;
   if (!allowedOrigin || origin !== allowedOrigin) return json({ error: "Origin not allowed" }, 403);
 
   const auth = req.headers.get("Authorization") ?? "";

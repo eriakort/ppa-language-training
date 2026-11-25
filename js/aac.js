@@ -128,8 +128,9 @@
     }).join("");
     var grid = shown.length
       ? '<div class="aac-grid">' + shown.map(function (x, i) {
+          var photoUrl = x.photo ? (api.safePhotoUrl ? api.safePhotoUrl(x.photo) : (/^(?:blob:|data:image\/(?:png|jpe?g|webp|gif);base64,)/i.test(String(x.photo).trim()) ? String(x.photo).trim() : "")) : "";
           return '<button class="aac-tile" data-act="aac-tile" data-i="' + i + '"><span class="aac-pic">' +
-            (x.photo ? '<img src="' + esc(x.photo) + '" alt="">' : '<span aria-hidden="true">' + x.icon + '</span>') + '</span>' +
+            (photoUrl ? '<img src="' + esc(photoUrl) + '" alt="">' : '<span aria-hidden="true">' + esc(x.icon || "💬") + '</span>') + '</span>' +
             '<span class="aac-label">' + esc(x.text) + '</span>' + (x.sub ? '<small>' + esc(x.sub) + '</small>' : '') + '</button>';
         }).join("") + '</div>'
       : '<p class="sub">' + esc(tab === "mine" ? t.noneMine : t.noneHere) + '</p>';

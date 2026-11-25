@@ -614,9 +614,10 @@
       return '<li class="' + cls + '">' + esc(String(idx + 1)) + '</li>';
     }).join("") + '</ol>';
 
-    var picHtml = card.photo
-      ? '<div class="pic"><img src="' + esc(card.photo) + '" alt=""></div>'
-      : '<div class="pic sm" aria-hidden="true">' + (card.pic || "💬") + '</div>';
+    var safePhoto = card.photo ? (api.safePhotoUrl ? api.safePhotoUrl(card.photo) : (/^(?:blob:|data:image\/(?:png|jpe?g|webp|gif);base64,)/i.test(String(card.photo).trim()) ? String(card.photo).trim() : "")) : "";
+    var picHtml = safePhoto
+      ? '<div class="pic"><img src="' + esc(safePhoto) + '" alt=""></div>'
+      : '<div class="pic sm" aria-hidden="true">' + esc(card.pic || "💬") + '</div>';
 
     var sfaHtml = st.sfaLevel > 0 && sfaList.length
       ? '<div class="wb-cuebox"><strong>' + esc(t.sfaTitle) + '</strong><ul>' + sfaList.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join("") + '</ul></div>'

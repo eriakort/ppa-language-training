@@ -85,6 +85,13 @@
       portalReturned: "Sei tornato dal portale di fatturazione Stripe.",
       stripeNotReady: "Il pagamento online con carta non è ancora attivo su questo server. Puoi comunque sbloccare subito il piano completo con un codice di accesso.",
       noCustomerPortal: "Nessun abbonamento Stripe collegato a questo account.",
+      stripeContinueBtn: "Continua su Stripe ↗",
+      stripePopupNote: "La pagina sicura Stripe è pronta: premi il pulsante qui sotto per aprirla in una nuova scheda.",
+      stripeErrInvalidKey: "Chiave Stripe non valida sul server: verifica la chiave segreta nelle impostazioni di fatturazione del server (senza virgolette).",
+      stripeErrInvalidPrice: "ID prezzo Stripe non valido sul server: verifica di aver inserito l'ID del prezzo (e non quello del prodotto).",
+      stripeErrPriceNotRecurring: "Il prezzo Stripe configurato è «Una tantum»: deve invece essere «Ricorrente» (mensile o annuale).",
+      stripeErrPriceNotFound: "Prezzo Stripe non trovato: verifica che la chiave segreta e gli ID prezzo siano entrambi in modalità Test (o entrambi in Live).",
+      stripeErrPortalNotConfigured: "Il Portale Clienti Stripe non è ancora salvato nelle impostazioni di Fatturazione su Stripe Dashboard.",
       stripeError: "Impossibile avviare la sessione Stripe. Riprova tra poco o usa un codice di accesso.",
       orCodeTitle: "Hai ricevuto un codice di accesso?",
       close: "Chiudi",
@@ -150,6 +157,13 @@
       portalReturned: "Returned from the Stripe billing portal.",
       stripeNotReady: "Online card checkout is not enabled on this server yet. You can unlock Full Access right away with an access code.",
       noCustomerPortal: "No Stripe subscription is linked to this account yet.",
+      stripeContinueBtn: "Continue to Stripe ↗",
+      stripePopupNote: "Your secure Stripe session is ready. Click below to open it in a new browser tab.",
+      stripeErrInvalidKey: "Stripe rejected the server secret key: check that the billing secret key is pasted accurately in server secrets (with no extra quotes).",
+      stripeErrInvalidPrice: "Invalid Stripe Price ID on the server: make sure you entered the Price API ID rather than the Product ID.",
+      stripeErrPriceNotRecurring: "The configured Stripe price is One-time: change it to a Recurring monthly/yearly price in Stripe Product catalog.",
+      stripeErrPriceNotFound: "Stripe price ID not found: make sure your server billing key and monthly/yearly Price IDs are all from the same mode (Test or Live).",
+      stripeErrPortalNotConfigured: "Stripe Customer Portal is not configured yet: open Stripe Dashboard -> Billing -> Customer portal and click Save.",
       stripeError: "Could not start Stripe billing. Please try again shortly or use an access code.",
       orCodeTitle: "Have an access code?",
       close: "Close",
@@ -285,7 +299,7 @@
   var panel = null;
   var modalState = {
     open: false, reason: "manage", featureLabel: "", msg: "", err: "",
-    busy: false, busyKind: "", busyPlan: "", codeDraft: "", billingInfo: null
+    busy: false, busyKind: "", busyPlan: "", codeDraft: "", billingInfo: null, externalUrl: ""
   };
 
   function isPatientLocked() {
@@ -371,12 +385,34 @@
     }
   }
 
+  function isEmbeddedFrame() {
+    try { return window.self !== window.top; } catch (e) { return true; }
+  }
+
+  function mapStripeError(err) {
+    var t = T();
+    var code = err && err.code ? String(err.code) : "";
+    if (code === "stripe_not_configured") return t.stripeNotReady;
+    if (code === "no_stripe_customer") return t.noCustomerPortal;
+    if (code === "invalid_stripe_key") return t.stripeErrInvalidKey;
+    if (code === "invalid_price_id") return t.stripeErrInvalidPrice;
+    if (code === "price_not_recurring") return t.stripeErrPriceNotRecurring;
+    if (code === "price_not_found" || code === "customer_not_found") return t.stripeErrPriceNotFound;
+    if (code === "portal_not_configured") return t.stripeErrPortalNotConfigured;
+    var msg = err && err.message ? String(err.message) : "";
+    if (msg && msg !== "Edge Function returned a non-2xx status code" && !/^(checkout|portal)/i.test(msg)) {
+      return t.stripeError + " (" + msg.slice(0, 120) + ")";
+    }
+    return t.stripeError;
+  }
+
   async function startCheckout(plan) {
     var e = entApi();
     if (!e || !e.createCheckoutSession || modalState.busy) return;
     var p = plan === "yearly" ? "yearly" : "monthly";
     modalState.err = "";
     modalState.msg = "";
+    modalState.externalUrl = "";
     modalState.busy = true;
     modalState.busyKind = "checkout";
     modalState.busyPlan = p;
@@ -388,10 +424,16 @@
         uErr.code = "invalid_redirect_url";
         throw uErr;
       }
-      modalState.msg = T().openingStripe;
       modalState.busy = false;
       modalState.busyKind = "";
       modalState.busyPlan = "";
+      if (isEmbeddedFrame()) {
+        modalState.externalUrl = res.url;
+        modalState.msg = T().stripePopupNote;
+        renderModal();
+        return;
+      }
+      modalState.msg = T().openingStripe;
       renderModal();
       if (window.location && typeof window.location.assign === "function") {
         window.location.assign(res.url);
@@ -400,8 +442,7 @@
       modalState.busy = false;
       modalState.busyKind = "";
       modalState.busyPlan = "";
-      var code = err && err.code ? String(err.code) : "";
-      modalState.err = code === "stripe_not_configured" ? T().stripeNotReady : T().stripeError;
+      modalState.err = mapStripeError(err);
       renderModal();
     }
   }
@@ -411,6 +452,7 @@
     if (!e || !e.createPortalSession || modalState.busy) return;
     modalState.err = "";
     modalState.msg = "";
+    modalState.externalUrl = "";
     modalState.busy = true;
     modalState.busyKind = "portal";
     modalState.busyPlan = "";
@@ -422,9 +464,15 @@
         uErr.code = "invalid_redirect_url";
         throw uErr;
       }
-      modalState.msg = T().openingPortal;
       modalState.busy = false;
       modalState.busyKind = "";
+      if (isEmbeddedFrame()) {
+        modalState.externalUrl = res.url;
+        modalState.msg = T().stripePopupNote;
+        renderModal();
+        return;
+      }
+      modalState.msg = T().openingPortal;
       renderModal();
       if (window.location && typeof window.location.assign === "function") {
         window.location.assign(res.url);
@@ -432,10 +480,7 @@
     } catch (err) {
       modalState.busy = false;
       modalState.busyKind = "";
-      var code = err && err.code ? String(err.code) : "";
-      modalState.err = code === "no_stripe_customer" ? T().noCustomerPortal
-        : code === "stripe_not_configured" ? T().stripeNotReady
-        : T().stripeError;
+      modalState.err = mapStripeError(err);
       renderModal();
     }
   }
@@ -536,6 +581,9 @@
         '<button type="button" class="link pw-refresh-btn" data-pw="refresh"' + dis + '>' + esc(t.refreshPlanBtn) + '</button>';
     }
 
+    var extSafe = (modalState.externalUrl &&
+      (modalState.externalUrl.indexOf("https://checkout.stripe.com/") === 0 || modalState.externalUrl.indexOf("https://billing.stripe.com/") === 0))
+      ? modalState.externalUrl : "";
     var html = '<div class="pw-card">' +
       '<div class="account-head"><h2 id="pw-title">' + esc(title) + '</h2>' +
       '<button type="button" class="account-close" data-pw="close" aria-label="' + esc(t.close) + '">×</button></div>' +
@@ -546,6 +594,7 @@
       '<p class="account-note">' + esc(t.alwaysFree) + '</p></div>' +
       bodyHtml +
       (modalState.msg ? '<p class="account-message" role="status">' + esc(modalState.msg) + '</p>' : '') +
+      (extSafe ? '<a class="primary account-action pw-ext-link" href="' + esc(extSafe) + '" target="_blank" rel="noopener noreferrer">' + esc(t.stripeContinueBtn) + '</a>' : '') +
       (modalState.err ? '<p class="account-error" role="alert">' + esc(modalState.err) + '</p>' : '') +
       '</div>';
 
@@ -573,6 +622,7 @@
     modalState.featureLabel = opts.featureLabel || "";
     modalState.msg = opts.msg || applyPendingCheckoutNotice() || "";
     modalState.err = "";
+    modalState.externalUrl = "";
     modalState.busy = false;
     modalState.busyKind = "";
     modalState.busyPlan = "";

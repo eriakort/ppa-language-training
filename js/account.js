@@ -25,6 +25,8 @@
       planRedeem: "Abbonati o inserisci codice",
       planManagePortal: "Gestisci abbonamento Stripe",
       portalOpening: "Apertura portale Stripe…",
+      portalReady: "Portale pronto: premi qui sotto per aprirlo in una nuova scheda.",
+      portalOpenBtn: "Apri portale Stripe ↗",
       portalUnavailable: "Il portale Stripe non è ancora disponibile su questo account.",
       adminCodes: "Pannello Admin (Codici e Utenti)"
     },
@@ -51,12 +53,14 @@
       planRedeem: "Subscribe or enter access code",
       planManagePortal: "Manage Stripe subscription",
       portalOpening: "Opening Stripe billing portal…",
+      portalReady: "Portal ready: click below to open it in a new browser tab.",
+      portalOpenBtn: "Open Stripe Portal ↗",
       portalUnavailable: "Stripe billing portal is not available for this account yet.",
       adminCodes: "Admin panel (Codes & Users)"
     }
   };
   var lang = window.POG.getLang();
-  var T = copy[lang], client = null, mode = "signin", message = "", error = "", user = null;
+  var T = copy[lang], client = null, mode = "signin", message = "", error = "", portalExtUrl = "", user = null;
   var launcher, panel, observer;
 
   function configured() {
@@ -124,6 +128,9 @@
       (showAdminCodes ? '<button type="button" class="primary account-action" data-action="admin-codes">' + escapeHtml(T.adminCodes) + '</button>' : '') +
       '</div>';
     if (message) html += '<p class="account-message" role="status">' + escapeHtml(message) + '</p>';
+    if (portalExtUrl && portalExtUrl.indexOf("https://billing.stripe.com/") === 0) {
+      html += '<a class="primary account-action pw-ext-link" href="' + escapeHtml(portalExtUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(T.portalOpenBtn) + '</a>';
+    }
     if (error) html += '<p class="account-error" role="alert">' + escapeHtml(error) + '</p>';
     html += '</div>';
     panel.innerHTML = html;
@@ -199,6 +206,7 @@
       }
       else if (a === "stripe-portal") {
         var entApi = window.POG && window.POG.entitlements ? window.POG.entitlements : null;
+        portalExtUrl = "";
         if (!entApi || !entApi.createPortalSession) {
           error = T.portalUnavailable;
           render();
@@ -208,7 +216,13 @@
         render();
         entApi.createPortalSession().then(function (res) {
           if (res && typeof res.url === "string" && res.url.indexOf("https://billing.stripe.com/") === 0) {
-            if (window.location && typeof window.location.assign === "function") {
+            var inIframe = false;
+            try { inIframe = window.self !== window.top; } catch (e) { inIframe = true; }
+            if (inIframe) {
+              portalExtUrl = res.url;
+              message = T.portalReady;
+              render();
+            } else if (window.location && typeof window.location.assign === "function") {
               window.location.assign(res.url);
             }
           } else {
@@ -216,8 +230,9 @@
           }
         }).catch(function (err) {
           message = "";
+          portalExtUrl = "";
           var code = err && err.code ? String(err.code) : "";
-          error = (code === "no_stripe_customer" || code === "stripe_not_configured") ? T.portalUnavailable : T.error;
+          error = (code === "no_stripe_customer" || code === "stripe_not_configured" || code === "portal_not_configured") ? T.portalUnavailable : T.error;
           render();
         });
         return;

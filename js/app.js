@@ -33,6 +33,11 @@
     if (activeProfileId && !list.some(function (p) { return p.id === activeProfileId; })) setActiveProfile(list.length ? list[0].id : "");
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  function safePhotoUrl(u) {
+    if (typeof u !== "string") return "";
+    var s = u.trim();
+    return (/^blob:/i.test(s) || /^data:image\/(?:png|jpe?g|webp|gif);base64,/i.test(s)) ? s : "";
+  }
   function csvCell(value) {
     var text = value == null ? "" : String(value);
     if (typeof value === "string") {
@@ -1186,12 +1191,12 @@
     var html = "";
     if (tiles.length) {
       html += '<div class="homebtns">' + tiles.map(function (h) {
-        return '<button class="homebtn" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + h.icon + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
+        return '<button class="homebtn" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + esc(h.icon || "") + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
       }).join("") + '</div>';
     }
     if (solo.length) {
       html += solo.map(function (h) {
-        return '<button class="var-launch" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + h.icon + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
+        return '<button class="var-launch" data-act="' + esc(h.act) + '"><span class="hb-ico" aria-hidden="true">' + esc(h.icon || "") + '</span><span>' + esc(h.label[lang] || h.label.it) + '</span></button>';
       }).join("");
     }
     return html;
@@ -1491,7 +1496,7 @@
       try { parsed = JSON.parse(rawInput); } catch (e) { return { ok: false, error: t.restoreInvalid }; }
     }
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ok: false, error: t.restoreInvalid };
-    if (parsed.format !== "pog-local-backup" && parsed.version !== 1) return { ok: false, error: t.restoreInvalid };
+    if (parsed.format !== "pog-local-backup" || parsed.version !== 1) return { ok: false, error: t.restoreInvalid };
     if (!parsed.data || typeof parsed.data !== "object" || Array.isArray(parsed.data)) return { ok: false, error: t.restoreInvalid };
     var profObj = parsed.data.profile;
     var cleanName = profObj && typeof profObj.name === "string" ? profObj.name.trim().slice(0, 40) : (typeof parsed.profileName === "string" ? parsed.profileName.trim().slice(0, 40) : "");
@@ -1712,7 +1717,7 @@
       var d = st.data[lang], aids = "";
       if (S.support >= 1) aids += '<div class="hint"><b>1</b><div><strong>' + esc(t.questions) + '</strong><ul class="qlist">' + d[2].map(function (q) { return '<li>' + esc(q) + '</li>'; }).join("") + '</ul></div></div>';
       if (S.support >= 2) aids += '<div class="hint"><b>2</b><div><strong>' + esc(t.keywords) + '</strong><div class="kw">' + d[3].map(function (w) { return '<span>' + esc(w) + '</span>'; }).join("") + '</div></div></div>';
-      body += '<div class="pic sm" aria-hidden="true">' + st.data.pic + '</div>' +
+      body += '<div class="pic sm" aria-hidden="true">' + esc(st.data.pic || "") + '</div>' +
         '<p class="instr">' + esc(t.tellMe) + ': ' + esc(fmtTitle(d[0])) + '</p><p class="sub">' + esc(d[1]) + '</p>' +
         (aids ? '<div class="hints">' + aids + '</div>' : '') +
         '<div class="tools">' + hintBtn() + '</div>' + rateRow();
@@ -1806,7 +1811,7 @@
     var showPic = S.support >= 2;
     return '<p class="instr">' + esc(t.cwInstr) + '</p><p class="sub">' + esc(fill(t.cwProgress, { current: st.data.wi + 1, total: pz.p.length })) + '</p>' +
       '<p class="clue"><b>' + (st.data.wi + 1) + ' ' + (w.d === "a" ? t.across : t.down) + '</b>' + esc(w.clue) + '</p>' +
-      (showPic ? '<div class="pic sm" aria-hidden="true">' + w.pic + '</div>' : '') +
+      (showPic ? '<div class="pic sm" aria-hidden="true">' + esc(w.pic || "") + '</div>' : '') +
       '<div class="cwbox"><div class="cw" style="--cols:' + C + '">' + html + '</div></div>' + letterInput(st);
   }
   function viewBuild(st) {
@@ -1952,7 +1957,10 @@
     S.pathHint = d.path[k]; S.support++; S.nudge = ""; render();
   }
   /* An item's picture: the album photo when there is one, otherwise its icon. */
-  function picHtml(d) { return d && d.photo ? '<img src="' + esc(d.photo) + '" alt="">' : (d && d.pic) || ""; }
+  function picHtml(d) {
+    var u = d && safePhotoUrl(d.photo);
+    return u ? '<img src="' + esc(u) + '" alt="">' : esc((d && d.pic) || "");
+  }
   function optsHtml(pictures) {
     if (!S.opts) return "";
     return '<div class="opts">' + S.opts.map(function (o, i) {
@@ -2412,7 +2420,7 @@
   document.documentElement.lang = lang;
   /* What the communication board and album modules may use. */
   window.POG.appApi = {
-    t: function () { return T[lang]; }, lang: function () { return lang; }, esc: esc, fill: fill,
+    t: function () { return T[lang]; }, lang: function () { return lang; }, esc: esc, fill: fill, safePhotoUrl: safePhotoUrl,
     load: load, save: save, header: header, render: render,
     go: function (s) { if (s !== "home" && window.POG.paywall && !window.POG.paywall.guardScreen(s)) return; screen = s; render(); }, screen: function () { return screen; },
     flash: function (m) { flash = m; }, flashText: function () { return flash; },

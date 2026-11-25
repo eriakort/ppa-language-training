@@ -96,7 +96,7 @@ check(
 check(
   stylesCss.includes(".pw-plans") &&
   stylesCss.includes(".pw-plan-btn") &&
-  swJs.includes('pog-shell-v29') &&
+  /pog-shell-v3\d/.test(swJs) &&
   docsMd.includes("202611230001_stripe_billing.sql") &&
   docsMd.includes("sync_stripe_entitlement"),
   "styles, service worker cache bump, and docs are updated for Phase 4"
@@ -221,6 +221,15 @@ async function runBehavioralTests() {
                   };
                 }
                 if (body.action === "create_checkout") {
+                  if (checkoutInvokeMode === "price_not_recurring") {
+                    return {
+                      data: null,
+                      error: {
+                        message: "Edge Function returned a non-2xx status code",
+                        context: { json: async () => ({ error: "Stripe price must be recurring", code: "price_not_recurring" }) }
+                      }
+                    };
+                  }
                   if (checkoutInvokeMode === "not_configured") {
                     return {
                       data: null,
@@ -376,6 +385,52 @@ async function runBehavioralTests() {
     /Online card checkout is not enabled on this server yet/.test(pwPanel.innerHTML),
     "paywall displays localized fallback error when Stripe secrets are not configured"
   );
+
+  // Simulate price_not_recurring diagnostic message
+  checkoutInvokeMode = "price_not_recurring";
+  await pwClick({
+    target: {
+      closest(sel) {
+        if (sel === "[data-pw]") {
+          return {
+            disabled: false,
+            getAttribute(k) { return k === "data-pw" ? "checkout" : (k === "data-plan" ? "monthly" : null); }
+          };
+        }
+        return null;
+      }
+    }
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  check(
+    /One-time.*Recurring/i.test(pwPanel.innerHTML),
+    "paywall surfaces specific guidance when Stripe price is not recurring"
+  );
+
+  // Simulate iframe-embedded mode -> renders safe target=_blank Stripe Checkout anchor
+  checkoutInvokeMode = "ok";
+  sandbox.window.self = sandbox.window;
+  sandbox.window.top = {};
+  await pwClick({
+    target: {
+      closest(sel) {
+        if (sel === "[data-pw]") {
+          return {
+            disabled: false,
+            getAttribute(k) { return k === "data-pw" ? "checkout" : (k === "data-plan" ? "yearly" : null); }
+          };
+        }
+        return null;
+      }
+    }
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  check(
+    pwPanel.innerHTML.includes('href="https://checkout.stripe.com/c/pay/cs_test_yearly"') &&
+    pwPanel.innerHTML.includes('target="_blank"'),
+    "embedded iframe mode renders validated target=_blank Stripe Checkout button cleanly"
+  );
+  sandbox.window.top = sandbox.window;
 
   // Simulate active Stripe customer: Portal appears in both Paywall modal & Account panel
   tier = "full";

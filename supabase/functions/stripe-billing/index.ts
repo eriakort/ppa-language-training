@@ -6,8 +6,10 @@
 //   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_YEARLY
 import { createClient } from "@supabase/supabase-js";
 
+const normalizedSiteOrigin = (Deno.env.get("APP_SITE_URL") ?? "").trim().replace(/^["']|["']$/g, "").trim().replace(/\/+$/, "");
+
 const cors = {
-  "Access-Control-Allow-Origin": Deno.env.get("APP_SITE_URL") ?? "null",
+  "Access-Control-Allow-Origin": normalizedSiteOrigin || "null",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Vary": "Origin",
@@ -98,10 +100,44 @@ async function stripeRequest(
   return { ok: resp.ok, status: resp.status, data };
 }
 
+function cleanEnv(name: string): string {
+  return (Deno.env.get(name) ?? "").trim().replace(/^["']|["']$/g, "").trim();
+}
+
 function getPriceConfig() {
   return {
-    monthly: (Deno.env.get("STRIPE_PRICE_MONTHLY") ?? "").trim(),
-    yearly: (Deno.env.get("STRIPE_PRICE_YEARLY") ?? "").trim(),
+    monthly: cleanEnv("STRIPE_PRICE_MONTHLY"),
+    yearly: cleanEnv("STRIPE_PRICE_YEARLY"),
+  };
+}
+
+function sanitizeStripeError(res: { status: number; data: Record<string, unknown> }, kind: "checkout" | "portal") {
+  const errObj = (res.data?.error as Record<string, unknown> | undefined) ?? {};
+  const stripeCode = typeof errObj.code === "string" ? errObj.code : "";
+  const stripeParam = typeof errObj.param === "string" ? errObj.param : "";
+  const rawMsg = typeof errObj.message === "string" ? errObj.message : "";
+  const safeMsg = rawMsg.replace(/(?:sk|pk|rk|whsec)_[a-zA-Z0-9_*]+/g, "[redacted]");
+
+  console.error(`stripe-billing ${kind} error`, { status: res.status, code: stripeCode, param: stripeParam, message: safeMsg });
+
+  if (res.status === 401) {
+    return { code: "invalid_stripe_key", error: "Stripe rejected STRIPE_SECRET_KEY" };
+  }
+  if (/not recurring|mode.*subscription/i.test(safeMsg)) {
+    return { code: "price_not_recurring", error: "Stripe price must be recurring for subscription checkout" };
+  }
+  if (stripeCode === "resource_missing" && stripeParam.includes("price")) {
+    return { code: "price_not_found", error: "Stripe price ID not found for this key mode" };
+  }
+  if (stripeCode === "resource_missing" && stripeParam.includes("customer")) {
+    return { code: "customer_not_found", error: "Stripe customer ID not found for this key mode" };
+  }
+  if (/portal/i.test(safeMsg) && /configur/i.test(safeMsg)) {
+    return { code: "portal_not_configured", error: "Stripe Customer Portal is not configured in Stripe Dashboard yet" };
+  }
+  return {
+    code: stripeCode || "stripe_api_error",
+    error: safeMsg || `Could not start Stripe ${kind} session`,
   };
 }
 
@@ -121,8 +157,8 @@ Deno.serve(async (req) => {
   const url = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const stripeKey = (Deno.env.get("STRIPE_SECRET_KEY") ?? "").trim();
-  const webhookSecret = (Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "").trim();
+  const stripeKey = cleanEnv("STRIPE_SECRET_KEY");
+  const webhookSecret = cleanEnv("STRIPE_WEBHOOK_SECRET");
 
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -211,7 +247,7 @@ Deno.serve(async (req) => {
 
   /* ---------- Path B: Browser User Checkout & Customer Portal ---------- */
   const origin = req.headers.get("origin");
-  const allowedOrigin = Deno.env.get("APP_SITE_URL");
+  const allowedOrigin = normalizedSiteOrigin;
   if (!allowedOrigin || origin !== allowedOrigin) {
     return json({ error: "Origin not allowed" }, 403);
   }
@@ -269,6 +305,12 @@ Deno.serve(async (req) => {
     if (!priceId) {
       return json({ error: "stripe_not_configured", code: "stripe_not_configured" }, 503);
     }
+    if (!priceId.startsWith("price_")) {
+      return json({ error: "Price ID must start with price_", code: "invalid_price_id" }, 400);
+    }
+    if (!stripeKey.startsWith("sk_") && !stripeKey.startsWith("rk_")) {
+      return json({ error: "STRIPE_SECRET_KEY must be a Stripe secret key (sk_...)", code: "invalid_stripe_key" }, 500);
+    }
 
     const { data: ent } = await admin
       .from("user_entitlements")
@@ -296,7 +338,8 @@ Deno.serve(async (req) => {
     const sessionRes = await stripeRequest(stripeKey, "POST", "/v1/checkout/sessions", params);
     const sessionUrl = typeof sessionRes.data.url === "string" ? sessionRes.data.url : "";
     if (!sessionRes.ok || !sessionUrl.startsWith("https://checkout.stripe.com/")) {
-      return json({ error: "Could not start Stripe checkout session" }, 502);
+      const diag = sanitizeStripeError(sessionRes, "checkout");
+      return json({ error: diag.error, code: diag.code }, 502);
     }
     return json({ ok: true, url: sessionUrl, plan });
   }
@@ -318,7 +361,8 @@ Deno.serve(async (req) => {
     });
     const portalUrl = typeof portalRes.data.url === "string" ? portalRes.data.url : "";
     if (!portalRes.ok || !portalUrl.startsWith("https://billing.stripe.com/")) {
-      return json({ error: "Could not open Stripe billing portal" }, 502);
+      const diag = sanitizeStripeError(portalRes, "portal");
+      return json({ error: diag.error, code: diag.code }, 502);
     }
     return json({ ok: true, url: portalUrl });
   }

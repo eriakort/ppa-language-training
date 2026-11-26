@@ -1024,6 +1024,25 @@
   }
   function topTools() { return langToggle() + themeButton(); }
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && themeOpen) { themeOpen = false; rerenderKeep(); } });
+  // Enter key support for common form fields
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.keyCode !== 13) return;
+    var t = e.target;
+    if (!t || !t.id) return;
+    var id = t.id;
+    // Places input is handled by its own module
+    if (id === "pl-input" || id === "fl-input") return;
+    // PIN unlock
+    if (id === "un-pin") { e.preventDefault(); var b = document.querySelector("[data-act=\"un-ok\"]"); if (b) b.click(); return; }
+    if (id === "th-pin") { e.preventDefault(); var b2 = document.querySelector("[data-act=\"th-unlock\"]"); if (b2) b2.click(); return; }
+    if (id === "th-pin1" || id === "th-pin2") { e.preventDefault(); var b3 = document.querySelector("[data-act=\"pin-set\"]"); if (b3) b3.click(); return; }
+    // Settings save (when focus is in a settings field)
+    if (screen === "settings" && (id.indexOf("set-") === 0 || id.indexOf("lv-") === 0)) {
+      e.preventDefault();
+      var saveBtn = document.querySelector("[data-act=\"save-settings\"]");
+      if (saveBtn) saveBtn.click();
+    }
+  });
   try { window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme); } catch (e) {}
   /* A small IT | EN switch in the top bar of every screen (hidden while patient mode is locked). */
   function langToggle() {
@@ -1742,15 +1761,6 @@
       body += '<p class="instr">' + esc(T[lang].game.places || "Places & items") + '</p>' +
         '<p class="sub">' + esc(T[lang].pickExtra || "") + '</p>' +
         '<button class="primary" data-act="places-launch">' + esc(T[lang].game.places || "Start") + '</button>';
-      // Safe auto-start: schedule once after render, never during it
-      if (!st._placesStarted && window.POG && window.POG.places && window.POG.places.start) {
-        st._placesStarted = true;
-        setTimeout(function () {
-          if (S && cur() === st && screen === "item" && window.POG.places && window.POG.places.start) {
-            window.POG.places.start();
-          }
-        }, 50);
-      }
     } else if (st.game === "name" && st.lv <= 2) {
       var w = st.data[lang], h = "";
       if (S.support >= 1) h += '<div class="hint"><b>1</b><span>' + esc(w[1]) + '</span></div>';

@@ -53,9 +53,9 @@
   var GAMES = ["describe", "mystery", "crossword", "name", "wordbuild", "script", "read", "echo", "seq"];
   var MAXLV = { describe: 3, mystery: 4, crossword: 4, name: 4, wordbuild: 4, script: 3, read: 4, echo: 3, seq: 3 };
   var PLACE_N = { describe: 1, mystery: 2, crossword: 2, name: 2, wordbuild: 2, script: 2, read: 1, echo: 2, seq: 1 };
-  var EXTRAS = ["maze", "calc", "path", "places"];
+  var EXTRAS = ["maze", "calc", "path"];
   /* Every game a session can include, in session order (hardest first, sequences always last). */
-  var ORDER = ["describe", "mystery", "crossword", "wordbuild", "name", "script", "read", "echo", "maze", "calc", "path", "places", "seq"];
+  var ORDER = ["describe", "mystery", "crossword", "wordbuild", "name", "script", "read", "echo", "maze", "calc", "path", "seq"];
   var RULE = { down: 0.6, downN: 3, up: 0.9, upN: 5, flag: 0.4, place: 0.6 };
 
   var T = window.POG.strings, C = window.POG.content;
@@ -193,7 +193,6 @@
     return { levels: lv, auto: s.auto !== false, allowUp: s.allowUp !== false, maze: s.maze === true, mazeSize: size,
       calc: s.calc === true, calcLevel: [1, 2, 3].indexOf(+s.calcLevel) >= 0 ? +s.calcLevel : 1,
       path: s.path === true, pathSize: [4, 5].indexOf(+s.pathSize) >= 0 ? +s.pathSize : 4,
-      places: s.places === true,
       record: s.record === true, consentAt: s.consentAt || null, recordConcurrent: s.recordConcurrent == null ? !isMobile() : !!s.recordConcurrent,
       patientMode: s.patientMode === true };
   }
@@ -697,7 +696,6 @@
     if (set.maze) list.push("maze");
     if (set.calc) list.push("calc");
     if (set.path) list.push("path");
-    if (set.places) list.push("places");
     list.push("seq");
     return { day: day, list: list, set: set };
   }
@@ -707,7 +705,6 @@
       if (g === "maze") { steps.push({ game: "maze", lv: null, data: { n: tp.set.mazeSize } }); return; }
       if (g === "calc") { makeCalc(tp.set.calcLevel, 5).forEach(function (q) { steps.push({ game: "calc", lv: null, data: q }); }); return; }
       if (g === "path") { steps.push({ game: "path", lv: null, data: makePath(tp.set.pathSize, d) }); return; }
-      if (g === "places") { steps.push({ game: "places", lv: null, data: {} }); return; }
       var n = { describe: 1, mystery: 2, crossword: 10, wordbuild: 3, name: 4, script: 2, read: 4, echo: 2, seq: 1 }[g];
       steps = steps.concat(makeSteps(g, L[g], n, d));
     });
@@ -1702,7 +1699,6 @@
       '<div class="setrow"><label for="set-clevel">' + esc(t.calcLevel) + '</label><select id="set-clevel">' +
       [1, 2, 3].map(function (n) { return '<option value="' + n + '"' + (set.calcLevel === n ? ' selected' : '') + '>' + esc(t.calcLevels[n]) + '</option>'; }).join("") + '</select></div>' +
       '<label class="check"><input type="checkbox" id="set-path"' + (set.path ? ' checked' : '') + '>' + esc(t.pathOn) + '</label>' +
-      '<label class="check"><input type="checkbox" id="set-places"' + (set.places ? ' checked' : '') + '>' + esc(t.placesOn || "Places & items") + '</label>' +
       '<div class="setrow"><label for="set-psize">' + esc(t.pathSize) + '</label><select id="set-psize">' +
       [4, 5].map(function (n) { return '<option value="' + n + '"' + (set.pathSize === n ? ' selected' : '') + '>' + esc(t.pathSizes[n]) + '</option>'; }).join("") + '</select></div>' +
       '</div>' +
@@ -1737,9 +1733,6 @@
       body += viewCalc(st);
     } else if (st.game === "path") {
       body += viewPath(st);
-    } else if (st.game === "places") {
-      if (window.POG && window.POG.places && window.POG.places.start) window.POG.places.start();
-      body += '<p class="note">Places & items</p>';
     } else if (st.game === "name" && st.lv <= 2) {
       var w = st.data[lang], h = "";
       if (S.support >= 1) h += '<div class="hint"><b>1</b><span>' + esc(w[1]) + '</span></div>';
@@ -2298,7 +2291,6 @@
       set.calcLevel = +document.getElementById("set-clevel").value;
       set.path = document.getElementById("set-path").checked;
       set.pathSize = +document.getElementById("set-psize").value;
-      set.places = document.getElementById("set-places").checked;
       var conc = document.getElementById("set-conc"); if (conc) set.recordConcurrent = conc.checked;
       var pm = document.getElementById("set-patient"), wantPatient = !!(pm && pm.checked);
       if (wantPatient && !load("pin")) {
@@ -2315,7 +2307,7 @@
       var which = confirmAsk; confirmAsk = "";
       if (which === "reset") {
         var s0 = getSettings();
-        save("history", {}); save("settings", { auto: s0.auto, allowUp: s0.allowUp, maze: s0.maze, mazeSize: s0.mazeSize, calc: s0.calc, calcLevel: s0.calcLevel, path: s0.path, pathSize: s0.pathSize, places: s0.places, record: s0.record, consentAt: s0.consentAt, recordConcurrent: s0.recordConcurrent });
+        save("history", {}); save("settings", { auto: s0.auto, allowUp: s0.allowUp, maze: s0.maze, mazeSize: s0.mazeSize, calc: s0.calc, calcLevel: s0.calcLevel, path: s0.path, pathSize: s0.pathSize, record: s0.record, consentAt: s0.consentAt, recordConcurrent: s0.recordConcurrent });
         flash = t.resetDone; render(); return;
       }
       save("placement", { status: "in_progress", levels: {}, flags: [] });

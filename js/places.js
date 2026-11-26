@@ -305,7 +305,7 @@
       '<h1 class="instr">' + esc(item.prompt) + '</h1>' +
       countBadge +
       '<div class="fl-entry">' +
-      '<input id="pl-input" type="text" autocomplete="off" value="' + esc(st.draft) + '" placeholder="' + esc(t.inputPh) + '" aria-label="' + esc(t.inputPh) + '">' +
+      '<input id="pl-input" type="text" enterkeyhint="done" autocomplete="off" value="' + esc(st.draft) + '" placeholder="' + esc(t.inputPh) + '" aria-label="' + esc(t.inputPh) + '">' +
       '<button type="button" class="secondary" data-act="pl-add">' + esc(t.addBtn) + '</button>' +
       '<button type="button" class="secondary" data-act="pl-tally">' + esc(t.tallyBtn) + '</button>' +
       '</div>' +
@@ -380,12 +380,15 @@
         V.st.draft = e.target.value;
       }
     });
-    document.addEventListener("keydown", function (e) {
-      if (api.screen() === "places" && V && V.st && !V.done && e.target && e.target.id === "pl-input" && e.key === "Enter") {
-        e.preventDefault();
-        A["pl-add"]();
-      }
-    });
+    function onPlacesEnter(e) {
+      if (api.screen() !== "places" || !V || !V.st || V.done) return;
+      if (!e.target || e.target.id !== "pl-input") return;
+      if (e.key !== "Enter" && e.keyCode !== 13) return;
+      e.preventDefault();
+      A["pl-add"]();
+    }
+    document.addEventListener("keydown", onPlacesEnter);
+    document.addEventListener("keypress", onPlacesEnter);
   }
 
   window.addEventListener("pog:languagechange", function () {

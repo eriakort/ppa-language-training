@@ -1742,6 +1742,15 @@
       body += '<p class="instr">' + esc(T[lang].game.places || "Places & items") + '</p>' +
         '<p class="sub">' + esc(T[lang].pickExtra || "") + '</p>' +
         '<button class="primary" data-act="places-launch">' + esc(T[lang].game.places || "Start") + '</button>';
+      // Safe auto-start: schedule once after render, never during it
+      if (!st._placesStarted && window.POG && window.POG.places && window.POG.places.start) {
+        st._placesStarted = true;
+        setTimeout(function () {
+          if (S && cur() === st && screen === "item" && window.POG.places && window.POG.places.start) {
+            window.POG.places.start();
+          }
+        }, 50);
+      }
     } else if (st.game === "name" && st.lv <= 2) {
       var w = st.data[lang], h = "";
       if (S.support >= 1) h += '<div class="hint"><b>1</b><span>' + esc(w[1]) + '</span></div>';

@@ -27,6 +27,7 @@
       stop: "Termina",
       listen: "🔊 Ascolta consegna",
       hint: "💡 Suggerimento",
+      hintText: "Pensa alle cose tipiche: mobili, utensili, oggetti di uso quotidiano.",
       inputPh: "Scrivi un oggetto…",
       addBtn: "Aggiungi",
       tallyBtn: "+1 Detto a voce",
@@ -57,6 +58,7 @@
       stop: "Stop",
       listen: "🔊 Hear prompt",
       hint: "💡 Hint",
+      hintText: "Think of typical things: furniture, tools, everyday objects.",
       inputPh: "Type an item…",
       addBtn: "Add",
       tallyBtn: "+1 Said aloud",
@@ -295,7 +297,7 @@
         }).join("") + '</div>'
       : '';
 
-    var cueHtml = st.hintShown ? '<div class="hint"><b>1</b><span>' + esc("Pensa alle cose tipiche: mobili, utensili, oggetti di uso quotidiano.") + '</span></div>' : '';
+    var cueHtml = st.hintShown ? '<div class="hint"><b>1</b><span>' + esc(t.hintText) + '</span></div>' : '';
 
     return bar + '<section class="card">' +
       '<p class="tag">' + esc(api.fill(t.lvTag, { n: V.lv })) + ' · ' + esc(item.place) + '</p>' +

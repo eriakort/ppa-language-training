@@ -28,9 +28,6 @@
       listen: "🔊 Ascolta consegna",
       hint: "💡 Suggerimento",
       hintText: "Pensa alle cose tipiche: mobili, utensili, oggetti di uso quotidiano.",
-      scaffoldBtn: "🪜 Mostra alcuni oggetti",
-      scaffoldAll: "Tutti i suggerimenti aperti",
-      clearBtn: "Pulisci tutto",
       inputPh: "Scrivi un oggetto…",
       addBtn: "Aggiungi",
       tallyBtn: "+1 Detto a voce",
@@ -62,9 +59,6 @@
       listen: "🔊 Hear prompt",
       hint: "💡 Hint",
       hintText: "Think of typical things: furniture, tools, everyday objects.",
-      scaffoldBtn: "🪜 Show some items",
-      scaffoldAll: "All starters shown",
-      clearBtn: "Clear all",
       inputPh: "Type an item…",
       addBtn: "Add",
       tallyBtn: "+1 Said aloud",
@@ -167,10 +161,6 @@
       nudge: ""
     };
   }
-  function getScaffoldItems(item, count) {
-    var items = (item.items || []).slice(0, Math.max(0, count));
-    return items.map(function (it) { return it.canonical; });
-  }
 
   function recordStep(st) {
     var item = st.item;
@@ -180,7 +170,7 @@
     var independent = produced > 0 && !assisted;
     var score = produced === 0
       ? 0
-      : Math.round(Math.max(0.4, Math.min(1, ratio - st.scaffolds * 0.05 - (st.hintShown ? 0.03 : 0))) * 100) / 100;
+      : Math.round(Math.max(0.35, Math.min(1, ratio - st.scaffolds * 0.08 - (st.hintShown ? 0.05 : 0))) * 100) / 100;
     var result = produced === 0 ? "model" : (independent && produced >= item.softGoal ? "good" : "almost");
     V.log.push({
       game: "places",
@@ -324,14 +314,8 @@
       '<div class="tools">' +
       '<button type="button" class="tool" data-act="pl-say">' + esc(t.listen) + '</button>' +
       '<button type="button" class="tool" data-act="pl-hint"' + (st.hintShown ? ' disabled' : '') + '>' + esc(t.hint) + '</button>' +
-      '<button type="button" class="tool" data-act="pl-scaffold"' + (st.scaffolds >= 3 ? ' disabled' : '') + '>' + esc(st.scaffolds >= 3 ? t.scaffoldAll : t.scaffoldBtn) + '</button>' +
-      '<button type="button" class="tool" data-act="pl-clear"' + (st.words.length === 0 ? ' disabled' : '') + '>' + esc(t.clearBtn) + '</button>' +
       '</div>' +
       cueHtml +
-      (st.scaffolds > 0 ? '<div class="fl-scaffolds">' + getScaffoldItems(item, st.scaffolds * 2).map(function (w) {
-        var used = !!st.seen[normalizeWord(w)];
-        return '<button type="button" class="var-tile fl-chip' + (used ? ' ok' : '') + '" data-act="pl-chip" data-w="' + esc(w) + '"' + (used ? ' disabled' : '') + '>' + esc(w) + '</button>';
-      }).join("") + '</div>' : '') +
       '<button type="button" class="primary" data-act="pl-next">' + esc(V.i + 1 < V.steps.length ? t.next : t.done) + '</button>' +
       '</section>';
   }
@@ -350,24 +334,6 @@
   A["pl-back"] = function () { stopVoice(); V = null; api.go("home"); };
   A["pl-say"] = function () { if (V && V.st && V.st.item) api.speak(V.st.item.prompt); };
   A["pl-hint"] = function () { if (!V || !V.st || V.done) return; V.st.hintShown = true; api.render(); };
-  A["pl-scaffold"] = function () {
-    if (!V || !V.st || V.done) return;
-    if (V.st.scaffolds < 3) V.st.scaffolds++;
-    api.render();
-  };
-  A["pl-clear"] = function () {
-    if (!V || !V.st || V.done) return;
-    V.st.words = [];
-    V.st.seen = {};
-    V.st.nudge = "";
-    api.render();
-  };
-  A["pl-chip"] = function (b) {
-    if (!V || !V.st || V.done) return;
-    var w = b.getAttribute("data-w");
-    if (addWordValue(w)) api.speak(w);
-    api.render();
-  };
 
   A["pl-add"] = function () {
     if (!V || !V.st || V.done) return;
@@ -431,6 +397,7 @@
     label: function () { return T().btn; },
     desc: function () { return T().desc; },
     level: getLevel,
-    start: startDrill
+    start: startDrill,
+    listSessions: listSessions
   };
 })();
